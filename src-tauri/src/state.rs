@@ -80,6 +80,8 @@ pub struct AppState {
     pub data_dir: PathBuf,
     /// Traffic, latency and security monitoring (bounded queue + writer).
     pub monitor: crate::services::monitor::Monitor,
+    /// The sandbox (analyzer mode) engine, in its own `sandbox.db`.
+    pub sandbox: crate::sandbox::Sandbox,
 }
 
 pub struct OpenOptions {
@@ -120,12 +122,31 @@ impl AppState {
             .connect_timeout(Duration::from_secs(10))
             .pool_idle_timeout(Duration::from_secs(90))
             .build()?;
-        Ok(Arc::new(Self {
+        let sandbox_db = Arc::new(crate::sandbox::SandboxDb::open(
+            &data_dir.join("sandbox.db"),
+        )?);
+        crate::security::fsperm::restrict_db_files(&data_dir.join("sandbox.db"))?;
+        let symbols = opts.brokers.symbols();
+        let sandbox_bus = bus.clone();
+        let sandbox_clock = opts.clock.clone();
+        let ctx = Arc::new_cyclic(|me: &std::sync::Weak<Self>| Self {
+            sandbox: crate::sandbox::Sandbox::with_db(
+                sandbox_db,
+                crate::sandbox::SandboxDeps {
+                    symbols: Arc::new(crate::services::sandbox_feed::MasterSymbols(
+                        symbols.clone(),
+                    )),
+                    quotes: Arc::new(crate::services::sandbox_feed::LiveQuotes::new(me.clone())),
+                    clock: sandbox_clock,
+                    bus: Some(sandbox_bus),
+                },
+                crate::sandbox::SandboxOptions::default(),
+            ),
             sqlite,
             logs,
             duckdb,
             security,
-            symbols: opts.brokers.symbols(),
+            symbols,
             brokers: opts.brokers,
             websocket: Arc::new(WebSocketManager::new()),
             bus,
@@ -142,7 +163,12 @@ impl AppState {
             tasks: Mutex::new(JoinSet::new()),
             data_dir: data_dir.to_path_buf(),
             monitor: crate::services::monitor::Monitor::new(),
-        }))
+        });
+        // Analyzer mode survives restarts: resume the sandbox engine.
+        if ctx.sqlite.get_analyze_mode().unwrap_or(false) {
+            crate::services::analyzer_service::AnalyzerService::spawn_engine_transition(&ctx, true);
+        }
+        Ok(ctx)
     }
 
     /// Production defaults: OS keychain, system clock, every broker adapter.
@@ -176,6 +202,7 @@ impl AppState {
     /// close the market feed.
     pub async fn shutdown(&self) {
         self.shutdown.cancel();
+        self.sandbox.shutdown().await;
         self.bus.shutdown(Duration::from_secs(2)).await;
         let mut tasks = std::mem::take(&mut *self.tasks.lock());
         tasks.abort_all();
