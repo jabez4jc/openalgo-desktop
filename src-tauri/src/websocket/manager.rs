@@ -421,6 +421,7 @@ impl WebSocketManager {
         *self.sender.write() = None;
         *self.broker_id.write() = None;
         self.subscriptions.write().clear();
+        self.token_map.write().clear();
         Ok(())
     }
 
