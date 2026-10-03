@@ -1,10 +1,13 @@
-//! Symbol Service
+//! Symbol master service: download, persist, load, search, expiries.
 //!
-//! Handles symbol search, lookup, and master contract operations.
-//! Called by both Tauri commands and REST API.
+//! The master lives in one place at runtime, the shared `SymbolResolver`
+//! (`state.symbols`, also held by every broker adapter). SQLite is only the
+//! cache that survives a restart.
 
+use crate::brokers::common::symbols::{ContractQuery, SymToken};
+use crate::brokers::types::AuthToken;
 use crate::error::{AppError, Result};
-use crate::state::{AppState, SymbolInfo};
+use crate::state::AppState;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
@@ -12,14 +15,34 @@ use tracing::info;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SymbolSearchResult {
     pub symbol: String,
+    pub brsymbol: String,
     pub token: String,
     pub exchange: String,
+    pub brexchange: String,
     pub name: String,
     pub instrument_type: String,
     pub lot_size: i32,
     pub tick_size: f64,
     pub strike: Option<f64>,
     pub expiry: Option<String>,
+}
+
+impl From<SymToken> for SymbolSearchResult {
+    fn from(s: SymToken) -> Self {
+        Self {
+            strike: Some(s.strike),
+            expiry: Some(s.expiry),
+            symbol: s.symbol,
+            brsymbol: s.brsymbol,
+            token: s.token,
+            exchange: s.exchange,
+            brexchange: s.brexchange,
+            name: s.name,
+            instrument_type: s.instrument_type,
+            lot_size: s.lot_size,
+            tick_size: s.tick_size,
+        }
+    }
 }
 
 /// Expiry dates result
@@ -29,235 +52,145 @@ pub struct ExpiryResult {
     pub expiry_dates: Vec<String>,
 }
 
-/// Symbol service for business logic
 pub struct SymbolService;
 
 impl SymbolService {
-    /// Search symbols by query
+    /// Search: symbols starting with the query first (sorted), then symbols
+    /// or names containing it, up to `limit`.
     pub fn search_symbols(
         state: &AppState,
         query: &str,
         exchange: Option<&str>,
         limit: Option<usize>,
     ) -> Result<Vec<SymbolSearchResult>> {
-        info!("SymbolService::search_symbols - query={}", query);
-
         let limit = limit.unwrap_or(50);
-        let query_lower = query.to_lowercase();
-
-        let results: Vec<SymbolSearchResult> = state
-            .symbol_cache
-            .iter()
-            .filter(|entry| {
-                let symbol = entry.value();
-                let matches_query = symbol.symbol.to_lowercase().contains(&query_lower)
-                    || symbol.name.to_lowercase().contains(&query_lower);
-
-                let matches_exchange = exchange
-                    .map(|e| symbol.exchange.eq_ignore_ascii_case(e))
-                    .unwrap_or(true);
-
-                matches_query && matches_exchange
-            })
-            .take(limit)
-            .map(|entry| {
-                let s = entry.value();
-                SymbolSearchResult {
-                    symbol: s.symbol.clone(),
-                    token: s.token.clone(),
-                    exchange: s.exchange.clone(),
-                    name: s.name.clone(),
-                    instrument_type: s.instrument_type.clone(),
-                    lot_size: s.lot_size,
-                    tick_size: s.tick_size,
-                    strike: None, // Not available in SymbolInfo
-                    expiry: None, // Not available in SymbolInfo
+        let snap = state.symbols.snapshot();
+        let mut out: Vec<&SymToken> = snap.search_prefix(query, exchange, limit);
+        if out.len() < limit {
+            let q = query.to_lowercase();
+            for s in snap.rows() {
+                if out.len() >= limit {
+                    break;
                 }
-            })
-            .collect();
-
-        Ok(results)
+                if exchange.is_some_and(|e| !s.exchange.eq_ignore_ascii_case(e)) {
+                    continue;
+                }
+                let hit =
+                    s.symbol.to_lowercase().contains(&q) || s.name.to_lowercase().contains(&q);
+                if hit && !out.iter().any(|o| std::ptr::eq(*o, s)) {
+                    out.push(s);
+                }
+            }
+        }
+        Ok(out.into_iter().cloned().map(Into::into).collect())
     }
 
-    /// Get symbol info by exchange and symbol name
     pub fn get_symbol_info(
         state: &AppState,
         exchange: &str,
         symbol: &str,
     ) -> Result<SymbolSearchResult> {
         state
-            .get_symbol_by_name(exchange, symbol)
-            .map(|s| SymbolSearchResult {
-                symbol: s.symbol,
-                token: s.token,
-                exchange: s.exchange,
-                name: s.name,
-                instrument_type: s.instrument_type,
-                lot_size: s.lot_size,
-                tick_size: s.tick_size,
-                strike: None,
-                expiry: None,
-            })
+            .symbols
+            .by_symbol(exchange, symbol)
+            .map(Into::into)
             .ok_or_else(|| AppError::NotFound(format!("Symbol not found: {} {}", exchange, symbol)))
     }
 
-    /// Get symbol info by exchange and token
     pub fn get_symbol_by_token(
         state: &AppState,
         exchange: &str,
         token: &str,
     ) -> Result<SymbolSearchResult> {
         state
-            .get_symbol_by_token(exchange, token)
-            .map(|s| SymbolSearchResult {
-                symbol: s.symbol,
-                token: s.token,
-                exchange: s.exchange,
-                name: s.name,
-                instrument_type: s.instrument_type,
-                lot_size: s.lot_size,
-                tick_size: s.tick_size,
-                strike: None,
-                expiry: None,
-            })
+            .symbols
+            .by_token(exchange, token)
+            .map(Into::into)
             .ok_or_else(|| AppError::NotFound(format!("Token not found: {} {}", exchange, token)))
     }
 
-    /// Get total symbol count
     pub fn get_symbol_count(state: &AppState) -> usize {
-        state.symbol_count()
+        state.symbols.len()
     }
 
-    /// Get all instruments for an exchange
+    /// Every instrument (optionally one exchange).
     pub fn get_instruments(state: &AppState, exchange: Option<&str>) -> Vec<SymbolSearchResult> {
         state
-            .symbol_cache
+            .symbols
+            .snapshot()
+            .rows()
             .iter()
-            .filter(|entry| {
-                exchange
-                    .map(|e| entry.value().exchange.eq_ignore_ascii_case(e))
-                    .unwrap_or(true)
-            })
-            .map(|entry| {
-                let s = entry.value();
-                SymbolSearchResult {
-                    symbol: s.symbol.clone(),
-                    token: s.token.clone(),
-                    exchange: s.exchange.clone(),
-                    name: s.name.clone(),
-                    instrument_type: s.instrument_type.clone(),
-                    lot_size: s.lot_size,
-                    tick_size: s.tick_size,
-                    strike: None,
-                    expiry: None,
-                }
-            })
+            .filter(|s| exchange.is_none_or(|e| s.exchange.eq_ignore_ascii_case(e)))
+            .cloned()
+            .map(Into::into)
             .collect()
     }
 
-    /// Get expiry dates for a symbol (for derivatives)
+    /// Expiries of an underlying from the `expiry` column (`DD-MMM-YY`),
+    /// earliest first. `instrument_type` is the web's `futures` / `options`
+    /// or an exact `FUT` / `CE` / `PE`.
     pub fn get_expiry_dates(
         state: &AppState,
         symbol: &str,
         exchange: &str,
         instrument_type: &str,
     ) -> Result<ExpiryResult> {
-        info!(
-            "SymbolService::get_expiry_dates - {} {} {}",
-            symbol, exchange, instrument_type
-        );
-
-        // Filter symbols to find expiries
-        let mut expiry_dates: Vec<String> = state
-            .symbol_cache
+        let types: &[&str] = match instrument_type.to_ascii_lowercase().as_str() {
+            "futures" | "fut" => &["FUT"],
+            "options" => &["CE", "PE"],
+            "ce" => &["CE"],
+            "pe" => &["PE"],
+            _ => &["FUT", "CE", "PE"],
+        };
+        let snap = state.symbols.snapshot();
+        let mut dated: Vec<(chrono::NaiveDate, String)> = types
             .iter()
-            .filter(|entry| {
-                let s = entry.value();
-                s.exchange.eq_ignore_ascii_case(exchange)
-                    && s.symbol.starts_with(symbol)
-                    && s.instrument_type.eq_ignore_ascii_case(instrument_type)
-            })
-            .filter_map(|entry| {
-                // Extract expiry from symbol name (broker-specific parsing)
-                // This is a simplified version - actual implementation depends on symbol format
-                let s = entry.value();
-                Self::extract_expiry_from_symbol(&s.symbol, symbol)
+            .flat_map(|t| snap.expiries(exchange, symbol, Some(t)))
+            .filter_map(|e| {
+                crate::brokers::common::master_contract::parse_oa_expiry(&e).map(|d| (d, e))
             })
             .collect();
-
-        expiry_dates.sort();
-        expiry_dates.dedup();
-
+        dated.sort();
+        dated.dedup();
         Ok(ExpiryResult {
             success: true,
-            expiry_dates,
+            expiry_dates: dated.into_iter().map(|(_, e)| e).collect(),
         })
     }
 
-    /// Refresh symbol master from broker
-    pub async fn refresh_symbol_master(state: &AppState) -> Result<usize> {
-        info!("SymbolService::refresh_symbol_master");
-
-        let session = state
-            .get_broker_session()
-            .ok_or_else(|| AppError::Auth("Broker not connected".to_string()))?;
-
-        let broker = state
-            .brokers
-            .get(&session.broker_id)
-            .ok_or_else(|| AppError::Broker("Broker not found".to_string()))?;
-
-        // Download master contract from broker
-        let symbols = broker
-            .download_master_contract(session.auth_token.expose())
-            .await?;
-
-        // Convert to SymbolInfo
-        let symbol_infos: Vec<SymbolInfo> = symbols
-            .into_iter()
-            .map(|s| SymbolInfo {
-                symbol: s.symbol,
-                token: s.token,
-                exchange: s.exchange,
-                name: s.name,
-                lot_size: s.lot_size,
-                tick_size: s.tick_size,
-                instrument_type: s.instrument_type,
-                brsymbol: s.brsymbol,
-                brexchange: s.brexchange,
-            })
-            .collect();
-
-        let count = symbol_infos.len();
-
-        // Store in database
-        state.sqlite.store_symbols(&symbol_infos)?;
-
-        // Update cache
-        state.load_symbol_cache(symbol_infos);
-
-        info!("Loaded {} symbols", count);
-
-        Ok(count)
+    /// Contracts of an underlying (option-chain building block).
+    pub fn contracts(state: &AppState, q: &ContractQuery<'_>) -> Vec<SymToken> {
+        state.symbols.contracts(q)
     }
 
-    // ========================================================================
-    // Private Helper Methods
-    // ========================================================================
+    /// Load the persisted master into memory (start-up / broker resume).
+    pub fn load_from_db(state: &AppState) -> Result<usize> {
+        let rows = state.sqlite.load_symbols()?;
+        Ok(state.symbols.load(rows))
+    }
 
-    /// Extract expiry date from symbol name
-    /// This is broker-specific and simplified
-    fn extract_expiry_from_symbol(full_symbol: &str, base_symbol: &str) -> Option<String> {
-        // Remove base symbol to get suffix
-        let suffix = full_symbol.strip_prefix(base_symbol)?;
-
-        // Try to parse date patterns like "24JAN", "24FEB", "24D25" etc.
-        // This is a simplified implementation
-        if suffix.len() >= 5 {
-            // Might be in format like "24JAN25" or "24D25"
-            Some(suffix[..5].to_string())
-        } else {
-            None
+    /// Download the master from the connected broker, persist it, and swap
+    /// it in as the new in-memory generation.
+    pub async fn refresh_symbol_master(state: &AppState) -> Result<usize> {
+        info!("Downloading the master contract");
+        let session = state.get_broker_session().ok_or_else(|| {
+            AppError::Auth("Log in to your broker to download the master contract.".into())
+        })?;
+        let broker = state.brokers.get(&session.broker_id).ok_or_else(|| {
+            AppError::Broker("This broker is not available in this version.".into())
+        })?;
+        let auth = AuthToken::new(session.auth_token.expose())
+            .with_feed(session.feed_token.as_ref().map(|t| t.expose().to_string()));
+        // No database connection is held across the download.
+        let rows = broker.download_master_contract(&auth).await?;
+        if rows.is_empty() {
+            return Err(AppError::Broker(
+                "The broker returned an empty instrument list. Try again later.".into(),
+            ));
         }
+        state.sqlite.store_symbols(&rows)?;
+        let n = state.symbols.load(rows);
+        info!("Master contract loaded: {} instruments", n);
+        Ok(n)
     }
 }

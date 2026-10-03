@@ -21,7 +21,6 @@ use crate::services::apikey_service::ApiKeyCache;
 use crate::session::web::WebSessionStore;
 use crate::websocket::WebSocketManager;
 use chrono::{DateTime, Utc};
-use dashmap::DashMap;
 use parking_lot::{Mutex, RwLock};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -42,21 +41,9 @@ pub struct BrokerSession {
     pub authenticated_at: DateTime<Utc>,
 }
 
-/// Symbol cache entry
-#[derive(Debug, Clone)]
-pub struct SymbolInfo {
-    pub symbol: String,
-    pub token: String,
-    pub exchange: String,
-    pub name: String,
-    pub lot_size: i32,
-    pub tick_size: f64,
-    pub instrument_type: String,
-    /// Broker's original symbol format (e.g., "NSE:RELIANCE-EQ" for Fyers)
-    pub brsymbol: Option<String>,
-    /// Broker's exchange code
-    pub brexchange: Option<String>,
-}
+/// Symbol master row (every web `SymToken` column).
+pub use crate::brokers::common::symbols::SymToken as SymbolInfo;
+use crate::brokers::common::symbols::SymbolResolver;
 
 /// State of the HTTP listener, shown to the trader when it is not running.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
@@ -88,8 +75,8 @@ pub struct AppState {
     pub http: reqwest::Client,
     pub shutdown: CancellationToken,
     tasks: Mutex<JoinSet<()>>,
-    pub symbol_cache: DashMap<String, SymbolInfo>,
-    pub symbol_reverse_cache: DashMap<String, String>,
+    /// The symbol master, shared with every broker adapter in `brokers`.
+    pub symbols: SymbolResolver,
     pub data_dir: PathBuf,
 }
 
@@ -136,6 +123,7 @@ impl AppState {
             logs,
             duckdb,
             security,
+            symbols: opts.brokers.symbols(),
             brokers: opts.brokers,
             websocket: Arc::new(WebSocketManager::new()),
             bus,
@@ -150,8 +138,6 @@ impl AppState {
             http,
             shutdown: CancellationToken::new(),
             tasks: Mutex::new(JoinSet::new()),
-            symbol_cache: DashMap::new(),
-            symbol_reverse_cache: DashMap::new(),
             data_dir: data_dir.to_path_buf(),
         }))
     }
@@ -253,67 +239,48 @@ impl AppState {
         self.sessions.signed_in_user()
     }
 
-    /// Get symbol info by exchange:token (O(1) lookup)
+    /// Master row by exchange and broker token.
     pub fn get_symbol_by_token(&self, exchange: &str, token: &str) -> Option<SymbolInfo> {
-        let key = format!("{}:{}", exchange, token);
-        self.symbol_cache.get(&key).map(|r| r.clone())
+        self.symbols.by_token(exchange, token)
     }
 
-    /// Get symbol info by exchange:symbol (O(1) lookup)
+    /// Master row by exchange and OpenAlgo symbol.
     pub fn get_symbol_by_name(&self, exchange: &str, symbol: &str) -> Option<SymbolInfo> {
-        let reverse_key = format!("{}:{}", exchange, symbol);
-        self.symbol_reverse_cache
-            .get(&reverse_key)
-            .and_then(|token_ref| {
-                let token = token_ref.value();
-                let cache_key = format!("{}:{}", exchange, token);
-                self.symbol_cache.get(&cache_key).map(|r| r.clone())
-            })
+        self.symbols.by_symbol(exchange, symbol)
     }
 
-    /// Get token by exchange:symbol (O(1) lookup)
+    /// Broker token by exchange and OpenAlgo symbol.
     pub fn get_token_by_symbol(&self, exchange: &str, symbol: &str) -> Option<String> {
-        let key = format!("{}:{}", exchange, symbol);
-        self.symbol_reverse_cache.get(&key).map(|r| r.clone())
+        self.symbols.token(symbol, exchange)
     }
 
-    /// Check if symbol exists (O(1) lookup)
     pub fn symbol_exists(&self, exchange: &str, symbol: &str) -> bool {
-        let key = format!("{}:{}", exchange, symbol);
-        self.symbol_reverse_cache.contains_key(&key)
+        self.symbols.by_symbol(exchange, symbol).is_some()
     }
 
-    /// Get total number of symbols in cache
+    /// Instruments in the loaded master.
     pub fn symbol_count(&self) -> usize {
-        self.symbol_cache.len()
+        self.symbols.len()
     }
 
-    /// Replace the symbol cache (bounded by the master contract size; cleared
-    /// on logout).
+    /// Replace the master with a new generation (bounded by its size).
     pub fn load_symbol_cache(&self, symbols: Vec<SymbolInfo>) {
-        self.symbol_cache.clear();
-        self.symbol_reverse_cache.clear();
-        for symbol in symbols {
-            let cache_key = format!("{}:{}", symbol.exchange, symbol.token);
-            let reverse_key = format!("{}:{}", symbol.exchange, symbol.symbol);
-            self.symbol_reverse_cache
-                .insert(reverse_key, symbol.token.clone());
-            self.symbol_cache.insert(cache_key, symbol);
-        }
-        tracing::info!("Loaded {} symbols into cache", self.symbol_cache.len());
+        self.symbols.load(symbols);
     }
 
+    /// Drop the master (logout).
     pub fn clear_symbol_cache(&self) {
-        self.symbol_cache.clear();
-        self.symbol_reverse_cache.clear();
+        self.symbols.clear();
     }
 
-    /// Get all symbols for a specific exchange
+    /// Every instrument on one exchange.
     pub fn get_symbols_by_exchange(&self, exchange: &str) -> Vec<SymbolInfo> {
-        self.symbol_cache
+        self.symbols
+            .snapshot()
+            .rows()
             .iter()
-            .filter(|entry| entry.value().exchange.eq_ignore_ascii_case(exchange))
-            .map(|entry| entry.value().clone())
+            .filter(|s| s.exchange.eq_ignore_ascii_case(exchange))
+            .cloned()
             .collect()
     }
 }
