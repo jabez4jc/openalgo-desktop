@@ -4,6 +4,8 @@ version = "1.0.0"
 description = "OpenAlgo Desktop - Algorithmic Trading Platform"
 authors = ["OpenAlgo"]
 edition = "2021"
+license = "AGPL-3.0-only"
+publish = false
 rust-version = "1.92"
 
 [lib]

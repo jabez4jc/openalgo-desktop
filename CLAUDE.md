@@ -90,6 +90,10 @@ convention) carry over from web to desktop untouched. Both ports, the bind host
 and the LAN toggle are changeable in-app. Loopback is the default bind; binding
 beyond loopback is an explicit user choice.
 
+Debug builds always use the development ports. A release build uses them only
+when `OPENALGO_DESKTOP_DEV_PORTS=1` is set; that is the only environment
+variable the app reads, and it never carries a secret.
+
 A port already in use (macOS AirPlay holds 5000 on many Macs) must be reported
 to the user in the app with the fix, never only logged.
 
