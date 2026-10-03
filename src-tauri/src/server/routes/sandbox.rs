@@ -47,7 +47,7 @@ fn ser<T: serde::Serialize>(v: &T) -> Response {
 /// GET /sandbox/api/configs
 pub async fn configs(State(ctx): Ctx) -> Response {
     match ctx.sandbox.configs().await {
-        Ok(c) => ok(json!({"status": "success", "configs": c})),
+        Ok(c) => ok(c),
         Err(e) => sandbox_error("load the sandbox settings", e),
     }
 }
