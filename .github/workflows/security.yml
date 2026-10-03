@@ -32,7 +32,7 @@ on:
       - .github/gitleaks.toml
       - .github/workflows/security.yml
   push:
-    branches: [main]
+    branches: [master]
     paths:
       - package.json
       - package-lock.json

@@ -14,9 +14,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
   workflow_dispatch:
 
 permissions:
@@ -330,7 +330,7 @@ jobs:
           shared-key: tauri-build-${{ matrix.name }}
           cache-on-failure: true
           # Release caches are large; only main refreshes them, PRs restore.
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          save-if: ${{ github.ref == 'refs/heads/master' }}
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
