@@ -81,6 +81,10 @@ anyhow = "1.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
+# Exact decimal money (sandbox engine)
+rust_decimal = { version = "1", default-features = false, features = ["std"] }
+rust_decimal_macros = "1"
+
 # Concurrency
 parking_lot = "0.12"
 dashmap = "6.0"
@@ -97,6 +101,7 @@ uuid = { version = "1.8", features = ["v4"] }
 
 [dev-dependencies]
 tempfile = "3.10"
+proptest = "1"
 tokio = { version = "1", features = ["full", "test-util"] }
 
 [features]
