@@ -27,6 +27,9 @@
 //! - `HistoryService` - Historical data
 
 pub mod analyzer_service;
+pub mod apikey_service;
+pub mod auth_service;
+pub mod broker_auth_service;
 pub mod funds_service;
 pub mod history_service;
 pub mod holdings_service;

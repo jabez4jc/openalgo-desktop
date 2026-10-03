@@ -68,6 +68,7 @@ pub fn get_orders(conn: &Connection) -> Result<Vec<SandboxOrder>> {
 }
 
 /// Place a sandbox order
+#[allow(clippy::too_many_arguments)]
 pub fn place_order(
     conn: &Connection,
     symbol: &str,

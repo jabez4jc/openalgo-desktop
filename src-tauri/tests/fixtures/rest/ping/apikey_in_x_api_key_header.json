@@ -1,0 +1,29 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/ping",
+    "headers": {
+      "Content-Type": "application/json",
+      "X-API-KEY": "<APIKEY>"
+    },
+    "body": {}
+  },
+  "response": {
+    "status_code": 400,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "77",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "message": {
+        "apikey": [
+          "Missing data for required field."
+        ]
+      },
+      "status": "error"
+    }
+  },
+  "note": "Header-only auth: server reads apikey from JSON body only (schema required=True)"
+}

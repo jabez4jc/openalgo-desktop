@@ -15,7 +15,33 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         [],
     )?;
 
-    // Run each migration
+    run_legacy_schema(conn)?;
+    run_rust_migration(conn, "037_users_email_totp", m037_users_email_totp)?;
+    run_rust_migration(conn, "038_auth_session_columns", m038_auth_session_columns)?;
+    run_rust_migration(conn, "039_api_keys_lookup", m039_api_keys_lookup)?;
+    run_rust_migration(conn, "040_pending_oauth", m040_pending_oauth)?;
+    run_rust_migration(conn, "041_server_settings", m041_server_settings)?;
+    run_rust_migration(
+        conn,
+        "042_broker_credentials_market",
+        m042_broker_credentials_market,
+    )?;
+
+    tracing::info!("Database migrations completed");
+    Ok(())
+}
+
+/// Migrations 001-036, the schema shipped before this version. Separate so
+/// migration tests can build a database exactly as an older build left it.
+pub fn run_legacy_schema(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS migrations (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            applied_at TEXT NOT NULL DEFAULT (datetime('now'))
+        )",
+        [],
+    )?;
     run_migration(conn, "001_users", CREATE_USERS_TABLE)?;
     run_migration(conn, "002_auth", CREATE_AUTH_TABLE)?;
     run_migration(conn, "003_api_keys", CREATE_API_KEYS_TABLE)?;
@@ -92,8 +118,183 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         "036_enable_webhook_default",
         ENABLE_WEBHOOK_BY_DEFAULT,
     )?;
+    Ok(())
+}
 
-    tracing::info!("Database migrations completed");
+/// Whether a migration has been recorded.
+pub fn is_applied(conn: &Connection, name: &str) -> Result<bool> {
+    Ok(conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM migrations WHERE name = ?)",
+        [name],
+        |row| row.get(0),
+    )?)
+}
+
+/// Record a migration as applied (used by data migrations run from Rust).
+pub fn mark_applied(conn: &Connection, name: &str) -> Result<()> {
+    conn.execute("INSERT OR IGNORE INTO migrations (name) VALUES (?)", [name])?;
+    Ok(())
+}
+
+/// Run a migration written in Rust, inside one transaction, once.
+fn run_rust_migration(
+    conn: &Connection,
+    name: &str,
+    f: fn(&Connection) -> Result<()>,
+) -> Result<()> {
+    if is_applied(conn, name)? {
+        return Ok(());
+    }
+    tracing::info!("Running migration: {}", name);
+    conn.execute_batch("BEGIN IMMEDIATE")?;
+    match f(conn).and_then(|_| mark_applied(conn, name)) {
+        Ok(()) => {
+            conn.execute_batch("COMMIT")?;
+            Ok(())
+        }
+        Err(e) => {
+            let _ = conn.execute_batch("ROLLBACK");
+            Err(e)
+        }
+    }
+}
+
+pub fn column_exists(conn: &Connection, table: &str, column: &str) -> Result<bool> {
+    let mut stmt = conn.prepare(&format!("PRAGMA table_info({})", table))?;
+    let names = stmt
+        .query_map([], |row| row.get::<_, String>(1))?
+        .collect::<std::result::Result<Vec<_>, _>>()?;
+    Ok(names.iter().any(|n| n == column))
+}
+
+/// `ALTER TABLE ADD COLUMN` only when the column is missing, so a migration
+/// re-run on a partially migrated database never fails.
+fn add_column(conn: &Connection, table: &str, column: &str, decl: &str) -> Result<()> {
+    if !column_exists(conn, table, column)? {
+        conn.execute_batch(&format!(
+            "ALTER TABLE {} ADD COLUMN {} {}",
+            table, column, decl
+        ))?;
+    }
+    Ok(())
+}
+
+fn m037_users_email_totp(conn: &Connection) -> Result<()> {
+    add_column(conn, "users", "email", "TEXT")?;
+    add_column(conn, "users", "totp_secret_encrypted", "TEXT")?;
+    add_column(conn, "users", "totp_nonce", "TEXT")?;
+    add_column(conn, "users", "totp_enabled", "INTEGER NOT NULL DEFAULT 0")?;
+    add_column(
+        conn,
+        "users",
+        "totp_required_for_login",
+        "INTEGER NOT NULL DEFAULT 0",
+    )?;
+    add_column(
+        conn,
+        "users",
+        "totp_required_for_password_reset",
+        "INTEGER NOT NULL DEFAULT 0",
+    )?;
+    add_column(
+        conn,
+        "users",
+        "totp_required_for_mcp",
+        "INTEGER NOT NULL DEFAULT 0",
+    )?;
+    Ok(())
+}
+
+fn m038_auth_session_columns(conn: &Connection) -> Result<()> {
+    add_column(conn, "auth", "user_id", "TEXT")?;
+    add_column(conn, "auth", "user_name", "TEXT")?;
+    add_column(conn, "auth", "authenticated_at", "TEXT")?;
+    add_column(conn, "auth", "is_revoked", "INTEGER NOT NULL DEFAULT 0")?;
+    // Backfill from the row's own history rather than "now": a token issued
+    // before the last 03:00 IST boundary must stay expired after the upgrade.
+    conn.execute_batch(
+        "UPDATE auth SET authenticated_at = COALESCE(authenticated_at,
+            strftime('%Y-%m-%dT%H:%M:%SZ', updated_at),
+            strftime('%Y-%m-%dT%H:%M:%SZ', created_at))",
+    )?;
+    Ok(())
+}
+
+fn m039_api_keys_lookup(conn: &Connection) -> Result<()> {
+    add_column(conn, "api_keys", "lookup_hmac", "TEXT")?;
+    add_column(
+        conn,
+        "api_keys",
+        "order_mode",
+        "TEXT NOT NULL DEFAULT 'auto'",
+    )?;
+    conn.execute_batch(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_api_keys_lookup ON api_keys(lookup_hmac)
+         WHERE lookup_hmac IS NOT NULL",
+    )?;
+    Ok(())
+}
+
+fn m040_pending_oauth(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS pending_oauth (
+            state_hash TEXT PRIMARY KEY,
+            broker TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL
+        );",
+    )?;
+    Ok(())
+}
+
+fn m041_server_settings(conn: &Connection) -> Result<()> {
+    add_column(conn, "settings", "http_port", "INTEGER")?;
+    add_column(conn, "settings", "ws_port", "INTEGER")?;
+    add_column(conn, "settings", "bind_host", "TEXT")?;
+    add_column(conn, "settings", "active_broker", "TEXT")?;
+    add_column(conn, "settings", "redirect_url", "TEXT")?;
+    add_column(conn, "settings", "host_server", "TEXT")?;
+    add_column(conn, "settings", "websocket_url", "TEXT")?;
+    add_column(
+        conn,
+        "settings",
+        "ngrok_allow",
+        "INTEGER NOT NULL DEFAULT 0",
+    )?;
+    // Backfill from what the user already chose for the old webhook server;
+    // only fill what is still empty.
+    conn.execute_batch(
+        "UPDATE settings SET
+            http_port = COALESCE(http_port, webhook_port, 5000),
+            ws_port = COALESCE(ws_port, 8765),
+            bind_host = COALESCE(bind_host, webhook_host, '127.0.0.1'),
+            host_server = COALESCE(host_server, ngrok_url),
+            active_broker = COALESCE(active_broker, default_broker)
+         WHERE id = 1",
+    )?;
+    Ok(())
+}
+
+fn m042_broker_credentials_market(conn: &Connection) -> Result<()> {
+    add_column(
+        conn,
+        "broker_credentials",
+        "api_key_market_encrypted",
+        "TEXT",
+    )?;
+    add_column(conn, "broker_credentials", "api_key_market_nonce", "TEXT")?;
+    add_column(
+        conn,
+        "broker_credentials",
+        "api_secret_market_encrypted",
+        "TEXT",
+    )?;
+    add_column(
+        conn,
+        "broker_credentials",
+        "api_secret_market_nonce",
+        "TEXT",
+    )?;
     Ok(())
 }
 

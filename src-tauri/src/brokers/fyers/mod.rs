@@ -506,13 +506,6 @@ impl Broker for FyersBroker {
 
         let app_id_hash = Self::generate_app_id_hash(&credentials.api_key, &api_secret);
 
-        tracing::info!(
-            "Fyers auth: api_key={}, auth_code_len={}",
-            credentials.api_key,
-            auth_code.len()
-        );
-        tracing::debug!("Fyers appIdHash: {}", app_id_hash);
-
         #[derive(Serialize)]
         struct ValidateRequest {
             grant_type: String,
@@ -1264,7 +1257,7 @@ impl FyersBroker {
             }
 
             // Parse the 21 columns
-            let fytoken = fields.get(0).unwrap_or(&"").trim();
+            let fytoken = fields.first().unwrap_or(&"").trim();
             let symbol_details = fields.get(1).unwrap_or(&"").trim();
             let exchange_instrument_type: i32 =
                 fields.get(2).unwrap_or(&"0").trim().parse().unwrap_or(0);
@@ -1439,6 +1432,7 @@ impl FyersBroker {
     }
 
     /// Process F&O row (NSE_FO, BSE_FO, NSE_CD, MCX_COM)
+    #[allow(clippy::too_many_arguments)]
     fn process_fo_row(
         fytoken: &str,
         symbol_details: &str,

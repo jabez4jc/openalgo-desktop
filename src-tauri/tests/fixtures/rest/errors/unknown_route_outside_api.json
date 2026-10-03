@@ -1,0 +1,22 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/doesnotexist",
+    "headers": {},
+    "body": null
+  },
+  "response": {
+    "status_code": 404,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Disposition": "inline; filename=index.html",
+      "Content-Type": "text/html; charset=utf-8",
+      "Content-Length": "2740"
+    },
+    "body": {
+      "_raw_text": "<!doctype html>\n<html lang=\"en\">\n  <head>\n    <meta charset=\"UTF-8\" />\n    <link rel=\"icon\" href=\"/favicon.ico\" />\n    <link rel=\"apple-touch-icon\" href=\"/apple-touch-icon.png\" />\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\" />\n    <meta name=\"description\" content=\"OpenAlgo - Open Source Algorithmic Trading Platform\" />\n    <meta name=\"theme-color\" content=\"#3b82f6\" />\n    <title>OpenAlgo</title>\n    <script type=\"module\" crossorigin src=\"/assets/index-BwMMdRhk.js\"></script>\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/rolldown-runtime-Cyuzqnbw.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/react-vendor-LH7mBByU.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/dist-BLo2_6o6.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/dist-pCPT0ErH.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/dist-eNPoIXqJ.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/dist-DNZC92vP.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/es2015-Dt-0tC_N.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/dist-B5bpzcPw.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/dist-CghME7MB.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/dist-B_xqZgW0.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/dist-CwqMUpbH.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/dist-DhH_Qtyq.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/tanstack-BAhcf5k6.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/client-HUqx_zHX.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/utils-BhWVr7uv.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/dist-PIwEhYPu.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/createLucideIcon-CxEvg8o7.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/bell-SdmhINZu.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/bot-D38xW-2w.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/check-CoPgGe79.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/chevron-right-CQIwlJ_Q.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/x-Ss0E4fUB.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/middleware-Dy1wFKiq.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/react-CEMqcyIp.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/alertStore-FZgqUS0M.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/button-BB6JK0r7.js\">\n    <link rel=\"modulepreload\" crossorigin href=\"/assets/brokerStore-DklBpjib.js\">\n    <link rel=\"stylesheet\" crossorigin href=\"/assets/index-Daea5bJQ.css\">\n  </head>\n  <body>\n    <div id=\"root\"></div>\n  </body>\n</html>\n",
+      "_raw_text_truncated": false,
+      "_raw_len": 2740
+    }
+  }
+}

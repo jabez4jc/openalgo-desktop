@@ -23,7 +23,7 @@ impl AnalyzerService {
     /// Get current analyzer status
     pub fn get_status(state: &AppState) -> Result<AnalyzerStatus> {
         let analyze_mode = state.sqlite.get_analyze_mode().unwrap_or(false);
-        let total_logs = state.sqlite.count_order_logs(None, None).unwrap_or(0);
+        let total_logs = state.logs.count_analyzer_logs().unwrap_or(0);
 
         Ok(AnalyzerStatus {
             analyze_mode,

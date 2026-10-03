@@ -25,6 +25,7 @@ pub struct TrafficLog {
 }
 
 /// Log a request
+#[allow(clippy::too_many_arguments)]
 pub fn log_request(
     conn: &Connection,
     client_ip: &str,
@@ -107,8 +108,8 @@ pub fn get_stats(conn: &Connection) -> Result<TrafficStats> {
         let mut stmt =
             conn.prepare("SELECT status_code, COUNT(*) FROM traffic_logs GROUP BY status_code")?;
         let rows = stmt.query_map([], |row| Ok((row.get::<_, i32>(0)?, row.get::<_, i64>(1)?)))?;
-        for row in rows {
-            if let Ok((status, count)) = row {
+        for (status, count) in rows.flatten() {
+            {
                 requests_by_status.insert(status, count);
             }
         }
@@ -121,8 +122,8 @@ pub fn get_stats(conn: &Connection) -> Result<TrafficStats> {
         let rows = stmt.query_map([], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?))
         })?;
-        for row in rows {
-            if let Ok((method, count)) = row {
+        for (method, count) in rows.flatten() {
+            {
                 requests_by_method.insert(method, count);
             }
         }

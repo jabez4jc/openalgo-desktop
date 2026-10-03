@@ -25,6 +25,7 @@ pub struct LatencyLog {
 }
 
 /// Create latency log entry
+#[allow(clippy::too_many_arguments)]
 pub fn log_latency(
     conn: &Connection,
     order_id: &str,
@@ -217,8 +218,8 @@ pub fn get_stats(conn: &Connection) -> Result<LatencyStats> {
             "SELECT total_ms FROM latency_logs WHERE total_ms IS NOT NULL ORDER BY total_ms",
         )?;
         let rows = stmt.query_map([], |row| row.get::<_, f64>(0))?;
-        for row in rows {
-            if let Ok(v) = row {
+        for v in rows.flatten() {
+            {
                 all_latencies.push(v);
             }
         }
@@ -250,8 +251,8 @@ pub fn get_stats(conn: &Connection) -> Result<LatencyStats> {
             ))
         })?;
 
-        for row in rows {
-            if let Ok((broker, total, failed, avg_rtt, avg_total, under_150)) = row {
+        for (broker, total, failed, avg_rtt, avg_total, under_150) in rows.flatten() {
+            {
                 let sla = if total > 0 {
                     (under_150 as f64 / total as f64) * 100.0
                 } else {
@@ -265,8 +266,8 @@ pub fn get_stats(conn: &Connection) -> Result<LatencyStats> {
                         "SELECT total_ms FROM latency_logs WHERE broker = ?1 AND total_ms IS NOT NULL ORDER BY total_ms"
                     )?;
                     let prows = pstmt.query_map(params![&broker], |row| row.get::<_, f64>(0))?;
-                    for prow in prows {
-                        if let Ok(v) = prow {
+                    for v in prows.flatten() {
+                        {
                             broker_latencies.push(v);
                         }
                     }

@@ -57,7 +57,7 @@ impl OrderbookService {
             .get(&broker_id)
             .ok_or_else(|| AppError::Broker(format!("Broker '{}' not found", broker_id)))?;
 
-        let orders = broker.get_order_book(&auth_token).await?;
+        let orders = broker.get_order_book(auth_token.expose()).await?;
 
         Ok(OrderbookResult {
             success: true,
@@ -87,7 +87,7 @@ impl OrderbookService {
             .get(&broker_id)
             .ok_or_else(|| AppError::Broker(format!("Broker '{}' not found", broker_id)))?;
 
-        let trades = broker.get_trade_book(&auth_token).await?;
+        let trades = broker.get_trade_book(auth_token.expose()).await?;
 
         Ok(TradebookResult {
             success: true,
@@ -118,10 +118,13 @@ impl OrderbookService {
     // Private Helper Methods
     // ========================================================================
 
-    fn get_auth(state: &AppState, api_key: Option<&str>) -> Result<(String, String)> {
+    fn get_auth(
+        state: &AppState,
+        api_key: Option<&str>,
+    ) -> Result<(crate::security::Secret, String)> {
         match api_key {
             Some(key) => {
-                let _api_key_info = state.sqlite.validate_api_key(key, &state.security)?;
+                crate::services::apikey_service::require_valid(state, key)?;
                 let session = state
                     .get_broker_session()
                     .ok_or_else(|| AppError::Auth("Broker not connected".to_string()))?;

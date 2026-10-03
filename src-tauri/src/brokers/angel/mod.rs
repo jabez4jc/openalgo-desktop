@@ -1119,7 +1119,7 @@ impl Broker for AngelBroker {
 
         Ok(symbols
             .into_iter()
-            .map(|s| Self::process_angel_symbol(s))
+            .map(Self::process_angel_symbol)
             .collect())
     }
 }
@@ -1176,43 +1176,24 @@ impl AngelBroker {
         // Build proper symbol for derivatives based on exchange and instrument type
         let name = &s.name;
 
-        // CDS Futures
-        if (instrument_type == "FUTCUR" || instrument_type == "FUTIRC") && exchange == "CDS" {
+        // Derivatives whose Angel symbol does not follow the OpenAlgo format
+        // are rebuilt (same rules as the web's master_contract_db.py):
+        // CDS currency and IRC futures, MCX commodity futures, BFO index and
+        // stock futures -> NAME + DDMMMYY + FUT; the matching options ->
+        // NAME + DDMMMYY + STRIKE + CE/PE. NFO symbols already match.
+        let it = instrument_type.as_str();
+        let ex = exchange.as_str();
+        let rebuilt_future = matches!(
+            (it, ex),
+            ("FUTCUR" | "FUTIRC", "CDS") | ("FUTCOM", "MCX") | ("FUTIDX" | "FUTSTK", "BFO")
+        );
+        let rebuilt_option = matches!(
+            (it, ex),
+            ("OPTCUR" | "OPTIRC", "CDS") | ("OPTFUT", "MCX") | ("OPTIDX" | "OPTSTK", "BFO")
+        );
+        if rebuilt_future {
             symbol = format!("{}{}FUT", name, expiry_nodash);
-        }
-        // MCX Futures
-        else if instrument_type == "FUTCOM" && exchange == "MCX" {
-            symbol = format!("{}{}FUT", name, expiry_nodash);
-        }
-        // BFO Index Futures
-        else if instrument_type == "FUTIDX" && exchange == "BFO" {
-            symbol = format!("{}{}FUT", name, expiry_nodash);
-        }
-        // BFO Stock Futures
-        else if instrument_type == "FUTSTK" && exchange == "BFO" {
-            symbol = format!("{}{}FUT", name, expiry_nodash);
-        }
-        // CDS Options
-        else if (instrument_type == "OPTCUR" || instrument_type == "OPTIRC") && exchange == "CDS"
-        {
-            let strike_str = Self::format_strike(strike);
-            let opt_type = if brsymbol.ends_with("CE") { "CE" } else { "PE" };
-            symbol = format!("{}{}{}{}", name, expiry_nodash, strike_str, opt_type);
-        }
-        // MCX Options
-        else if instrument_type == "OPTFUT" && exchange == "MCX" {
-            let strike_str = Self::format_strike(strike);
-            let opt_type = if brsymbol.ends_with("CE") { "CE" } else { "PE" };
-            symbol = format!("{}{}{}{}", name, expiry_nodash, strike_str, opt_type);
-        }
-        // BFO Index Options
-        else if instrument_type == "OPTIDX" && exchange == "BFO" {
-            let strike_str = Self::format_strike(strike);
-            let opt_type = if brsymbol.ends_with("CE") { "CE" } else { "PE" };
-            symbol = format!("{}{}{}{}", name, expiry_nodash, strike_str, opt_type);
-        }
-        // BFO Stock Options
-        else if instrument_type == "OPTSTK" && exchange == "BFO" {
+        } else if rebuilt_option {
             let strike_str = Self::format_strike(strike);
             let opt_type = if brsymbol.ends_with("CE") { "CE" } else { "PE" };
             symbol = format!("{}{}{}{}", name, expiry_nodash, strike_str, opt_type);
@@ -1319,5 +1300,32 @@ impl Default for AngelFundsData {
             exposure: StringOrFloat::None,
             collateral: StringOrFloat::None,
         }
+    }
+}
+
+#[cfg(test)]
+mod symbol_tests {
+    use super::*;
+
+    fn sym(json: &str) -> SymbolData {
+        AngelBroker::process_angel_symbol(serde_json::from_str(json).unwrap())
+    }
+
+    #[test]
+    fn bfo_and_mcx_derivatives_are_rebuilt_nfo_kept() {
+        let f = sym(
+            r#"{"token":"1","symbol":"SENSEX25OCTFUT","name":"SENSEX","exch_seg":"BFO","instrumenttype":"FUTIDX","lotsize":"20","tick_size":"5","expiry":"30OCT2025","strike":"-1"}"#,
+        );
+        assert_eq!(f.symbol, "SENSEX30OCT25FUT");
+        assert_eq!(f.instrument_type, "FUT");
+        let o = sym(
+            r#"{"token":"2","symbol":"CRUDEOIL25NOV5000CE","name":"CRUDEOIL","exch_seg":"MCX","instrumenttype":"OPTFUT","lotsize":"100","tick_size":"10","expiry":"17NOV2025","strike":"500000"}"#,
+        );
+        assert_eq!(o.symbol, "CRUDEOIL17NOV255000CE");
+        assert_eq!(o.instrument_type, "CE");
+        let n = sym(
+            r#"{"token":"3","symbol":"NIFTY30OCT2525000CE","name":"NIFTY","exch_seg":"NFO","instrumenttype":"OPTIDX","lotsize":"75","tick_size":"5","expiry":"30OCT2025","strike":"2500000"}"#,
+        );
+        assert_eq!(n.symbol, "NIFTY30OCT2525000CE");
     }
 }

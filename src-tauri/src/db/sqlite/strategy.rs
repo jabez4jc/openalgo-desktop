@@ -83,6 +83,7 @@ fn get_strategy_by_id(conn: &Connection, id: i64) -> Result<Strategy> {
 }
 
 /// Update a strategy
+#[allow(clippy::too_many_arguments)]
 pub fn update_strategy(
     conn: &Connection,
     id: i64,

@@ -1,88 +1,74 @@
-//! Argon2id password hashing
+//! Argon2id password hashing with a pepper, and the HMAC lookup index for
+//! API keys.
 
 use crate::error::{AppError, Result};
 use argon2::{
     password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2, Params, Version,
 };
+use base64::Engine;
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
 
-#[allow(dead_code)]
-const PEPPER_SIZE: usize = 32;
+pub const PEPPER_SIZE: usize = 32;
 
-/// Hashing manager using Argon2id
-pub struct HashingManager {
-    pepper: Vec<u8>,
+/// OWASP baseline for Argon2id. Parameters are stored in the PHC string, so
+/// verification of older hashes keeps working if these change.
+fn argon2() -> Result<Argon2<'static>> {
+    let params = Params::new(19456, 2, 1, None)
+        .map_err(|e| AppError::Internal(format!("argon2 params: {}", e)))?;
+    Ok(Argon2::new(
+        argon2::Algorithm::Argon2id,
+        Version::V0x13,
+        params,
+    ))
 }
 
-impl HashingManager {
-    /// Create new hashing manager with pepper
-    pub fn new(pepper: &[u8]) -> Self {
-        Self {
-            pepper: pepper.to_vec(),
-        }
+fn peppered(pepper: &[u8], password: &str) -> String {
+    let pepper_b64 = base64::engine::general_purpose::STANDARD.encode(pepper);
+    format!("{}{}", password, pepper_b64)
+}
+
+pub fn hash_password(pepper: &[u8], password: &str) -> Result<String> {
+    let salt = SaltString::generate(&mut OsRng);
+    argon2()?
+        .hash_password(peppered(pepper, password).as_bytes(), &salt)
+        .map(|h| h.to_string())
+        .map_err(|e| AppError::Internal(format!("password hashing failed: {}", e)))
+}
+
+pub fn verify_password(pepper: &[u8], password: &str, hash: &str) -> Result<bool> {
+    let parsed = PasswordHash::new(hash)
+        .map_err(|e| AppError::Internal(format!("invalid password hash: {}", e)))?;
+    match Argon2::default().verify_password(peppered(pepper, password).as_bytes(), &parsed) {
+        Ok(()) => Ok(true),
+        Err(argon2::password_hash::Error::Password) => Ok(false),
+        Err(e) => Err(AppError::Internal(format!("password verification: {}", e))),
     }
+}
 
-    /// Generate a new random pepper (used in tests)
-    #[allow(dead_code)]
-    pub fn generate_pepper() -> Vec<u8> {
-        use rand::RngCore;
-        let mut pepper = vec![0u8; PEPPER_SIZE];
-        OsRng.fill_bytes(&mut pepper);
-        pepper
-    }
+/// Deterministic, indexable digest of an API key: HMAC-SHA256 keyed with the
+/// pepper. Lets the server find the one candidate row without running Argon2
+/// over every stored key.
+pub fn lookup_hmac(pepper: &[u8], api_key: &str) -> String {
+    // HMAC accepts any key length, so this cannot fail.
+    let mut mac = match <Hmac<Sha256> as Mac>::new_from_slice(pepper) {
+        Ok(m) => m,
+        Err(_) => return String::new(),
+    };
+    mac.update(b"openalgo-api-key:");
+    mac.update(api_key.as_bytes());
+    hex::encode(mac.finalize().into_bytes())
+}
 
-    /// Hash a password with Argon2id
-    pub fn hash_password(&self, password: &str) -> Result<String> {
-        // Combine password with pepper
-        let peppered = self.pepper_password(password);
-
-        // Use Argon2id with secure parameters
-        let argon2 = Argon2::new(
-            argon2::Algorithm::Argon2id,
-            Version::V0x13,
-            Params::new(
-                19456, // m_cost (19 MiB)
-                2,     // t_cost (2 iterations)
-                1,     // p_cost (1 thread)
-                None,  // output length (default 32)
-            )
-            .map_err(|e| AppError::Internal(format!("Invalid Argon2 params: {}", e)))?,
-        );
-
-        let salt = SaltString::generate(&mut OsRng);
-
-        let hash = argon2
-            .hash_password(peppered.as_bytes(), &salt)
-            .map_err(|e| AppError::Internal(format!("Password hashing failed: {}", e)))?;
-
-        Ok(hash.to_string())
-    }
-
-    /// Verify a password against a hash
-    pub fn verify_password(&self, password: &str, hash: &str) -> Result<bool> {
-        let peppered = self.pepper_password(password);
-
-        let parsed_hash = PasswordHash::new(hash)
-            .map_err(|e| AppError::Internal(format!("Invalid password hash format: {}", e)))?;
-
-        let argon2 = Argon2::default();
-
-        match argon2.verify_password(peppered.as_bytes(), &parsed_hash) {
-            Ok(()) => Ok(true),
-            Err(argon2::password_hash::Error::Password) => Ok(false),
-            Err(e) => Err(AppError::Internal(format!(
-                "Password verification failed: {}",
-                e
-            ))),
-        }
-    }
-
-    /// Combine password with pepper
-    fn pepper_password(&self, password: &str) -> String {
-        use base64::Engine;
-        let pepper_b64 = base64::engine::general_purpose::STANDARD.encode(&self.pepper);
-        format!("{}{}", password, pepper_b64)
-    }
+/// Raw 32-byte key derived from a password, used to wrap the key vault when
+/// no OS keychain is available.
+pub fn derive_kek(password: &str, salt: &[u8]) -> Result<[u8; 32]> {
+    let mut out = [0u8; 32];
+    argon2()?
+        .hash_password_into(password.as_bytes(), salt, &mut out)
+        .map_err(|e| AppError::Encryption(format!("key derivation failed: {}", e)))?;
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -90,31 +76,28 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_hash_and_verify() {
-        let pepper = HashingManager::generate_pepper();
-        let manager = HashingManager::new(&pepper);
-
-        let password = "my_secure_password123!";
-        let hash = manager.hash_password(password).unwrap();
-
-        assert!(manager.verify_password(password, &hash).unwrap());
-        assert!(!manager.verify_password("wrong_password", &hash).unwrap());
+    fn hash_and_verify() {
+        let pepper = [7u8; 32];
+        let h = hash_password(&pepper, "Secret@123").unwrap();
+        assert!(verify_password(&pepper, "Secret@123", &h).unwrap());
+        assert!(!verify_password(&pepper, "wrong", &h).unwrap());
+        assert!(!verify_password(&[8u8; 32], "Secret@123", &h).unwrap());
     }
 
     #[test]
-    fn test_different_hashes() {
-        let pepper = HashingManager::generate_pepper();
-        let manager = HashingManager::new(&pepper);
+    fn hmac_is_deterministic_and_keyed() {
+        let a = lookup_hmac(&[1u8; 32], "key");
+        assert_eq!(a, lookup_hmac(&[1u8; 32], "key"));
+        assert_ne!(a, lookup_hmac(&[2u8; 32], "key"));
+        assert_ne!(a, lookup_hmac(&[1u8; 32], "key2"));
+        assert_eq!(a.len(), 64);
+    }
 
-        let password = "same_password";
-        let hash1 = manager.hash_password(password).unwrap();
-        let hash2 = manager.hash_password(password).unwrap();
-
-        // Same password should produce different hashes due to random salts
-        assert_ne!(hash1, hash2);
-
-        // But both should verify correctly
-        assert!(manager.verify_password(password, &hash1).unwrap());
-        assert!(manager.verify_password(password, &hash2).unwrap());
+    #[test]
+    fn kek_depends_on_password_and_salt() {
+        let a = derive_kek("pw", b"0123456789abcdef").unwrap();
+        assert_eq!(a, derive_kek("pw", b"0123456789abcdef").unwrap());
+        assert_ne!(a, derive_kek("pw2", b"0123456789abcdef").unwrap());
+        assert_ne!(a, derive_kek("pw", b"fedcba9876543210").unwrap());
     }
 }

@@ -89,7 +89,7 @@ impl OrderService {
             .ok_or_else(|| AppError::Broker(format!("Broker '{}' not found", broker_id)))?;
 
         // Place order via broker
-        match broker.place_order(&auth_token, order.clone()).await {
+        match broker.place_order(auth_token.expose(), order.clone()).await {
             Ok(response) => {
                 // Log the order
                 Self::log_order(state, "placeorder", &order, &response, api_key);
@@ -142,7 +142,10 @@ impl OrderService {
             .get(&broker_id)
             .ok_or_else(|| AppError::Broker(format!("Broker '{}' not found", broker_id)))?;
 
-        match broker.modify_order(&auth_token, order_id, order).await {
+        match broker
+            .modify_order(auth_token.expose(), order_id, order)
+            .await
+        {
             Ok(response) => Ok(ModifyOrderResult {
                 success: true,
                 order_id: response.order_id,
@@ -198,7 +201,9 @@ impl OrderService {
             .get(&broker_id)
             .ok_or_else(|| AppError::Broker(format!("Broker '{}' not found", broker_id)))?;
 
-        broker.cancel_order(&auth_token, order_id, variety).await?;
+        broker
+            .cancel_order(auth_token.expose(), order_id, variety)
+            .await?;
 
         Ok(CancelOrderResult {
             success: true,
@@ -231,7 +236,7 @@ impl OrderService {
             .ok_or_else(|| AppError::Broker(format!("Broker '{}' not found", broker_id)))?;
 
         // Get all open orders
-        let orders = broker.get_order_book(&auth_token).await?;
+        let orders = broker.get_order_book(auth_token.expose()).await?;
 
         let mut results = Vec::new();
         for order in orders {
@@ -241,7 +246,7 @@ impl OrderService {
                 || order.status == "TRIGGER PENDING"
             {
                 match broker
-                    .cancel_order(&auth_token, &order.order_id, None)
+                    .cancel_order(auth_token.expose(), &order.order_id, None)
                     .await
                 {
                     Ok(_) => {
@@ -273,11 +278,14 @@ impl OrderService {
     ///
     /// If api_key is provided (REST API call), validate it and get auth from DB.
     /// Otherwise, use the current broker session (Tauri command call).
-    fn get_auth(state: &AppState, api_key: Option<&str>) -> Result<(String, String)> {
+    fn get_auth(
+        state: &AppState,
+        api_key: Option<&str>,
+    ) -> Result<(crate::security::Secret, String)> {
         match api_key {
             Some(key) => {
                 // REST API call - validate API key and get auth token
-                let _api_key_info = state.sqlite.validate_api_key(key, &state.security)?;
+                crate::services::apikey_service::require_valid(state, key)?;
 
                 // Get the current broker session (API key holder shares the session)
                 let session = state

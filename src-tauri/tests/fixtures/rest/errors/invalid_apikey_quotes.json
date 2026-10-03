@@ -1,0 +1,27 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/quotes",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "invalid-key-0000",
+      "symbol": "RELIANCE",
+      "exchange": "NSE"
+    }
+  },
+  "response": {
+    "status_code": 403,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "55",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "message": "Invalid openalgo apikey",
+      "status": "error"
+    }
+  }
+}

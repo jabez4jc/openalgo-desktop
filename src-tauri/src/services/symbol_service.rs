@@ -208,7 +208,9 @@ impl SymbolService {
             .ok_or_else(|| AppError::Broker("Broker not found".to_string()))?;
 
         // Download master contract from broker
-        let symbols = broker.download_master_contract(&session.auth_token).await?;
+        let symbols = broker
+            .download_master_contract(session.auth_token.expose())
+            .await?;
 
         // Convert to SymbolInfo
         let symbol_infos: Vec<SymbolInfo> = symbols

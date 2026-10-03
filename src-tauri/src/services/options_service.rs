@@ -408,10 +408,10 @@ impl OptionsService {
         }
 
         // Parse ITM/OTM with offset (e.g., "ITM1", "OTM2")
-        let (is_itm, offset) = if selection_upper.starts_with("ITM") {
-            (true, selection_upper[3..].parse::<i32>().unwrap_or(1))
-        } else if selection_upper.starts_with("OTM") {
-            (false, selection_upper[3..].parse::<i32>().unwrap_or(1))
+        let (is_itm, offset) = if let Some(n) = selection_upper.strip_prefix("ITM") {
+            (true, n.parse::<i32>().unwrap_or(1))
+        } else if let Some(n) = selection_upper.strip_prefix("OTM") {
+            (false, n.parse::<i32>().unwrap_or(1))
         } else {
             return atm_strike;
         };

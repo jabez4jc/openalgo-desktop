@@ -258,28 +258,28 @@ pub fn update_rate_limit_config(
 
     if let Some(limit) = api_rate_limit {
         // Validate rate limit (1-1000 per second reasonable range)
-        if limit >= 1 && limit <= 1000 {
+        if (1..=1000).contains(&limit) {
             updates.push("api_rate_limit = ?");
             params.push(Box::new(limit));
         }
     }
     if let Some(limit) = order_rate_limit {
         // Validate order rate limit (1-100 per second)
-        if limit >= 1 && limit <= 100 {
+        if (1..=100).contains(&limit) {
             updates.push("order_rate_limit = ?");
             params.push(Box::new(limit));
         }
     }
     if let Some(limit) = smart_order_rate_limit {
         // Validate smart order rate limit (1-20 per second)
-        if limit >= 1 && limit <= 20 {
+        if (1..=20).contains(&limit) {
             updates.push("smart_order_rate_limit = ?");
             params.push(Box::new(limit));
         }
     }
     if let Some(delay) = smart_order_delay {
         // Validate delay (0.1 to 5.0 seconds)
-        if delay >= 0.1 && delay <= 5.0 {
+        if (0.1..=5.0).contains(&delay) {
             updates.push("smart_order_delay = ?");
             params.push(Box::new(delay));
         }

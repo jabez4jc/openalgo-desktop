@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenAlgo</title>
+    <link rel="stylesheet" href="startup.css" />
+  </head>
+  <body>
+    <main class="card">
+      <h1>OpenAlgo is starting</h1>
+      <p id="message">Please wait.</p>
+      <div id="actions" hidden>
+        <label for="port">Port</label>
+        <input id="port" type="number" min="1024" max="65535" />
+        <button id="retry" type="button">Try again</button>
+      </div>
+    </main>
+    <script src="startup.js"></script>
+  </body>
+</html>

@@ -50,7 +50,7 @@ impl PositionService {
             .get(&broker_id)
             .ok_or_else(|| AppError::Broker(format!("Broker '{}' not found", broker_id)))?;
 
-        let positions = broker.get_positions(&auth_token).await?;
+        let positions = broker.get_positions(auth_token.expose()).await?;
 
         Ok(PositionResult {
             success: true,
@@ -209,10 +209,13 @@ impl PositionService {
     // Private Helper Methods
     // ========================================================================
 
-    fn get_auth(state: &AppState, api_key: Option<&str>) -> Result<(String, String)> {
+    fn get_auth(
+        state: &AppState,
+        api_key: Option<&str>,
+    ) -> Result<(crate::security::Secret, String)> {
         match api_key {
             Some(key) => {
-                let _api_key_info = state.sqlite.validate_api_key(key, &state.security)?;
+                crate::services::apikey_service::require_valid(state, key)?;
                 let session = state
                     .get_broker_session()
                     .ok_or_else(|| AppError::Auth("Broker not connected".to_string()))?;

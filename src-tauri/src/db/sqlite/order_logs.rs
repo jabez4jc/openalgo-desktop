@@ -27,6 +27,7 @@ pub struct OrderLog {
 }
 
 /// Create a new order log entry
+#[allow(clippy::too_many_arguments)]
 pub fn create_log(
     conn: &Connection,
     order_id: Option<&str>,
