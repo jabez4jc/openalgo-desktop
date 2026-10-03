@@ -46,10 +46,7 @@ pub struct SetupResponse {
 
 /// Login with username and password
 #[tauri::command]
-pub async fn login(
-    state: State<'_, AppState>,
-    request: LoginRequest,
-) -> Result<LoginResponse> {
+pub async fn login(state: State<'_, AppState>, request: LoginRequest) -> Result<LoginResponse> {
     tracing::info!("Login attempt for user: {}", request.username);
 
     // Verify credentials against database
@@ -198,12 +195,23 @@ pub async fn setup(state: State<'_, AppState>, request: SetupRequest) -> Result<
         .sqlite
         .create_user(&request.username, &request.password, &state.security)?;
 
-    tracing::info!("Admin user '{}' created successfully (id: {})", user.username, user.id);
+    tracing::info!(
+        "Admin user '{}' created successfully (id: {})",
+        user.username,
+        user.id
+    );
 
     // Auto-generate API key for the user
-    match state.sqlite.create_api_key("default", "read,write", &state.security) {
+    match state
+        .sqlite
+        .create_api_key("default", "read,write", &state.security)
+    {
         Ok((id, _api_key)) => {
-            tracing::info!("Auto-generated API key (id: {}) for user '{}'", id, user.username);
+            tracing::info!(
+                "Auto-generated API key (id: {}) for user '{}'",
+                id,
+                user.username
+            );
         }
         Err(e) => {
             tracing::warn!("Failed to auto-generate API key: {}", e);

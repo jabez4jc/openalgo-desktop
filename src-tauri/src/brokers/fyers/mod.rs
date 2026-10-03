@@ -2,8 +2,8 @@
 
 #![allow(non_snake_case)]
 
-use crate::brokers::{AuthResponse, Broker, BrokerCredentials};
 use crate::brokers::types::*;
+use crate::brokers::{AuthResponse, Broker, BrokerCredentials};
 use crate::error::{AppError, Result};
 use async_trait::async_trait;
 use reqwest::Client;
@@ -160,7 +160,11 @@ struct FyersOrderData {
     segment: Option<i64>,
     #[serde(default, deserialize_with = "deserialize_optional_string_or_int")]
     side: Option<i64>,
-    #[serde(rename = "type", default, deserialize_with = "deserialize_optional_string_or_int")]
+    #[serde(
+        rename = "type",
+        default,
+        deserialize_with = "deserialize_optional_string_or_int"
+    )]
     order_type: Option<i64>,
     #[serde(default, deserialize_with = "deserialize_optional_string_or_int")]
     status: Option<i64>,
@@ -502,7 +506,11 @@ impl Broker for FyersBroker {
 
         let app_id_hash = Self::generate_app_id_hash(&credentials.api_key, &api_secret);
 
-        tracing::info!("Fyers auth: api_key={}, auth_code_len={}", credentials.api_key, auth_code.len());
+        tracing::info!(
+            "Fyers auth: api_key={}, auth_code_len={}",
+            credentials.api_key,
+            auth_code.len()
+        );
         tracing::debug!("Fyers appIdHash: {}", app_id_hash);
 
         #[derive(Serialize)]
@@ -538,8 +546,12 @@ impl Broker for FyersBroker {
             access_token: Option<String>,
         }
 
-        let result: ValidateResponse = serde_json::from_str(&response_text)
-            .map_err(|e| AppError::Auth(format!("Failed to parse Fyers response: {} - Raw: {}", e, response_text)))?;
+        let result: ValidateResponse = serde_json::from_str(&response_text).map_err(|e| {
+            AppError::Auth(format!(
+                "Failed to parse Fyers response: {} - Raw: {}",
+                e, response_text
+            ))
+        })?;
 
         if result.s != "ok" {
             let error_msg = format!(
@@ -548,7 +560,9 @@ impl Broker for FyersBroker {
             );
             tracing::error!("{}", error_msg);
             return Err(AppError::Auth(
-                result.message.unwrap_or_else(|| "Authentication failed".to_string()),
+                result
+                    .message
+                    .unwrap_or_else(|| "Authentication failed".to_string()),
             ));
         }
 
@@ -557,9 +571,14 @@ impl Broker for FyersBroker {
             .ok_or_else(|| AppError::Auth("No access token in response".to_string()))?;
 
         // Extract client_id from api_key (format: APPID-100)
-        let client_id = credentials
-            .client_id
-            .unwrap_or_else(|| credentials.api_key.split('-').next().unwrap_or("").to_string());
+        let client_id = credentials.client_id.unwrap_or_else(|| {
+            credentials
+                .api_key
+                .split('-')
+                .next()
+                .unwrap_or("")
+                .to_string()
+        });
 
         // Combined auth token format for Fyers: api_key:access_token
         let combined_token = format!("{}:{}", credentials.api_key, access_token);
@@ -606,7 +625,8 @@ impl Broker for FyersBroker {
         let symbol = order.broker_symbol.clone().unwrap_or_else(|| {
             tracing::warn!(
                 "No broker_symbol provided for {}:{}, constructing manually",
-                order.exchange, order.symbol
+                order.exchange,
+                order.symbol
             );
             format!("{}:{}", order.exchange, order.symbol)
         });
@@ -647,7 +667,9 @@ impl Broker for FyersBroker {
 
         if result.s != "ok" {
             return Err(AppError::Broker(
-                result.message.unwrap_or_else(|| "Order placement failed".to_string()),
+                result
+                    .message
+                    .unwrap_or_else(|| "Order placement failed".to_string()),
             ));
         }
 
@@ -714,7 +736,9 @@ impl Broker for FyersBroker {
 
         if result.s != "ok" {
             return Err(AppError::Broker(
-                result.message.unwrap_or_else(|| "Order modification failed".to_string()),
+                result
+                    .message
+                    .unwrap_or_else(|| "Order modification failed".to_string()),
             ));
         }
 
@@ -757,7 +781,9 @@ impl Broker for FyersBroker {
 
         if result.s != "ok" {
             return Err(AppError::Broker(
-                result.message.unwrap_or_else(|| "Order cancellation failed".to_string()),
+                result
+                    .message
+                    .unwrap_or_else(|| "Order cancellation failed".to_string()),
             ));
         }
 
@@ -776,23 +802,20 @@ impl Broker for FyersBroker {
 
         if result.s != "ok" {
             return Err(AppError::Broker(
-                result.message.unwrap_or_else(|| "Failed to fetch order book".to_string()),
+                result
+                    .message
+                    .unwrap_or_else(|| "Failed to fetch order book".to_string()),
             ));
         }
 
-        let orders = result
-            .data
-            .and_then(|d| d.orderBook)
-            .unwrap_or_default();
+        let orders = result.data.and_then(|d| d.orderBook).unwrap_or_default();
 
         let mapped_orders: Vec<Order> = orders
             .into_iter()
             .map(|o| {
-                let exchange = get_exchange_name(
-                    o.exchange.unwrap_or(10),
-                    o.segment.unwrap_or(10),
-                );
-                let symbol_name = o.symbol
+                let exchange = get_exchange_name(o.exchange.unwrap_or(10), o.segment.unwrap_or(10));
+                let symbol_name = o
+                    .symbol
                     .as_ref()
                     .map(|s| Self::extract_symbol_name(s))
                     .unwrap_or_default();
@@ -835,23 +858,20 @@ impl Broker for FyersBroker {
 
         if result.s != "ok" {
             return Err(AppError::Broker(
-                result.message.unwrap_or_else(|| "Failed to fetch trade book".to_string()),
+                result
+                    .message
+                    .unwrap_or_else(|| "Failed to fetch trade book".to_string()),
             ));
         }
 
-        let trades = result
-            .data
-            .and_then(|d| d.tradeBook)
-            .unwrap_or_default();
+        let trades = result.data.and_then(|d| d.tradeBook).unwrap_or_default();
 
         let mapped_trades: Vec<Order> = trades
             .into_iter()
             .map(|t| {
-                let exchange = get_exchange_name(
-                    t.exchange.unwrap_or(10),
-                    t.segment.unwrap_or(10),
-                );
-                let symbol_name = t.symbol
+                let exchange = get_exchange_name(t.exchange.unwrap_or(10), t.segment.unwrap_or(10));
+                let symbol_name = t
+                    .symbol
                     .as_ref()
                     .map(|s| Self::extract_symbol_name(s))
                     .unwrap_or_default();
@@ -894,23 +914,20 @@ impl Broker for FyersBroker {
 
         if result.s != "ok" {
             return Err(AppError::Broker(
-                result.message.unwrap_or_else(|| "Failed to fetch positions".to_string()),
+                result
+                    .message
+                    .unwrap_or_else(|| "Failed to fetch positions".to_string()),
             ));
         }
 
-        let positions = result
-            .data
-            .and_then(|d| d.netPositions)
-            .unwrap_or_default();
+        let positions = result.data.and_then(|d| d.netPositions).unwrap_or_default();
 
         let mapped_positions: Vec<Position> = positions
             .into_iter()
             .map(|p| {
-                let exchange = get_exchange_name(
-                    p.exchange.unwrap_or(10),
-                    p.segment.unwrap_or(10),
-                );
-                let symbol_name = p.symbol
+                let exchange = get_exchange_name(p.exchange.unwrap_or(10), p.segment.unwrap_or(10));
+                let symbol_name = p
+                    .symbol
                     .as_ref()
                     .map(|s| Self::extract_symbol_name(s))
                     .unwrap_or_default();
@@ -931,9 +948,17 @@ impl Broker for FyersBroker {
                     realized_pnl: p.realized_profit.unwrap_or(0.0),
                     unrealized_pnl: p.unrealized_profit.unwrap_or(0.0),
                     buy_quantity: if quantity > 0 { quantity } else { 0 },
-                    buy_value: if quantity > 0 { quantity as f64 * avg_price } else { 0.0 },
+                    buy_value: if quantity > 0 {
+                        quantity as f64 * avg_price
+                    } else {
+                        0.0
+                    },
                     sell_quantity: if quantity < 0 { quantity.abs() } else { 0 },
-                    sell_value: if quantity < 0 { quantity.abs() as f64 * avg_price } else { 0.0 },
+                    sell_value: if quantity < 0 {
+                        quantity.abs() as f64 * avg_price
+                    } else {
+                        0.0
+                    },
                 }
             })
             .collect();
@@ -953,23 +978,20 @@ impl Broker for FyersBroker {
 
         if result.s != "ok" {
             return Err(AppError::Broker(
-                result.message.unwrap_or_else(|| "Failed to fetch holdings".to_string()),
+                result
+                    .message
+                    .unwrap_or_else(|| "Failed to fetch holdings".to_string()),
             ));
         }
 
-        let holdings = result
-            .data
-            .and_then(|d| d.holdings)
-            .unwrap_or_default();
+        let holdings = result.data.and_then(|d| d.holdings).unwrap_or_default();
 
         let mapped_holdings: Vec<Holding> = holdings
             .into_iter()
             .map(|h| {
-                let exchange = get_exchange_name(
-                    h.exchange.unwrap_or(10),
-                    h.segment.unwrap_or(10),
-                );
-                let symbol_name = h.symbol
+                let exchange = get_exchange_name(h.exchange.unwrap_or(10), h.segment.unwrap_or(10));
+                let symbol_name = h
+                    .symbol
                     .as_ref()
                     .map(|s| Self::extract_symbol_name(s))
                     .unwrap_or_default();
@@ -1014,13 +1036,11 @@ impl Broker for FyersBroker {
         let result: FyersResponse<FundsResponseData> = response.json().await?;
 
         // Fyers funds API returns code: 200 on success
-        let fund_limit = result
-            .data
-            .and_then(|d| d.fund_limit)
-            .unwrap_or_default();
+        let fund_limit = result.data.and_then(|d| d.fund_limit).unwrap_or_default();
 
         // Process fund limit entries into a map
-        let mut funds_map: std::collections::HashMap<String, (f64, f64)> = std::collections::HashMap::new();
+        let mut funds_map: std::collections::HashMap<String, (f64, f64)> =
+            std::collections::HashMap::new();
         for fund in fund_limit {
             if let Some(title) = fund.title {
                 let key = title.to_lowercase().replace(' ', "_");
@@ -1071,7 +1091,10 @@ impl Broker for FyersBroker {
 
         let response = self
             .client
-            .get(format!("https://api-t1.fyers.in/data/quotes?symbols={}", encoded_symbols))
+            .get(format!(
+                "https://api-t1.fyers.in/data/quotes?symbols={}",
+                encoded_symbols
+            ))
             .headers(self.get_headers(Some(auth_token)))
             .send()
             .await?;
@@ -1209,7 +1232,11 @@ impl Broker for FyersBroker {
                     }
                 }
                 Err(e) => {
-                    tracing::warn!("Failed to download Fyers master for {}: {}", exchange_key, e);
+                    tracing::warn!(
+                        "Failed to download Fyers master for {}: {}",
+                        exchange_key,
+                        e
+                    );
                 }
             }
         }
@@ -1239,13 +1266,24 @@ impl FyersBroker {
             // Parse the 21 columns
             let fytoken = fields.get(0).unwrap_or(&"").trim();
             let symbol_details = fields.get(1).unwrap_or(&"").trim();
-            let exchange_instrument_type: i32 = fields.get(2).unwrap_or(&"0").trim().parse().unwrap_or(0);
+            let exchange_instrument_type: i32 =
+                fields.get(2).unwrap_or(&"0").trim().parse().unwrap_or(0);
             let lot_size: i32 = fields.get(3).unwrap_or(&"1").trim().parse().unwrap_or(1);
-            let tick_size: f64 = fields.get(4).unwrap_or(&"0.05").trim().parse().unwrap_or(0.05);
+            let tick_size: f64 = fields
+                .get(4)
+                .unwrap_or(&"0.05")
+                .trim()
+                .parse()
+                .unwrap_or(0.05);
             let expiry_timestamp: i64 = fields.get(8).unwrap_or(&"0").trim().parse().unwrap_or(0);
             let symbol_ticker = fields.get(9).unwrap_or(&"").trim();
             let underlying_symbol = fields.get(13).unwrap_or(&"").trim();
-            let strike_price: f64 = fields.get(15).unwrap_or(&"0.0").trim().parse().unwrap_or(0.0);
+            let strike_price: f64 = fields
+                .get(15)
+                .unwrap_or(&"0.0")
+                .trim()
+                .parse()
+                .unwrap_or(0.0);
             let option_type = fields.get(16).unwrap_or(&"").trim();
 
             // Skip invalid rows
@@ -1256,28 +1294,66 @@ impl FyersBroker {
             // Process based on exchange key
             let processed = match exchange_key {
                 "NSE_CM" => Self::process_nse_cm_row(
-                    fytoken, symbol_details, exchange_instrument_type, lot_size, tick_size,
-                    symbol_ticker, underlying_symbol,
+                    fytoken,
+                    symbol_details,
+                    exchange_instrument_type,
+                    lot_size,
+                    tick_size,
+                    symbol_ticker,
+                    underlying_symbol,
                 ),
                 "BSE_CM" => Self::process_bse_cm_row(
-                    fytoken, symbol_details, exchange_instrument_type, lot_size, tick_size,
-                    symbol_ticker, underlying_symbol,
+                    fytoken,
+                    symbol_details,
+                    exchange_instrument_type,
+                    lot_size,
+                    tick_size,
+                    symbol_ticker,
+                    underlying_symbol,
                 ),
                 "NSE_FO" => Self::process_fo_row(
-                    fytoken, symbol_details, lot_size, tick_size, expiry_timestamp,
-                    symbol_ticker, strike_price, option_type, "NFO",
+                    fytoken,
+                    symbol_details,
+                    lot_size,
+                    tick_size,
+                    expiry_timestamp,
+                    symbol_ticker,
+                    strike_price,
+                    option_type,
+                    "NFO",
                 ),
                 "BSE_FO" => Self::process_fo_row(
-                    fytoken, symbol_details, lot_size, tick_size, expiry_timestamp,
-                    symbol_ticker, strike_price, option_type, "BFO",
+                    fytoken,
+                    symbol_details,
+                    lot_size,
+                    tick_size,
+                    expiry_timestamp,
+                    symbol_ticker,
+                    strike_price,
+                    option_type,
+                    "BFO",
                 ),
                 "NSE_CD" => Self::process_fo_row(
-                    fytoken, symbol_details, lot_size, tick_size, expiry_timestamp,
-                    symbol_ticker, strike_price, option_type, "CDS",
+                    fytoken,
+                    symbol_details,
+                    lot_size,
+                    tick_size,
+                    expiry_timestamp,
+                    symbol_ticker,
+                    strike_price,
+                    option_type,
+                    "CDS",
                 ),
                 "MCX_COM" => Self::process_fo_row(
-                    fytoken, symbol_details, lot_size, tick_size, expiry_timestamp,
-                    symbol_ticker, strike_price, option_type, "MCX",
+                    fytoken,
+                    symbol_details,
+                    lot_size,
+                    tick_size,
+                    expiry_timestamp,
+                    symbol_ticker,
+                    strike_price,
+                    option_type,
+                    "MCX",
                 ),
                 _ => None,
             };
@@ -1406,7 +1482,11 @@ impl FyersBroker {
             tick_size,
             instrument_type: instrument_type.to_string(),
             expiry,
-            strike: if strike_price > 0.0 { Some(strike_price) } else { None },
+            strike: if strike_price > 0.0 {
+                Some(strike_price)
+            } else {
+                None
+            },
             option_type: match option_type {
                 "CE" => Some("CE".to_string()),
                 "PE" => Some("PE".to_string()),

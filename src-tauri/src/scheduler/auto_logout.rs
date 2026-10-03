@@ -53,20 +53,18 @@ impl AutoLogoutScheduler {
     /// Get auto-logout configuration from database
     fn get_config(&self) -> AutoLogoutConfig {
         match self.app_handle.try_state::<AppState>() {
-            Some(state) => {
-                match state.sqlite.get_auto_logout_config() {
-                    Ok(config) => config,
-                    Err(e) => {
-                        warn!("Failed to get auto-logout config, using defaults: {}", e);
-                        AutoLogoutConfig {
-                            enabled: true,
-                            hour: DEFAULT_HOUR,
-                            minute: DEFAULT_MINUTE,
-                            warnings: DEFAULT_WARNINGS.to_vec(),
-                        }
+            Some(state) => match state.sqlite.get_auto_logout_config() {
+                Ok(config) => config,
+                Err(e) => {
+                    warn!("Failed to get auto-logout config, using defaults: {}", e);
+                    AutoLogoutConfig {
+                        enabled: true,
+                        hour: DEFAULT_HOUR,
+                        minute: DEFAULT_MINUTE,
+                        warnings: DEFAULT_WARNINGS.to_vec(),
                     }
                 }
-            }
+            },
             None => {
                 warn!("AppState not available, using default auto-logout config");
                 AutoLogoutConfig {
@@ -140,7 +138,12 @@ impl AutoLogoutScheduler {
                 );
 
                 // Emit warnings at configured intervals
-                self.schedule_warnings(duration_to_logout, &config.warnings, config.hour, config.minute);
+                self.schedule_warnings(
+                    duration_to_logout,
+                    &config.warnings,
+                    config.hour,
+                    config.minute,
+                );
 
                 // Re-check if still enabled before executing
                 let config = self.get_config();
@@ -153,7 +156,13 @@ impl AutoLogoutScheduler {
     }
 
     /// Schedule and emit warnings before logout
-    fn schedule_warnings(&self, duration_to_logout: Duration, warnings: &[u32], hour: u32, minute: u32) {
+    fn schedule_warnings(
+        &self,
+        duration_to_logout: Duration,
+        warnings: &[u32],
+        hour: u32,
+        minute: u32,
+    ) {
         let minutes_to_logout = duration_to_logout.as_secs() / 60;
 
         // Sort warnings in descending order (30, 15, 5, 1)
@@ -187,7 +196,12 @@ impl AutoLogoutScheduler {
         // Sleep until exactly the target time
         let remaining = Self::duration_until_time_ist(hour, minute);
         if remaining.as_secs() > 0 {
-            info!("Sleeping {} seconds until {:02}:{:02} IST", remaining.as_secs(), hour, minute);
+            info!(
+                "Sleeping {} seconds until {:02}:{:02} IST",
+                remaining.as_secs(),
+                hour,
+                minute
+            );
             std::thread::sleep(remaining);
         }
     }

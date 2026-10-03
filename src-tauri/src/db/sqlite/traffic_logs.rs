@@ -49,7 +49,7 @@ pub fn get_recent_logs(conn: &Connection, limit: i64) -> Result<Vec<TrafficLog>>
         "SELECT id, timestamp, client_ip, method, path, status_code, duration_ms, host, error
          FROM traffic_logs
          ORDER BY timestamp DESC
-         LIMIT ?1"
+         LIMIT ?1",
     )?;
 
     let rows = stmt.query_map(params![limit], |row| {
@@ -81,31 +81,32 @@ pub struct TrafficStats {
 
 /// Get traffic statistics
 pub fn get_stats(conn: &Connection) -> Result<TrafficStats> {
-    let total_requests: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM traffic_logs",
-        [],
-        |row| row.get(0),
-    ).unwrap_or(0);
+    let total_requests: i64 = conn
+        .query_row("SELECT COUNT(*) FROM traffic_logs", [], |row| row.get(0))
+        .unwrap_or(0);
 
-    let error_requests: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM traffic_logs WHERE status_code >= 400",
-        [],
-        |row| row.get(0),
-    ).unwrap_or(0);
+    let error_requests: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM traffic_logs WHERE status_code >= 400",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
 
-    let avg_duration: f64 = conn.query_row(
-        "SELECT COALESCE(AVG(duration_ms), 0) FROM traffic_logs",
-        [],
-        |row| row.get(0),
-    ).unwrap_or(0.0);
+    let avg_duration: f64 = conn
+        .query_row(
+            "SELECT COALESCE(AVG(duration_ms), 0) FROM traffic_logs",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0.0);
 
     // Requests by status code
     let mut requests_by_status = std::collections::HashMap::new();
     {
-        let mut stmt = conn.prepare("SELECT status_code, COUNT(*) FROM traffic_logs GROUP BY status_code")?;
-        let rows = stmt.query_map([], |row| {
-            Ok((row.get::<_, i32>(0)?, row.get::<_, i64>(1)?))
-        })?;
+        let mut stmt =
+            conn.prepare("SELECT status_code, COUNT(*) FROM traffic_logs GROUP BY status_code")?;
+        let rows = stmt.query_map([], |row| Ok((row.get::<_, i32>(0)?, row.get::<_, i64>(1)?)))?;
         for row in rows {
             if let Ok((status, count)) = row {
                 requests_by_status.insert(status, count);
@@ -165,11 +166,13 @@ pub struct IPBan {
 /// Check if IP is banned
 pub fn is_ip_banned(conn: &Connection, ip_address: &str) -> Result<bool> {
     // First check if IP exists and if it's permanent
-    let ban: Option<(bool, Option<String>)> = conn.query_row(
-        "SELECT is_permanent, expires_at FROM ip_bans WHERE ip_address = ?1",
-        params![ip_address],
-        |row| Ok((row.get(0)?, row.get(1)?)),
-    ).ok();
+    let ban: Option<(bool, Option<String>)> = conn
+        .query_row(
+            "SELECT is_permanent, expires_at FROM ip_bans WHERE ip_address = ?1",
+            params![ip_address],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .ok();
 
     if let Some((is_permanent, expires_at)) = ban {
         if is_permanent {
@@ -177,17 +180,22 @@ pub fn is_ip_banned(conn: &Connection, ip_address: &str) -> Result<bool> {
         }
         if expires_at.is_some() {
             // Use SQLite for datetime comparison to avoid timezone issues
-            let is_expired: bool = conn.query_row(
-                "SELECT expires_at < datetime('now') FROM ip_bans WHERE ip_address = ?1",
-                params![ip_address],
-                |row| row.get(0),
-            ).unwrap_or(true);
+            let is_expired: bool = conn
+                .query_row(
+                    "SELECT expires_at < datetime('now') FROM ip_bans WHERE ip_address = ?1",
+                    params![ip_address],
+                    |row| row.get(0),
+                )
+                .unwrap_or(true);
 
             if !is_expired {
                 return Ok(true);
             } else {
                 // Ban expired, remove it
-                conn.execute("DELETE FROM ip_bans WHERE ip_address = ?1", params![ip_address])?;
+                conn.execute(
+                    "DELETE FROM ip_bans WHERE ip_address = ?1",
+                    params![ip_address],
+                )?;
             }
         }
     }
@@ -283,11 +291,13 @@ pub fn get_all_bans(conn: &Connection) -> Result<Vec<IPBan>> {
 /// Track 404 error
 pub fn track_404(conn: &Connection, ip_address: &str, path: &str) -> Result<()> {
     // Check if tracking exists
-    let existing: Option<(i32, String)> = conn.query_row(
-        "SELECT error_count, paths_attempted FROM error_404_tracker WHERE ip_address = ?1",
-        params![ip_address],
-        |row| Ok((row.get(0)?, row.get(1)?)),
-    ).ok();
+    let existing: Option<(i32, String)> = conn
+        .query_row(
+            "SELECT error_count, paths_attempted FROM error_404_tracker WHERE ip_address = ?1",
+            params![ip_address],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .ok();
 
     if let Some((count, paths)) = existing {
         // Update existing tracker
@@ -295,14 +305,18 @@ pub fn track_404(conn: &Connection, ip_address: &str, path: &str) -> Result<()> 
         if !paths_vec.contains(&path.to_string()) {
             paths_vec.push(path.to_string());
             if paths_vec.len() > 50 {
-                paths_vec = paths_vec[paths_vec.len()-50..].to_vec();
+                paths_vec = paths_vec[paths_vec.len() - 50..].to_vec();
             }
         }
 
         conn.execute(
             "UPDATE error_404_tracker SET error_count = ?1, last_error_at = datetime('now'),
              paths_attempted = ?2 WHERE ip_address = ?3",
-            params![count + 1, serde_json::to_string(&paths_vec).unwrap_or_default(), ip_address],
+            params![
+                count + 1,
+                serde_json::to_string(&paths_vec).unwrap_or_default(),
+                ip_address
+            ],
         )?;
     } else {
         // Create new tracker
@@ -318,7 +332,10 @@ pub fn track_404(conn: &Connection, ip_address: &str, path: &str) -> Result<()> 
 }
 
 /// Get suspicious IPs with high 404 counts
-pub fn get_suspicious_404_ips(conn: &Connection, min_errors: i32) -> Result<Vec<(String, i32, String)>> {
+pub fn get_suspicious_404_ips(
+    conn: &Connection,
+    min_errors: i32,
+) -> Result<Vec<(String, i32, String)>> {
     // Clean up old entries (older than 24 hours)
     conn.execute(
         "DELETE FROM error_404_tracker WHERE first_error_at < datetime('now', '-1 day')",
@@ -329,11 +346,15 @@ pub fn get_suspicious_404_ips(conn: &Connection, min_errors: i32) -> Result<Vec<
         "SELECT ip_address, error_count, paths_attempted
          FROM error_404_tracker
          WHERE error_count >= ?1
-         ORDER BY error_count DESC"
+         ORDER BY error_count DESC",
     )?;
 
     let rows = stmt.query_map(params![min_errors], |row| {
-        Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?, row.get::<_, String>(2)?))
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, i32>(1)?,
+            row.get::<_, String>(2)?,
+        ))
     })?;
 
     rows.collect()
@@ -344,7 +365,11 @@ pub fn get_suspicious_404_ips(conn: &Connection, min_errors: i32) -> Result<Vec<
 // ============================================================================
 
 /// Track invalid API key attempt
-pub fn track_invalid_api_key(conn: &Connection, ip_address: &str, api_key_hash: Option<&str>) -> Result<()> {
+pub fn track_invalid_api_key(
+    conn: &Connection,
+    ip_address: &str,
+    api_key_hash: Option<&str>,
+) -> Result<()> {
     let existing: Option<(i32, String)> = conn.query_row(
         "SELECT attempt_count, api_keys_tried FROM invalid_api_key_tracker WHERE ip_address = ?1",
         params![ip_address],
@@ -357,7 +382,7 @@ pub fn track_invalid_api_key(conn: &Connection, ip_address: &str, api_key_hash: 
             if !keys_vec.contains(&hash.to_string()) {
                 keys_vec.push(hash.to_string());
                 if keys_vec.len() > 20 {
-                    keys_vec = keys_vec[keys_vec.len()-20..].to_vec();
+                    keys_vec = keys_vec[keys_vec.len() - 20..].to_vec();
                 }
             }
         }
@@ -385,7 +410,10 @@ pub fn track_invalid_api_key(conn: &Connection, ip_address: &str, api_key_hash: 
 }
 
 /// Get suspicious API users
-pub fn get_suspicious_api_users(conn: &Connection, min_attempts: i32) -> Result<Vec<(String, i32)>> {
+pub fn get_suspicious_api_users(
+    conn: &Connection,
+    min_attempts: i32,
+) -> Result<Vec<(String, i32)>> {
     // Clean up old entries
     conn.execute(
         "DELETE FROM invalid_api_key_tracker WHERE first_attempt_at < datetime('now', '-1 day')",
@@ -396,7 +424,7 @@ pub fn get_suspicious_api_users(conn: &Connection, min_attempts: i32) -> Result<
         "SELECT ip_address, attempt_count
          FROM invalid_api_key_tracker
          WHERE attempt_count >= ?1
-         ORDER BY attempt_count DESC"
+         ORDER BY attempt_count DESC",
     )?;
 
     let rows = stmt.query_map(params![min_attempts], |row| {

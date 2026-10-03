@@ -49,7 +49,8 @@ pub async fn close_position(
         &request.symbol,
         &request.product,
         None,
-    ).await?;
+    )
+    .await?;
 
     Ok(ClosePositionResponse {
         success: result.success,
@@ -67,9 +68,12 @@ pub async fn close_all_positions(state: State<'_, AppState>) -> Result<Vec<Close
 
     let results = PositionService::close_all_positions(&state, None).await?;
 
-    Ok(results.into_iter().map(|r| ClosePositionResponse {
-        success: r.success,
-        order_id: r.order_id,
-        message: r.message,
-    }).collect())
+    Ok(results
+        .into_iter()
+        .map(|r| ClosePositionResponse {
+            success: r.success,
+            order_id: r.order_id,
+            message: r.message,
+        })
+        .collect())
 }

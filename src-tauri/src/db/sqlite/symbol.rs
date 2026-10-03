@@ -46,7 +46,12 @@ pub fn store_symbols(conn: &mut Connection, symbols: &[SymbolInfo]) -> Result<()
                 &symbol.brsymbol,
                 &symbol.brexchange,
             ]) {
-                tracing::error!("Failed to insert symbol {}: {:?} - Error: {}", idx, symbol.symbol, e);
+                tracing::error!(
+                    "Failed to insert symbol {}: {:?} - Error: {}",
+                    idx,
+                    symbol.symbol,
+                    e
+                );
                 return Err(e.into());
             }
         }
@@ -56,7 +61,11 @@ pub fn store_symbols(conn: &mut Connection, symbols: &[SymbolInfo]) -> Result<()
     tx.commit()?;
 
     let elapsed = start.elapsed();
-    tracing::info!("Stored {} symbols in database in {:.2}s", symbols.len(), elapsed.as_secs_f64());
+    tracing::info!(
+        "Stored {} symbols in database in {:.2}s",
+        symbols.len(),
+        elapsed.as_secs_f64()
+    );
     Ok(())
 }
 
@@ -89,11 +98,7 @@ pub fn load_symbols(conn: &Connection) -> Result<Vec<SymbolInfo>> {
 /// Get symbol count from database
 #[allow(dead_code)]
 pub fn count_symbols(conn: &Connection) -> Result<i64> {
-    let count: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM symtoken",
-        [],
-        |row| row.get(0),
-    )?;
+    let count: i64 = conn.query_row("SELECT COUNT(*) FROM symtoken", [], |row| row.get(0))?;
     Ok(count)
 }
 
@@ -143,20 +148,21 @@ pub fn search_symbols(
              WHERE (symbol LIKE ?1 OR name LIKE ?1) AND exchange = ?2
              LIMIT ?3",
         )?;
-        let symbols = stmt.query_map(params![query_pattern, exch, limit_i64], |row| {
-            Ok(SymbolInfo {
-                symbol: row.get(0)?,
-                token: row.get(1)?,
-                exchange: row.get(2)?,
-                name: row.get(3)?,
-                lot_size: row.get(4)?,
-                tick_size: row.get(5)?,
-                instrument_type: row.get(6)?,
-                brsymbol: row.get(7)?,
-                brexchange: row.get(8)?,
-            })
-        })?
-        .collect::<std::result::Result<Vec<_>, _>>()?;
+        let symbols = stmt
+            .query_map(params![query_pattern, exch, limit_i64], |row| {
+                Ok(SymbolInfo {
+                    symbol: row.get(0)?,
+                    token: row.get(1)?,
+                    exchange: row.get(2)?,
+                    name: row.get(3)?,
+                    lot_size: row.get(4)?,
+                    tick_size: row.get(5)?,
+                    instrument_type: row.get(6)?,
+                    brsymbol: row.get(7)?,
+                    brexchange: row.get(8)?,
+                })
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
         Ok(symbols)
     } else {
         let mut stmt = conn.prepare(
@@ -165,20 +171,21 @@ pub fn search_symbols(
              WHERE symbol LIKE ?1 OR name LIKE ?1
              LIMIT ?2",
         )?;
-        let symbols = stmt.query_map(params![query_pattern, limit_i64], |row| {
-            Ok(SymbolInfo {
-                symbol: row.get(0)?,
-                token: row.get(1)?,
-                exchange: row.get(2)?,
-                name: row.get(3)?,
-                lot_size: row.get(4)?,
-                tick_size: row.get(5)?,
-                instrument_type: row.get(6)?,
-                brsymbol: row.get(7)?,
-                brexchange: row.get(8)?,
-            })
-        })?
-        .collect::<std::result::Result<Vec<_>, _>>()?;
+        let symbols = stmt
+            .query_map(params![query_pattern, limit_i64], |row| {
+                Ok(SymbolInfo {
+                    symbol: row.get(0)?,
+                    token: row.get(1)?,
+                    exchange: row.get(2)?,
+                    name: row.get(3)?,
+                    lot_size: row.get(4)?,
+                    tick_size: row.get(5)?,
+                    instrument_type: row.get(6)?,
+                    brsymbol: row.get(7)?,
+                    brexchange: row.get(8)?,
+                })
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
         Ok(symbols)
     }
 }

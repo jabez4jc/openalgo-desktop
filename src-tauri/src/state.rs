@@ -197,7 +197,8 @@ impl AppState {
         for symbol in symbols {
             let cache_key = format!("{}:{}", symbol.exchange, symbol.token);
             let reverse_key = format!("{}:{}", symbol.exchange, symbol.symbol);
-            self.symbol_reverse_cache.insert(reverse_key, symbol.token.clone());
+            self.symbol_reverse_cache
+                .insert(reverse_key, symbol.token.clone());
             self.symbol_cache.insert(cache_key, symbol);
         }
 

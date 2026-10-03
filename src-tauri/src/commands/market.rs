@@ -41,7 +41,9 @@ pub async fn get_market_holidays_by_exchange(
     state: State<'_, AppState>,
     request: GetHolidaysByExchangeRequest,
 ) -> Result<Vec<MarketHoliday>> {
-    state.sqlite.get_market_holidays_by_exchange(&request.exchange, request.year)
+    state
+        .sqlite
+        .get_market_holidays_by_exchange(&request.exchange, request.year)
 }
 
 #[derive(Debug, Serialize)]
@@ -124,7 +126,9 @@ pub async fn update_market_timing(
         market_close: request.market_close,
         post_close_end: request.post_close_end,
     };
-    state.sqlite.update_market_timing(&request.exchange, &update_req)
+    state
+        .sqlite
+        .update_market_timing(&request.exchange, &update_req)
 }
 
 #[derive(Debug, Serialize)]
@@ -140,8 +144,5 @@ pub async fn is_market_open(
     exchange: String,
 ) -> Result<IsMarketOpenResponse> {
     let is_open = state.sqlite.is_market_open(&exchange)?;
-    Ok(IsMarketOpenResponse {
-        is_open,
-        exchange,
-    })
+    Ok(IsMarketOpenResponse { is_open, exchange })
 }

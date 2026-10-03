@@ -127,10 +127,7 @@ pub fn update_strategy(
 
     updates.push("updated_at = datetime('now')");
 
-    let sql = format!(
-        "UPDATE strategies SET {} WHERE id = ?",
-        updates.join(", ")
-    );
+    let sql = format!("UPDATE strategies SET {} WHERE id = ?", updates.join(", "));
 
     params.push(Box::new(id));
 
@@ -167,8 +164,8 @@ pub fn get_strategy_by_webhook_id(
                 webhook_id: row.get(2)?,
                 is_active: row.get::<_, i32>(3)? == 1,
                 // TODO: Add these fields to strategies table in a future migration
-                is_intraday: false,  // Default to positional
-                trading_mode: "BOTH".to_string(),  // Default to both directions
+                is_intraday: false,               // Default to positional
+                trading_mode: "BOTH".to_string(), // Default to both directions
                 start_time: Some("09:15".to_string()),
                 end_time: Some("15:15".to_string()),
                 squareoff_time: Some("15:25".to_string()),

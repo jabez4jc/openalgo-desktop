@@ -86,7 +86,13 @@ pub async fn delete_strategy(state: State<'_, AppState>, id: i64) -> Result<()> 
 
 /// Toggle strategy enabled/disabled
 #[tauri::command]
-pub async fn toggle_strategy(state: State<'_, AppState>, id: i64, enabled: bool) -> Result<Strategy> {
+pub async fn toggle_strategy(
+    state: State<'_, AppState>,
+    id: i64,
+    enabled: bool,
+) -> Result<Strategy> {
     tracing::info!("Toggling strategy {} to enabled={}", id, enabled);
-    state.sqlite.update_strategy(id, None, None, None, None, None, Some(enabled))
+    state
+        .sqlite
+        .update_strategy(id, None, None, None, None, None, Some(enabled))
 }

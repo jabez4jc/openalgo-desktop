@@ -123,10 +123,7 @@ pub async fn get_broker_status(state: State<'_, AppState>) -> Result<BrokerStatu
 
 /// Set active broker (for switching between brokers)
 #[tauri::command]
-pub async fn set_active_broker(
-    state: State<'_, AppState>,
-    broker_id: String,
-) -> Result<()> {
+pub async fn set_active_broker(state: State<'_, AppState>, broker_id: String) -> Result<()> {
     tracing::info!("Setting active broker: {}", broker_id);
 
     // Verify broker exists
@@ -135,7 +132,9 @@ pub async fn set_active_broker(
     }
 
     // Try to restore session from stored auth token
-    if let Some((auth_token, feed_token)) = state.sqlite.get_auth_token(&broker_id, &state.security)? {
+    if let Some((auth_token, feed_token)) =
+        state.sqlite.get_auth_token(&broker_id, &state.security)?
+    {
         let session = BrokerSession {
             broker_id: broker_id.clone(),
             auth_token,

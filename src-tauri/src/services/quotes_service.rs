@@ -3,7 +3,7 @@
 //! Handles quote and market depth retrieval.
 //! Called by both Tauri commands and REST API.
 
-use crate::brokers::types::{Quote, MarketDepth};
+use crate::brokers::types::{MarketDepth, Quote};
 use crate::error::{AppError, Result};
 use crate::state::AppState;
 use serde::{Deserialize, Serialize};
@@ -60,11 +60,9 @@ impl QuotesService {
         let symbols = vec![(exchange.to_string(), symbol.to_string())];
         let result = Self::get_quotes(state, symbols, api_key).await?;
 
-        result
-            .quotes
-            .into_iter()
-            .next()
-            .ok_or_else(|| AppError::NotFound(format!("Quote not found for {} {}", exchange, symbol)))
+        result.quotes.into_iter().next().ok_or_else(|| {
+            AppError::NotFound(format!("Quote not found for {} {}", exchange, symbol))
+        })
     }
 
     /// Get market depth for a symbol
@@ -83,7 +81,9 @@ impl QuotesService {
             .get(&broker_id)
             .ok_or_else(|| AppError::Broker(format!("Broker '{}' not found", broker_id)))?;
 
-        let depth = broker.get_market_depth(&auth_token, exchange, symbol).await?;
+        let depth = broker
+            .get_market_depth(&auth_token, exchange, symbol)
+            .await?;
 
         Ok(DepthResult {
             success: true,

@@ -1,6 +1,6 @@
 //! Order management commands
 
-use crate::brokers::types::{Order, OrderRequest, ModifyOrderRequest};
+use crate::brokers::types::{ModifyOrderRequest, Order, OrderRequest};
 use crate::error::Result;
 use crate::services::{OrderService, OrderbookService};
 use crate::state::AppState;
@@ -18,10 +18,7 @@ pub struct OrderResponse {
 ///
 /// Routes to sandbox in analyze mode.
 #[tauri::command]
-pub async fn place_order(
-    state: State<'_, AppState>,
-    order: OrderRequest,
-) -> Result<OrderResponse> {
+pub async fn place_order(state: State<'_, AppState>, order: OrderRequest) -> Result<OrderResponse> {
     tracing::info!("Placing order: {:?}", order);
 
     let result = OrderService::place_order(&state, order, None).await?;

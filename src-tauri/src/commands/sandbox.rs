@@ -1,8 +1,8 @@
 //! Sandbox (paper trading) commands
 
-use crate::db::sqlite::{SandboxFunds, SandboxHolding};
 use crate::db::sqlite::models::{SandboxOrder, SandboxPosition};
 use crate::db::sqlite::sandbox::{SandboxConfig, SandboxDailyPnl, SandboxPnlData, SandboxTrade};
+use crate::db::sqlite::{SandboxFunds, SandboxHolding};
 use crate::error::Result;
 use crate::state::AppState;
 use serde::{Deserialize, Serialize};
@@ -82,7 +82,9 @@ pub async fn update_sandbox_ltp(
     state: State<'_, AppState>,
     request: UpdateLtpRequest,
 ) -> Result<()> {
-    state.sqlite.update_sandbox_ltp(&request.exchange, &request.symbol, request.ltp)
+    state
+        .sqlite
+        .update_sandbox_ltp(&request.exchange, &request.symbol, request.ltp)
 }
 
 #[derive(Debug, Serialize)]
@@ -99,10 +101,7 @@ pub async fn cancel_sandbox_order(
 ) -> Result<CancelOrderResponse> {
     tracing::info!("Cancelling sandbox order: {}", order_id);
     let success = state.sqlite.cancel_sandbox_order(&order_id)?;
-    Ok(CancelOrderResponse {
-        success,
-        order_id,
-    })
+    Ok(CancelOrderResponse { success, order_id })
 }
 
 /// Get sandbox configuration
@@ -123,8 +122,14 @@ pub async fn update_sandbox_config(
     state: State<'_, AppState>,
     request: UpdateConfigRequest,
 ) -> Result<()> {
-    tracing::info!("Updating sandbox config: {} = {}", request.key, request.value);
-    state.sqlite.update_sandbox_config(&request.key, &request.value)
+    tracing::info!(
+        "Updating sandbox config: {} = {}",
+        request.key,
+        request.value
+    );
+    state
+        .sqlite
+        .update_sandbox_config(&request.key, &request.value)
 }
 
 /// Get sandbox trades

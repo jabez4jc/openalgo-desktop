@@ -337,7 +337,10 @@ pub struct SplitOrderRequest {
     pub action: String,
     #[serde(deserialize_with = "deserialize_flexible_i32")]
     pub quantity: i32,
-    #[serde(default = "default_split_size", deserialize_with = "deserialize_flexible_i32")]
+    #[serde(
+        default = "default_split_size",
+        deserialize_with = "deserialize_flexible_i32"
+    )]
     pub splitsize: i32,
     #[serde(default = "default_pricetype")]
     pub pricetype: String,
@@ -991,7 +994,8 @@ impl WebhookPayload {
 
     /// Get the action from various possible field names
     pub fn get_action(&self) -> Option<String> {
-        self.action.clone()
+        self.action
+            .clone()
             .or(self.order.clone())
             .or(self.side.clone())
             .or_else(|| {
@@ -1021,7 +1025,8 @@ impl WebhookPayload {
 
     /// Get price type from various possible field names
     pub fn get_pricetype(&self) -> String {
-        self.pricetype.clone()
+        self.pricetype
+            .clone()
             .or(self.order_type.clone())
             .unwrap_or_else(|| "MARKET".to_string())
             .to_uppercase()
@@ -1035,7 +1040,8 @@ impl WebhookPayload {
     /// Get list of symbols (for Chartink multi-stock)
     pub fn get_symbols(&self) -> Vec<String> {
         if let Some(stocks) = &self.stocks {
-            stocks.split(',')
+            stocks
+                .split(',')
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty())
                 .collect()

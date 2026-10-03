@@ -1,34 +1,36 @@
 //! SQLite database module
 
-pub mod models;
-mod connection;
-mod migrations;
-mod auth;
-mod user;
-mod api_keys;
-mod symbol;
-mod strategy;
-mod settings;
-pub mod sandbox;
-mod order_logs;
-mod market;
 mod analyzer_logs;
+mod api_keys;
+mod auth;
+mod connection;
 mod latency_logs;
+mod market;
+mod migrations;
+pub mod models;
+mod order_logs;
+pub mod sandbox;
+mod settings;
+mod strategy;
+mod symbol;
 mod traffic_logs;
+mod user;
 
 use crate::error::Result;
 use crate::security::SecurityManager;
 use crate::state::SymbolInfo;
-pub use models::{AutoLogoutConfig, WebhookConfig, ApiKey, ApiKeyInfo, SandboxFunds, SandboxHolding};
-pub use order_logs::{OrderLog, LogStats};
-pub use market::{MarketHoliday, MarketTiming, CreateHolidayRequest, UpdateTimingRequest};
 pub use analyzer_logs::{AnalyzerLog, AnalyzerLogStats};
-pub use latency_logs::{LatencyLog, LatencyStats, BrokerLatencyStats};
-pub use traffic_logs::{TrafficLog, TrafficStats, IPBan};
+pub use latency_logs::{BrokerLatencyStats, LatencyLog, LatencyStats};
+pub use market::{CreateHolidayRequest, MarketHoliday, MarketTiming, UpdateTimingRequest};
 use models::*;
+pub use models::{
+    ApiKey, ApiKeyInfo, AutoLogoutConfig, SandboxFunds, SandboxHolding, WebhookConfig,
+};
+pub use order_logs::{LogStats, OrderLog};
 use parking_lot::Mutex;
 use rusqlite::Connection;
 use std::path::Path;
+pub use traffic_logs::{IPBan, TrafficLog, TrafficStats};
 
 /// SQLite database wrapper
 pub struct SqliteDb {
@@ -171,7 +173,9 @@ impl SqliteDb {
         enabled: Option<bool>,
     ) -> Result<Strategy> {
         let conn = self.conn.lock();
-        strategy::update_strategy(&conn, id, name, exchange, symbol, product, quantity, enabled)
+        strategy::update_strategy(
+            &conn, id, name, exchange, symbol, product, quantity, enabled,
+        )
     }
 
     /// Delete a strategy
@@ -215,11 +219,7 @@ impl SqliteDb {
     }
 
     /// Validate API key and return the ApiKey if valid
-    pub fn validate_api_key(
-        &self,
-        apikey: &str,
-        security: &SecurityManager,
-    ) -> Result<ApiKey> {
+    pub fn validate_api_key(&self, apikey: &str, security: &SecurityManager) -> Result<ApiKey> {
         let conn = self.conn.lock();
         api_keys::validate_api_key(&conn, apikey, security)
     }
@@ -348,7 +348,13 @@ impl SqliteDb {
         smart_order_delay: Option<f64>,
     ) -> Result<models::RateLimitConfig> {
         let conn = self.conn.lock();
-        settings::update_rate_limit_config(&conn, api_rate_limit, order_rate_limit, smart_order_rate_limit, smart_order_delay)
+        settings::update_rate_limit_config(
+            &conn,
+            api_rate_limit,
+            order_rate_limit,
+            smart_order_rate_limit,
+            smart_order_delay,
+        )
     }
 
     // ========== Sandbox Methods ==========
@@ -377,7 +383,9 @@ impl SqliteDb {
         product: &str,
     ) -> Result<SandboxOrder> {
         let conn = self.conn.lock();
-        sandbox::place_order(&conn, symbol, exchange, side, quantity, price, order_type, product)
+        sandbox::place_order(
+            &conn, symbol, exchange, side, quantity, price, order_type, product,
+        )
     }
 
     /// Reset sandbox
@@ -461,7 +469,8 @@ impl SqliteDb {
     ) -> Result<i64> {
         let conn = self.conn.lock();
         order_logs::create_log(
-            &conn, order_id, broker, symbol, exchange, side, quantity, price, order_type, product, status, message, source,
+            &conn, order_id, broker, symbol, exchange, side, quantity, price, order_type, product,
+            status, message, source,
         )
     }
 
@@ -522,7 +531,11 @@ impl SqliteDb {
     }
 
     /// Get holidays by exchange
-    pub fn get_market_holidays_by_exchange(&self, exchange: &str, year: Option<i32>) -> Result<Vec<MarketHoliday>> {
+    pub fn get_market_holidays_by_exchange(
+        &self,
+        exchange: &str,
+        year: Option<i32>,
+    ) -> Result<Vec<MarketHoliday>> {
         let conn = self.conn.lock();
         market::get_holidays_by_exchange(&conn, exchange, year)
     }
@@ -554,7 +567,11 @@ impl SqliteDb {
     }
 
     /// Update market timing
-    pub fn update_market_timing(&self, exchange: &str, req: &UpdateTimingRequest) -> Result<MarketTiming> {
+    pub fn update_market_timing(
+        &self,
+        exchange: &str,
+        req: &UpdateTimingRequest,
+    ) -> Result<MarketTiming> {
         let conn = self.conn.lock();
         market::update_timing(&conn, exchange, req)
     }
@@ -582,10 +599,7 @@ impl SqliteDb {
     /// Set analyze mode
     pub fn set_analyze_mode(&self, enabled: bool) -> Result<()> {
         let conn = self.conn.lock();
-        conn.execute(
-            "UPDATE settings SET analyze_mode = ?1",
-            [enabled],
-        )?;
+        conn.execute("UPDATE settings SET analyze_mode = ?1", [enabled])?;
         Ok(())
     }
 
@@ -637,7 +651,12 @@ impl SqliteDb {
         response_data: &str,
     ) -> Result<i64> {
         let conn = self.conn.lock();
-        Ok(analyzer_logs::create_log(&conn, api_type, request_data, response_data)?)
+        Ok(analyzer_logs::create_log(
+            &conn,
+            api_type,
+            request_data,
+            response_data,
+        )?)
     }
 
     /// Get analyzer logs with pagination
@@ -701,9 +720,18 @@ impl SqliteDb {
     ) -> Result<i64> {
         let conn = self.conn.lock();
         Ok(latency_logs::log_latency(
-            &conn, order_id, broker, symbol, order_type,
-            rtt_ms, validation_ms, broker_response_ms, overhead_ms, total_ms,
-            status, error,
+            &conn,
+            order_id,
+            broker,
+            symbol,
+            order_type,
+            rtt_ms,
+            validation_ms,
+            broker_response_ms,
+            overhead_ms,
+            total_ms,
+            status,
+            error,
         )?)
     }
 
@@ -745,7 +773,16 @@ impl SqliteDb {
         error: Option<&str>,
     ) -> Result<i64> {
         let conn = self.conn.lock();
-        Ok(traffic_logs::log_request(&conn, client_ip, method, path, status_code, duration_ms, host, error)?)
+        Ok(traffic_logs::log_request(
+            &conn,
+            client_ip,
+            method,
+            path,
+            status_code,
+            duration_ms,
+            host,
+            error,
+        )?)
     }
 
     /// Get recent traffic logs
@@ -784,7 +821,14 @@ impl SqliteDb {
         created_by: &str,
     ) -> Result<bool> {
         let conn = self.conn.lock();
-        Ok(traffic_logs::ban_ip(&conn, ip_address, reason, duration_hours, permanent, created_by)?)
+        Ok(traffic_logs::ban_ip(
+            &conn,
+            ip_address,
+            reason,
+            duration_hours,
+            permanent,
+            created_by,
+        )?)
     }
 
     /// Unban an IP address
@@ -814,9 +858,17 @@ impl SqliteDb {
     }
 
     /// Track invalid API key attempt
-    pub fn track_invalid_api_key(&self, ip_address: &str, api_key_hash: Option<&str>) -> Result<()> {
+    pub fn track_invalid_api_key(
+        &self,
+        ip_address: &str,
+        api_key_hash: Option<&str>,
+    ) -> Result<()> {
         let conn = self.conn.lock();
-        Ok(traffic_logs::track_invalid_api_key(&conn, ip_address, api_key_hash)?)
+        Ok(traffic_logs::track_invalid_api_key(
+            &conn,
+            ip_address,
+            api_key_hash,
+        )?)
     }
 
     /// Get suspicious API users
@@ -901,7 +953,15 @@ impl SqliteDb {
     pub fn get_broker_credentials(
         &self,
         broker_id: &str,
-    ) -> Result<Option<(String, String, Option<String>, Option<String>, Option<String>)>> {
+    ) -> Result<
+        Option<(
+            String,
+            String,
+            Option<String>,
+            Option<String>,
+            Option<String>,
+        )>,
+    > {
         let conn = self.conn.lock();
         let mut stmt = conn.prepare(
             "SELECT api_key_encrypted, api_key_nonce, api_secret_encrypted, api_secret_nonce, client_id

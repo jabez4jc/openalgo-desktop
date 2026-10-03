@@ -36,7 +36,8 @@ fn default_mode() -> String {
 #[tauri::command]
 pub async fn websocket_connect(state: State<'_, AppState>) -> Result<bool> {
     // Get broker credentials from session
-    let broker_session = state.get_broker_session()
+    let broker_session = state
+        .get_broker_session()
         .ok_or_else(|| crate::error::AppError::Auth("Not logged in to broker".to_string()))?;
 
     let broker_id = broker_session.broker_id.clone();
@@ -49,11 +50,14 @@ pub async fn websocket_connect(state: State<'_, AppState>) -> Result<bool> {
         .ok_or_else(|| crate::error::AppError::Auth("No auth tokens found".to_string()))?;
 
     let _auth_token = tokens.0;
-    let feed_token = tokens.1
+    let feed_token = tokens
+        .1
         .ok_or_else(|| crate::error::AppError::Auth("No feed token found".to_string()))?;
 
     // Get API key from SQLite for WebSocket authentication
-    let creds = state.sqlite.get_broker_credentials(&broker_id)?
+    let creds = state
+        .sqlite
+        .get_broker_credentials(&broker_id)?
         .ok_or_else(|| crate::error::AppError::Auth("No broker credentials found".to_string()))?;
     // creds = (api_key_enc, api_key_nonce, api_secret_enc, api_secret_nonce, client_id)
     let api_key = state.security.decrypt(&creds.0, &creds.1)?;
@@ -103,7 +107,9 @@ pub async fn websocket_subscribe(
 
             // Register symbol mapping if provided
             if let Some(symbol) = &s.symbol {
-                state.websocket.register_symbol(&s.token, symbol, &s.exchange);
+                state
+                    .websocket
+                    .register_symbol(&s.token, symbol, &s.exchange);
             }
 
             SubscriptionRequest {

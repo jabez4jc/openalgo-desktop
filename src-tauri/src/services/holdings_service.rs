@@ -25,10 +25,7 @@ impl HoldingsService {
     ///
     /// In analyze mode, returns sandbox holdings.
     /// Otherwise, returns live broker holdings.
-    pub async fn get_holdings(
-        state: &AppState,
-        api_key: Option<&str>,
-    ) -> Result<HoldingsResult> {
+    pub async fn get_holdings(state: &AppState, api_key: Option<&str>) -> Result<HoldingsResult> {
         info!("HoldingsService::get_holdings");
 
         // Check if in analyze mode

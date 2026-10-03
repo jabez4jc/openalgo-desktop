@@ -40,10 +40,7 @@ impl OrderbookService {
     ///
     /// In analyze mode, returns sandbox orders.
     /// Otherwise, returns live broker orders.
-    pub async fn get_orderbook(
-        state: &AppState,
-        api_key: Option<&str>,
-    ) -> Result<OrderbookResult> {
+    pub async fn get_orderbook(state: &AppState, api_key: Option<&str>) -> Result<OrderbookResult> {
         info!("OrderbookService::get_orderbook");
 
         // Check if in analyze mode
@@ -73,10 +70,7 @@ impl OrderbookService {
     ///
     /// In analyze mode, returns sandbox trades.
     /// Otherwise, returns live broker trades.
-    pub async fn get_tradebook(
-        state: &AppState,
-        api_key: Option<&str>,
-    ) -> Result<TradebookResult> {
+    pub async fn get_tradebook(state: &AppState, api_key: Option<&str>) -> Result<TradebookResult> {
         info!("OrderbookService::get_tradebook");
 
         // Check if in analyze mode
@@ -183,7 +177,9 @@ impl OrderbookService {
 
         let trades: Vec<Order> = sandbox_orders
             .into_iter()
-            .filter(|so| so.status == "complete" || so.status == "COMPLETE" || so.status == "FILLED")
+            .filter(|so| {
+                so.status == "complete" || so.status == "COMPLETE" || so.status == "FILLED"
+            })
             .map(|so| Order {
                 order_id: so.order_id,
                 exchange_order_id: None,

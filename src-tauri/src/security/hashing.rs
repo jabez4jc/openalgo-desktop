@@ -2,9 +2,7 @@
 
 use crate::error::{AppError, Result};
 use argon2::{
-    password_hash::{
-        rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString,
-    },
+    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2, Params, Version,
 };
 
@@ -43,10 +41,10 @@ impl HashingManager {
             argon2::Algorithm::Argon2id,
             Version::V0x13,
             Params::new(
-                19456,  // m_cost (19 MiB)
-                2,      // t_cost (2 iterations)
-                1,      // p_cost (1 thread)
-                None,   // output length (default 32)
+                19456, // m_cost (19 MiB)
+                2,     // t_cost (2 iterations)
+                1,     // p_cost (1 thread)
+                None,  // output length (default 32)
             )
             .map_err(|e| AppError::Internal(format!("Invalid Argon2 params: {}", e)))?,
         );
@@ -72,7 +70,10 @@ impl HashingManager {
         match argon2.verify_password(peppered.as_bytes(), &parsed_hash) {
             Ok(()) => Ok(true),
             Err(argon2::password_hash::Error::Password) => Ok(false),
-            Err(e) => Err(AppError::Internal(format!("Password verification failed: {}", e))),
+            Err(e) => Err(AppError::Internal(format!(
+                "Password verification failed: {}",
+                e
+            ))),
         }
     }
 

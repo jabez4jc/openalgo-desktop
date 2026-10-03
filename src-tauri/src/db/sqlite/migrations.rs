@@ -21,22 +21,46 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
     run_migration(conn, "003_api_keys", CREATE_API_KEYS_TABLE)?;
     run_migration(conn, "004_symtoken", CREATE_SYMTOKEN_TABLE)?;
     run_migration(conn, "005_strategies", CREATE_STRATEGIES_TABLE)?;
-    run_migration(conn, "006_strategy_mappings", CREATE_STRATEGY_MAPPINGS_TABLE)?;
-    run_migration(conn, "007_chartink_strategies", CREATE_CHARTINK_STRATEGIES_TABLE)?;
-    run_migration(conn, "008_chartink_mappings", CREATE_CHARTINK_MAPPINGS_TABLE)?;
+    run_migration(
+        conn,
+        "006_strategy_mappings",
+        CREATE_STRATEGY_MAPPINGS_TABLE,
+    )?;
+    run_migration(
+        conn,
+        "007_chartink_strategies",
+        CREATE_CHARTINK_STRATEGIES_TABLE,
+    )?;
+    run_migration(
+        conn,
+        "008_chartink_mappings",
+        CREATE_CHARTINK_MAPPINGS_TABLE,
+    )?;
     run_migration(conn, "009_settings", CREATE_SETTINGS_TABLE)?;
-    run_migration(conn, "010_chart_preferences", CREATE_CHART_PREFERENCES_TABLE)?;
+    run_migration(
+        conn,
+        "010_chart_preferences",
+        CREATE_CHART_PREFERENCES_TABLE,
+    )?;
     run_migration(conn, "011_qty_freeze", CREATE_QTY_FREEZE_TABLE)?;
     run_migration(conn, "012_pending_orders", CREATE_PENDING_ORDERS_TABLE)?;
     run_migration(conn, "013_market_holidays", CREATE_MARKET_HOLIDAYS_TABLE)?;
     run_migration(conn, "014_market_timings", CREATE_MARKET_TIMINGS_TABLE)?;
     run_migration(conn, "015_order_logs", CREATE_ORDER_LOGS_TABLE)?;
     run_migration(conn, "016_sandbox_orders", CREATE_SANDBOX_ORDERS_TABLE)?;
-    run_migration(conn, "017_sandbox_positions", CREATE_SANDBOX_POSITIONS_TABLE)?;
+    run_migration(
+        conn,
+        "017_sandbox_positions",
+        CREATE_SANDBOX_POSITIONS_TABLE,
+    )?;
     run_migration(conn, "018_sandbox_trades", CREATE_SANDBOX_TRADES_TABLE)?;
     run_migration(conn, "019_sandbox_holdings", CREATE_SANDBOX_HOLDINGS_TABLE)?;
     run_migration(conn, "020_sandbox_funds", CREATE_SANDBOX_FUNDS_TABLE)?;
-    run_migration(conn, "021_sandbox_daily_pnl", CREATE_SANDBOX_DAILY_PNL_TABLE)?;
+    run_migration(
+        conn,
+        "021_sandbox_daily_pnl",
+        CREATE_SANDBOX_DAILY_PNL_TABLE,
+    )?;
     run_migration(conn, "022_auth_separate_nonces", ALTER_AUTH_SEPARATE_NONCES)?;
     run_migration(conn, "023_auto_logout_settings", ADD_AUTO_LOGOUT_SETTINGS)?;
     run_migration(conn, "024_webhook_settings", ADD_WEBHOOK_SETTINGS)?;
@@ -46,12 +70,28 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
     run_migration(conn, "028_ip_bans", CREATE_IP_BANS_TABLE)?;
     run_migration(conn, "029_error_trackers", CREATE_ERROR_TRACKERS_TABLES)?;
     run_migration(conn, "030_sandbox_config", CREATE_SANDBOX_CONFIG_TABLE)?;
-    run_migration(conn, "031_symtoken_broker_fields", ADD_SYMTOKEN_BROKER_FIELDS)?;
+    run_migration(
+        conn,
+        "031_symtoken_broker_fields",
+        ADD_SYMTOKEN_BROKER_FIELDS,
+    )?;
     run_migration(conn, "032_analyze_mode", ADD_ANALYZE_MODE)?;
-    run_migration(conn, "033_configured_brokers", CREATE_CONFIGURED_BROKERS_TABLE)?;
-    run_migration(conn, "034_broker_credentials", CREATE_BROKER_CREDENTIALS_TABLE)?;
+    run_migration(
+        conn,
+        "033_configured_brokers",
+        CREATE_CONFIGURED_BROKERS_TABLE,
+    )?;
+    run_migration(
+        conn,
+        "034_broker_credentials",
+        CREATE_BROKER_CREDENTIALS_TABLE,
+    )?;
     run_migration(conn, "035_rate_limit_settings", ADD_RATE_LIMIT_SETTINGS)?;
-    run_migration(conn, "036_enable_webhook_default", ENABLE_WEBHOOK_BY_DEFAULT)?;
+    run_migration(
+        conn,
+        "036_enable_webhook_default",
+        ENABLE_WEBHOOK_BY_DEFAULT,
+    )?;
 
     tracing::info!("Database migrations completed");
     Ok(())
@@ -68,10 +108,7 @@ fn run_migration(conn: &Connection, name: &str, sql: &str) -> Result<()> {
     if !exists {
         tracing::info!("Running migration: {}", name);
         conn.execute_batch(sql)?;
-        conn.execute(
-            "INSERT INTO migrations (name) VALUES (?)",
-            [name],
-        )?;
+        conn.execute("INSERT INTO migrations (name) VALUES (?)", [name])?;
     }
 
     Ok(())

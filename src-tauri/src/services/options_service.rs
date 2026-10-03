@@ -78,7 +78,7 @@ pub struct SyntheticFutureResult {
 pub struct OptionsOrderRequest {
     pub underlying: String,
     pub exchange: String,
-    pub option_type: String, // "CE" or "PE"
+    pub option_type: String,      // "CE" or "PE"
     pub strike_selection: String, // "ATM", "ITM1", "OTM1", etc.
     pub expiry_date: Option<String>,
     pub action: String,
@@ -108,10 +108,14 @@ impl OptionsService {
         expiry_date: Option<&str>,
         api_key: Option<&str>,
     ) -> Result<OptionChainResult> {
-        info!("OptionsService::get_option_chain - {} {}", underlying, exchange);
+        info!(
+            "OptionsService::get_option_chain - {} {}",
+            underlying, exchange
+        );
 
         // Get underlying LTP
-        let underlying_quote = QuotesService::get_quote(state, exchange, underlying, api_key).await?;
+        let underlying_quote =
+            QuotesService::get_quote(state, exchange, underlying, api_key).await?;
         let underlying_ltp = underlying_quote.ltp;
 
         // Calculate ATM strike (round to nearest strike interval)
@@ -120,7 +124,9 @@ impl OptionsService {
 
         // Find option symbols in cache
         let expiry = expiry_date.unwrap_or("");
-        let strikes = Self::build_option_chain(state, underlying, exchange, expiry, atm_strike, api_key).await?;
+        let strikes =
+            Self::build_option_chain(state, underlying, exchange, expiry, atm_strike, api_key)
+                .await?;
 
         Ok(OptionChainResult {
             success: true,
@@ -139,7 +145,10 @@ impl OptionsService {
         exchange: &str,
         api_key: Option<&str>,
     ) -> Result<OptionGreeks> {
-        info!("OptionsService::get_option_greeks - {} {}", symbol, exchange);
+        info!(
+            "OptionsService::get_option_greeks - {} {}",
+            symbol, exchange
+        );
 
         // Get option quote
         let quote = QuotesService::get_quote(state, exchange, symbol, api_key).await?;
@@ -154,8 +163,8 @@ impl OptionsService {
         Ok(OptionGreeks {
             symbol: symbol.to_string(),
             ltp: quote.ltp,
-            iv: 0.0,     // Would calculate IV from option price
-            delta: 0.0,  // Would calculate from Black-Scholes
+            iv: 0.0,    // Would calculate IV from option price
+            delta: 0.0, // Would calculate from Black-Scholes
             gamma: 0.0,
             theta: 0.0,
             vega: 0.0,
@@ -182,10 +191,22 @@ impl OptionsService {
         let atm_strike = (underlying_ltp / strike_interval).round() * strike_interval;
 
         // Parse strike selection (ATM, ITM1, ITM2, OTM1, OTM2, etc.)
-        let target_strike = Self::calculate_target_strike(atm_strike, strike_interval, option_type, strike_selection);
+        let target_strike = Self::calculate_target_strike(
+            atm_strike,
+            strike_interval,
+            option_type,
+            strike_selection,
+        );
 
         // Find matching symbol in cache
-        let symbol = Self::find_option_symbol(state, underlying, exchange, option_type, target_strike, expiry_date)?;
+        let symbol = Self::find_option_symbol(
+            state,
+            underlying,
+            exchange,
+            option_type,
+            target_strike,
+            expiry_date,
+        )?;
 
         Ok(symbol)
     }
@@ -198,21 +219,41 @@ impl OptionsService {
         expiry_date: &str,
         api_key: Option<&str>,
     ) -> Result<SyntheticFutureResult> {
-        info!("OptionsService::get_synthetic_future - {} {}", underlying, exchange);
+        info!(
+            "OptionsService::get_synthetic_future - {} {}",
+            underlying, exchange
+        );
 
         // Get underlying LTP
-        let underlying_quote = QuotesService::get_quote(state, exchange, underlying, api_key).await?;
+        let underlying_quote =
+            QuotesService::get_quote(state, exchange, underlying, api_key).await?;
         let underlying_ltp = underlying_quote.ltp;
 
         let strike_interval = Self::get_strike_interval(underlying);
         let atm_strike = (underlying_ltp / strike_interval).round() * strike_interval;
 
         // Get ATM call and put prices
-        let call_symbol = Self::find_option_symbol(state, underlying, exchange, "CE", atm_strike, Some(expiry_date))?;
-        let put_symbol = Self::find_option_symbol(state, underlying, exchange, "PE", atm_strike, Some(expiry_date))?;
+        let call_symbol = Self::find_option_symbol(
+            state,
+            underlying,
+            exchange,
+            "CE",
+            atm_strike,
+            Some(expiry_date),
+        )?;
+        let put_symbol = Self::find_option_symbol(
+            state,
+            underlying,
+            exchange,
+            "PE",
+            atm_strike,
+            Some(expiry_date),
+        )?;
 
-        let call_quote = QuotesService::get_quote(state, exchange, &call_symbol.symbol, api_key).await?;
-        let put_quote = QuotesService::get_quote(state, exchange, &put_symbol.symbol, api_key).await?;
+        let call_quote =
+            QuotesService::get_quote(state, exchange, &call_symbol.symbol, api_key).await?;
+        let put_quote =
+            QuotesService::get_quote(state, exchange, &put_symbol.symbol, api_key).await?;
 
         // Synthetic Future = Strike + Call Price - Put Price
         let synthetic_future_price = atm_strike + call_quote.ltp - put_quote.ltp;
@@ -232,10 +273,14 @@ impl OptionsService {
         req: OptionsOrderRequest,
         api_key: Option<&str>,
     ) -> Result<PlaceOrderResult> {
-        info!("OptionsService::place_options_order - {} {}", req.underlying, req.option_type);
+        info!(
+            "OptionsService::place_options_order - {} {}",
+            req.underlying, req.option_type
+        );
 
         // Get underlying LTP for strike calculation
-        let underlying_quote = QuotesService::get_quote(state, &req.exchange, &req.underlying, api_key).await?;
+        let underlying_quote =
+            QuotesService::get_quote(state, &req.exchange, &req.underlying, api_key).await?;
 
         // Resolve option symbol
         let option_symbol = Self::get_option_symbol(
@@ -261,8 +306,8 @@ impl OptionsService {
             disclosed_quantity: None,
             validity: "DAY".to_string(),
             amo: false,
-            broker_symbol: None,  // Set by OrderService from symbol cache
-            symbol_token: None,   // Set by OrderService from symbol cache
+            broker_symbol: None, // Set by OrderService from symbol cache
+            symbol_token: None,  // Set by OrderService from symbol cache
         };
 
         OrderService::place_order(state, order_request, api_key).await
@@ -278,10 +323,14 @@ impl OptionsService {
         legs: Vec<OptionsLeg>,
         api_key: Option<&str>,
     ) -> Result<Vec<PlaceOrderResult>> {
-        info!("OptionsService::place_options_multi_order - {} legs", legs.len());
+        info!(
+            "OptionsService::place_options_multi_order - {} legs",
+            legs.len()
+        );
 
         // Get underlying LTP
-        let underlying_quote = QuotesService::get_quote(state, exchange, underlying, api_key).await?;
+        let underlying_quote =
+            QuotesService::get_quote(state, exchange, underlying, api_key).await?;
 
         let mut results = Vec::new();
 
@@ -308,8 +357,8 @@ impl OptionsService {
                 disclosed_quantity: None,
                 validity: "DAY".to_string(),
                 amo: false,
-                broker_symbol: None,  // Set by OrderService from symbol cache
-                symbol_token: None,   // Set by OrderService from symbol cache
+                broker_symbol: None, // Set by OrderService from symbol cache
+                symbol_token: None,  // Set by OrderService from symbol cache
             };
 
             match OrderService::place_order(state, order_request, api_key).await {
@@ -346,7 +395,12 @@ impl OptionsService {
     }
 
     /// Calculate target strike based on selection
-    fn calculate_target_strike(atm_strike: f64, interval: f64, option_type: &str, selection: &str) -> f64 {
+    fn calculate_target_strike(
+        atm_strike: f64,
+        interval: f64,
+        option_type: &str,
+        selection: &str,
+    ) -> f64 {
         let selection_upper = selection.to_uppercase();
 
         if selection_upper == "ATM" {
@@ -365,10 +419,10 @@ impl OptionsService {
         let offset_amount = offset as f64 * interval;
 
         match (option_type.to_uppercase().as_str(), is_itm) {
-            ("CE", true) => atm_strike - offset_amount,   // ITM call = lower strike
-            ("CE", false) => atm_strike + offset_amount,  // OTM call = higher strike
-            ("PE", true) => atm_strike + offset_amount,   // ITM put = higher strike
-            ("PE", false) => atm_strike - offset_amount,  // OTM put = lower strike
+            ("CE", true) => atm_strike - offset_amount, // ITM call = lower strike
+            ("CE", false) => atm_strike + offset_amount, // OTM call = higher strike
+            ("PE", true) => atm_strike + offset_amount, // ITM put = higher strike
+            ("PE", false) => atm_strike - offset_amount, // OTM put = lower strike
             _ => atm_strike,
         }
     }
@@ -426,8 +480,12 @@ impl OptionsService {
             let strike = atm_strike + (i as f64 * strike_interval);
 
             // Find CE and PE symbols for this strike
-            let call_symbol = Self::find_option_symbol(state, underlying, exchange, "CE", strike, Some(expiry)).ok();
-            let put_symbol = Self::find_option_symbol(state, underlying, exchange, "PE", strike, Some(expiry)).ok();
+            let call_symbol =
+                Self::find_option_symbol(state, underlying, exchange, "CE", strike, Some(expiry))
+                    .ok();
+            let put_symbol =
+                Self::find_option_symbol(state, underlying, exchange, "PE", strike, Some(expiry))
+                    .ok();
 
             strikes.push(OptionChainEntry {
                 strike,

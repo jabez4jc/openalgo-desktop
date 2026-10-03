@@ -10,9 +10,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnalyzerLog {
     pub id: i64,
-    pub api_type: String,           // placeorder, cancelorder, modifyorder, etc.
-    pub request_data: String,       // JSON request
-    pub response_data: String,      // JSON response
+    pub api_type: String,      // placeorder, cancelorder, modifyorder, etc.
+    pub request_data: String,  // JSON request
+    pub response_data: String, // JSON response
     pub created_at: String,
 }
 
@@ -45,7 +45,7 @@ pub fn get_logs(
             "SELECT id, api_type, request_data, response_data, created_at
              FROM analyzer_logs
              WHERE api_type = ?1
-             ORDER BY created_at DESC LIMIT ?2 OFFSET ?3"
+             ORDER BY created_at DESC LIMIT ?2 OFFSET ?3",
         )?;
 
         let rows = stmt.query_map(params![api_t, limit, offset], |row| {
@@ -65,7 +65,7 @@ pub fn get_logs(
         let mut stmt = conn.prepare(
             "SELECT id, api_type, request_data, response_data, created_at
              FROM analyzer_logs
-             ORDER BY created_at DESC LIMIT ?1 OFFSET ?2"
+             ORDER BY created_at DESC LIMIT ?1 OFFSET ?2",
         )?;
 
         let rows = stmt.query_map(params![limit, offset], |row| {
@@ -100,11 +100,7 @@ pub fn count_logs(conn: &Connection, api_type: Option<&str>) -> Result<i64> {
             |row| row.get(0),
         )?
     } else {
-        conn.query_row(
-            "SELECT COUNT(*) FROM analyzer_logs",
-            [],
-            |row| row.get(0),
-        )?
+        conn.query_row("SELECT COUNT(*) FROM analyzer_logs", [], |row| row.get(0))?
     };
     Ok(count)
 }
@@ -135,11 +131,7 @@ pub struct AnalyzerLogStats {
 }
 
 pub fn get_stats(conn: &Connection) -> Result<AnalyzerLogStats> {
-    let total: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM analyzer_logs",
-        [],
-        |row| row.get(0),
-    )?;
+    let total: i64 = conn.query_row("SELECT COUNT(*) FROM analyzer_logs", [], |row| row.get(0))?;
 
     let placeorder: i64 = conn.query_row(
         "SELECT COUNT(*) FROM analyzer_logs WHERE api_type = 'placeorder'",

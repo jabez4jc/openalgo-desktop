@@ -1,9 +1,9 @@
 //! API key management with Argon2 hashing and AES-256-GCM encryption
 
+use super::models::{ApiKey, ApiKeyInfo};
 use crate::error::{AppError, Result};
 use crate::security::SecurityManager;
 use rusqlite::{params, Connection};
-use super::models::{ApiKey, ApiKeyInfo};
 
 /// Generate a random 64-character hex API key
 pub fn generate_api_key() -> String {
@@ -18,7 +18,7 @@ fn mask_api_key(key: &str) -> String {
     if key.len() <= 12 {
         "*".repeat(key.len())
     } else {
-        format!("{}...{}", &key[..8], &key[key.len()-4..])
+        format!("{}...{}", &key[..8], &key[key.len() - 4..])
     }
 }
 
@@ -43,7 +43,10 @@ pub fn create_api_key(
     )?;
 
     if exists {
-        return Err(AppError::Validation(format!("API key with name '{}' already exists", name)));
+        return Err(AppError::Validation(format!(
+            "API key with name '{}' already exists",
+            name
+        )));
     }
 
     // Generate new API key
@@ -85,21 +88,24 @@ pub fn validate_api_key(
         r#"
         SELECT id, name, key_hash, encrypted_key, nonce, permissions, created_at, last_used_at
         FROM api_keys
-        "#
+        "#,
     )?;
 
-    let keys: Vec<ApiKey> = stmt.query_map([], |row| {
-        Ok(ApiKey {
-            id: row.get(0)?,
-            name: row.get(1)?,
-            key_hash: row.get(2)?,
-            encrypted_key: row.get(3)?,
-            nonce: row.get(4)?,
-            permissions: row.get(5)?,
-            created_at: row.get(6)?,
-            last_used_at: row.get(7)?,
-        })
-    })?.filter_map(|r| r.ok()).collect();
+    let keys: Vec<ApiKey> = stmt
+        .query_map([], |row| {
+            Ok(ApiKey {
+                id: row.get(0)?,
+                name: row.get(1)?,
+                key_hash: row.get(2)?,
+                encrypted_key: row.get(3)?,
+                nonce: row.get(4)?,
+                permissions: row.get(5)?,
+                created_at: row.get(6)?,
+                last_used_at: row.get(7)?,
+            })
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
 
     // Check each key's hash
     for key in keys {
@@ -119,55 +125,61 @@ pub fn validate_api_key(
 }
 
 /// List all API keys (with masked key values)
-pub fn list_api_keys(
-    conn: &Connection,
-    security: &SecurityManager,
-) -> Result<Vec<ApiKeyInfo>> {
+pub fn list_api_keys(conn: &Connection, security: &SecurityManager) -> Result<Vec<ApiKeyInfo>> {
     let mut stmt = conn.prepare(
         r#"
         SELECT id, name, encrypted_key, nonce, permissions, created_at, last_used_at
         FROM api_keys
         ORDER BY created_at DESC
-        "#
+        "#,
     )?;
 
-    let keys: Vec<ApiKeyInfo> = stmt.query_map([], |row| {
-        let id: i64 = row.get(0)?;
-        let name: String = row.get(1)?;
-        let encrypted_key: String = row.get(2)?;
-        let nonce: String = row.get(3)?;
-        let permissions: String = row.get(4)?;
-        let created_at: String = row.get(5)?;
-        let last_used_at: Option<String> = row.get(6)?;
+    let keys: Vec<ApiKeyInfo> = stmt
+        .query_map([], |row| {
+            let id: i64 = row.get(0)?;
+            let name: String = row.get(1)?;
+            let encrypted_key: String = row.get(2)?;
+            let nonce: String = row.get(3)?;
+            let permissions: String = row.get(4)?;
+            let created_at: String = row.get(5)?;
+            let last_used_at: Option<String> = row.get(6)?;
 
-        Ok((id, name, encrypted_key, nonce, permissions, created_at, last_used_at))
-    })?.filter_map(|r| r.ok())
-    .filter_map(|(id, name, encrypted_key, nonce, permissions, created_at, last_used_at)| {
-        // Decrypt the key to get masked version
-        let key_masked = match security.decrypt(&encrypted_key, &nonce) {
-            Ok(decrypted) => mask_api_key(&decrypted),
-            Err(_) => "****...****".to_string(),
-        };
+            Ok((
+                id,
+                name,
+                encrypted_key,
+                nonce,
+                permissions,
+                created_at,
+                last_used_at,
+            ))
+        })?
+        .filter_map(|r| r.ok())
+        .filter_map(
+            |(id, name, encrypted_key, nonce, permissions, created_at, last_used_at)| {
+                // Decrypt the key to get masked version
+                let key_masked = match security.decrypt(&encrypted_key, &nonce) {
+                    Ok(decrypted) => mask_api_key(&decrypted),
+                    Err(_) => "****...****".to_string(),
+                };
 
-        Some(ApiKeyInfo {
-            id,
-            name,
-            key_masked,
-            permissions,
-            created_at,
-            last_used_at,
-        })
-    })
-    .collect();
+                Some(ApiKeyInfo {
+                    id,
+                    name,
+                    key_masked,
+                    permissions,
+                    created_at,
+                    last_used_at,
+                })
+            },
+        )
+        .collect();
 
     Ok(keys)
 }
 
 /// Get API key by name
-pub fn get_api_key_by_name(
-    conn: &Connection,
-    name: &str,
-) -> Result<Option<ApiKey>> {
+pub fn get_api_key_by_name(conn: &Connection, name: &str) -> Result<Option<ApiKey>> {
     let result = conn.query_row(
         r#"
         SELECT id, name, key_hash, encrypted_key, nonce, permissions, created_at, last_used_at
@@ -198,10 +210,7 @@ pub fn get_api_key_by_name(
 
 /// Delete API key by name
 pub fn delete_api_key(conn: &Connection, name: &str) -> Result<bool> {
-    let rows_affected = conn.execute(
-        "DELETE FROM api_keys WHERE name = ?1",
-        params![name],
-    )?;
+    let rows_affected = conn.execute("DELETE FROM api_keys WHERE name = ?1", params![name])?;
 
     if rows_affected > 0 {
         tracing::info!("Deleted API key '{}'", name);
@@ -213,10 +222,7 @@ pub fn delete_api_key(conn: &Connection, name: &str) -> Result<bool> {
 
 /// Delete API key by ID
 pub fn delete_api_key_by_id(conn: &Connection, id: i64) -> Result<bool> {
-    let rows_affected = conn.execute(
-        "DELETE FROM api_keys WHERE id = ?1",
-        params![id],
-    )?;
+    let rows_affected = conn.execute("DELETE FROM api_keys WHERE id = ?1", params![id])?;
 
     if rows_affected > 0 {
         tracing::info!("Deleted API key with id {}", id);
@@ -228,11 +234,7 @@ pub fn delete_api_key_by_id(conn: &Connection, id: i64) -> Result<bool> {
 
 /// Count total API keys
 pub fn count_api_keys(conn: &Connection) -> Result<i64> {
-    let count: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM api_keys",
-        [],
-        |row| row.get(0),
-    )?;
+    let count: i64 = conn.query_row("SELECT COUNT(*) FROM api_keys", [], |row| row.get(0))?;
     Ok(count)
 }
 
@@ -296,7 +298,8 @@ mod tests {
             )
             "#,
             [],
-        ).unwrap();
+        )
+        .unwrap();
 
         // Create SecurityManager
         let temp_dir = tempdir().unwrap();
@@ -345,7 +348,11 @@ mod tests {
         let _ = create_api_key(&conn, "test-key", "read", &security).unwrap();
 
         // Try to validate with wrong key
-        let result = validate_api_key(&conn, "wrong_key_1234567890123456789012345678901234567890", &security);
+        let result = validate_api_key(
+            &conn,
+            "wrong_key_1234567890123456789012345678901234567890",
+            &security,
+        );
         assert!(result.is_err());
     }
 

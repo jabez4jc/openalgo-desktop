@@ -21,10 +21,10 @@ use tracing::{debug, error, info, warn};
 /// Subscription mode for market data
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum SubscriptionMode {
-    Ltp = 1,      // Last traded price only
-    Quote = 2,    // LTP + OHLC + volume
+    Ltp = 1,       // Last traded price only
+    Quote = 2,     // LTP + OHLC + volume
     SnapQuote = 3, // Quote + best 5 bid/ask (Angel)
-    Full = 4,     // Full market depth
+    Full = 4,      // Full market depth
 }
 
 impl Default for SubscriptionMode {
@@ -226,7 +226,8 @@ impl WebSocketManager {
 
         // Spawn WebSocket handler task
         tokio::spawn(async move {
-            let mut heartbeat_interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
+            let mut heartbeat_interval =
+                tokio::time::interval(tokio::time::Duration::from_secs(30));
 
             loop {
                 tokio::select! {
@@ -411,7 +412,10 @@ impl WebSocketManager {
     /// Register token to symbol mapping
     pub fn register_symbol(&self, token: &str, symbol: &str, exchange: &str) {
         let mut map = self.token_map.write();
-        map.insert(token.to_string(), (symbol.to_string(), exchange.to_string()));
+        map.insert(
+            token.to_string(),
+            (symbol.to_string(), exchange.to_string()),
+        );
     }
 }
 
@@ -791,7 +795,12 @@ fn parse_fyers_snapshot(data: &[u8], _token_map: &TokenMap) -> Option<(MarketTic
         if offset + 4 > data.len() {
             break;
         }
-        fields[i] = i32::from_be_bytes([data[offset], data[offset + 1], data[offset + 2], data[offset + 3]]);
+        fields[i] = i32::from_be_bytes([
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
+        ]);
         offset += 4;
     }
 
@@ -806,11 +815,7 @@ fn parse_fyers_snapshot(data: &[u8], _token_map: &TokenMap) -> Option<(MarketTic
     };
     offset += 2;
 
-    let _precision = if offset < data.len() {
-        data[offset]
-    } else {
-        2
-    };
+    let _precision = if offset < data.len() { data[offset] } else { 2 };
     offset += 1;
 
     // Parse string fields: exchange, exchange_token, symbol
@@ -854,7 +859,11 @@ fn parse_fyers_snapshot(data: &[u8], _token_map: &TokenMap) -> Option<(MarketTic
         oi: fields.get(12).copied().unwrap_or(0) as i64,
         timestamp: fields.get(3).copied().unwrap_or(0) as i64 * 1000,
         change: if close > 0.0 { ltp - close } else { 0.0 },
-        change_percent: if close > 0.0 { ((ltp - close) / close) * 100.0 } else { 0.0 },
+        change_percent: if close > 0.0 {
+            ((ltp - close) / close) * 100.0
+        } else {
+            0.0
+        },
     };
 
     Some((tick, offset))
@@ -900,7 +909,10 @@ fn create_angel_subscribe(requests: &[SubscriptionRequest]) -> Message {
             "CDS" => 13,
             _ => 1,
         };
-        token_lists.entry(exchange_type).or_default().push(req.token.clone());
+        token_lists
+            .entry(exchange_type)
+            .or_default()
+            .push(req.token.clone());
     }
 
     let token_list: Vec<serde_json::Value> = token_lists
@@ -914,11 +926,7 @@ fn create_angel_subscribe(requests: &[SubscriptionRequest]) -> Message {
         .collect();
 
     // Use the highest mode requested
-    let mode = requests
-        .iter()
-        .map(|r| r.mode as u8)
-        .max()
-        .unwrap_or(2);
+    let mode = requests.iter().map(|r| r.mode as u8).max().unwrap_or(2);
 
     let msg = serde_json::json!({
         "correlationID": format!("sub_{}", chrono::Utc::now().timestamp_millis()),
@@ -947,7 +955,10 @@ fn create_angel_unsubscribe(symbols: &[(String, String)]) -> Message {
             "CDS" => 13,
             _ => 1,
         };
-        token_lists.entry(exchange_type).or_default().push(token.clone());
+        token_lists
+            .entry(exchange_type)
+            .or_default()
+            .push(token.clone());
     }
 
     let token_list: Vec<serde_json::Value> = token_lists
@@ -986,7 +997,12 @@ fn create_zerodha_subscribe(requests: &[SubscriptionRequest]) -> Message {
     });
 
     // Then set mode
-    let mode = match requests.iter().map(|r| r.mode).max().unwrap_or(SubscriptionMode::Quote) {
+    let mode = match requests
+        .iter()
+        .map(|r| r.mode)
+        .max()
+        .unwrap_or(SubscriptionMode::Quote)
+    {
         SubscriptionMode::Ltp => "ltp",
         SubscriptionMode::Quote => "quote",
         SubscriptionMode::Full | SubscriptionMode::SnapQuote => "full",

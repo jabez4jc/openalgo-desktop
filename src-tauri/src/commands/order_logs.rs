@@ -37,10 +37,9 @@ pub async fn get_order_logs(
         request.status.as_deref(),
     )?;
 
-    let total = state.sqlite.count_order_logs(
-        request.broker.as_deref(),
-        request.status.as_deref(),
-    )?;
+    let total = state
+        .sqlite
+        .count_order_logs(request.broker.as_deref(), request.status.as_deref())?;
 
     Ok(OrderLogsResponse {
         status: "success".to_string(),

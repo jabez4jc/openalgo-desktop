@@ -78,7 +78,10 @@ pub fn place_order(
     order_type: &str,
     product: &str,
 ) -> Result<SandboxOrder> {
-    let order_id = format!("SB{}", Uuid::new_v4().to_string().replace("-", "")[..12].to_uppercase());
+    let order_id = format!(
+        "SB{}",
+        Uuid::new_v4().to_string().replace("-", "")[..12].to_uppercase()
+    );
 
     // For market orders, simulate immediate fill
     let (status, filled_qty, avg_price) = if order_type == "MARKET" {
@@ -179,7 +182,10 @@ pub fn reset(conn: &Connection) -> Result<()> {
     conn.execute("DELETE FROM sandbox_positions", [])?;
     conn.execute("DELETE FROM sandbox_trades", [])?;
     conn.execute("DELETE FROM sandbox_holdings", [])?;
-    conn.execute("UPDATE sandbox_funds SET available_cash = 1000000, used_margin = 0, total_value = 1000000", [])?;
+    conn.execute(
+        "UPDATE sandbox_funds SET available_cash = 1000000, used_margin = 0, total_value = 1000000",
+        [],
+    )?;
     conn.execute("DELETE FROM sandbox_daily_pnl", [])?;
     tracing::info!("Sandbox reset completed");
     Ok(())
@@ -356,14 +362,30 @@ pub fn get_config(conn: &Connection) -> Result<SandboxConfig> {
 pub fn update_config(conn: &Connection, key: &str, value: &str) -> Result<()> {
     // Validate key is a valid column name
     let valid_keys = [
-        "starting_capital", "reset_day", "reset_time", "order_check_interval", "mtm_update_interval",
-        "nse_mis_leverage", "nfo_mis_leverage", "cds_mis_leverage", "mcx_mis_leverage",
-        "nse_cnc_leverage", "nfo_nrml_leverage", "cds_nrml_leverage", "mcx_nrml_leverage",
-        "nse_square_off_time", "nfo_square_off_time", "cds_square_off_time", "mcx_square_off_time",
+        "starting_capital",
+        "reset_day",
+        "reset_time",
+        "order_check_interval",
+        "mtm_update_interval",
+        "nse_mis_leverage",
+        "nfo_mis_leverage",
+        "cds_mis_leverage",
+        "mcx_mis_leverage",
+        "nse_cnc_leverage",
+        "nfo_nrml_leverage",
+        "cds_nrml_leverage",
+        "mcx_nrml_leverage",
+        "nse_square_off_time",
+        "nfo_square_off_time",
+        "cds_square_off_time",
+        "mcx_square_off_time",
     ];
 
     if !valid_keys.contains(&key) {
-        return Err(crate::error::AppError::Validation(format!("Invalid config key: {}", key)));
+        return Err(crate::error::AppError::Validation(format!(
+            "Invalid config key: {}",
+            key
+        )));
     }
 
     // Update the config - use parameterized value but column name is validated above
@@ -483,26 +505,21 @@ pub fn get_pnl_data(conn: &Connection) -> Result<SandboxPnlData> {
     let funds = get_funds(conn)?;
 
     // Calculate unrealized P&L from positions
-    let positions_unrealized_pnl: f64 = positions.iter()
-        .map(|p| p.pnl)
-        .sum();
+    let positions_unrealized_pnl: f64 = positions.iter().map(|p| p.pnl).sum();
 
     // Calculate unrealized P&L from holdings
-    let holdings_unrealized_pnl: f64 = holdings.iter()
-        .map(|h| h.pnl)
-        .sum();
+    let holdings_unrealized_pnl: f64 = holdings.iter().map(|h| h.pnl).sum();
 
     // Calculate today's realized P&L from today's trades
     let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-    let today_realized_pnl = daily_pnl.iter()
+    let today_realized_pnl = daily_pnl
+        .iter()
         .find(|p| p.date.starts_with(&today))
         .map(|p| p.realized_pnl)
         .unwrap_or(0.0);
 
     // Calculate all-time realized P&L
-    let all_time_realized_pnl: f64 = daily_pnl.iter()
-        .map(|p| p.realized_pnl)
-        .sum();
+    let all_time_realized_pnl: f64 = daily_pnl.iter().map(|p| p.realized_pnl).sum();
 
     let summary = SandboxPnlSummary {
         today_realized_pnl,

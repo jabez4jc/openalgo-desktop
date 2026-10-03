@@ -3,22 +3,22 @@
 //! A desktop application for algorithmic trading with support for
 //! multiple Indian brokers (Angel One, Zerodha, Fyers).
 
+pub mod brokers;
 pub mod commands;
 pub mod db;
-pub mod brokers;
-pub mod security;
-pub mod websocket;
-pub mod webhook;
-pub mod scheduler;
 pub mod error;
-pub mod state;
+pub mod scheduler;
+pub mod security;
 pub mod services;
+pub mod state;
+pub mod webhook;
+pub mod websocket;
 
 use scheduler::AutoLogoutScheduler;
 use state::AppState;
-use webhook::WebhookServer;
 use tauri::Manager;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use webhook::WebhookServer;
 
 /// Initialize and run the Tauri application
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -62,7 +62,9 @@ pub fn run() {
                         loop {
                             tauri::async_runtime::spawn(async {
                                 tokio::time::sleep(tokio::time::Duration::from_secs(3600)).await;
-                            }).await.ok();
+                            })
+                            .await
+                            .ok();
                         }
                     });
                     tracing::info!("Webhook server starting...");

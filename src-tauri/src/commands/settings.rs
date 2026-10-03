@@ -202,7 +202,7 @@ pub async fn update_rate_limit_config(
 pub struct BrokerInfo {
     pub id: String,
     pub name: String,
-    pub auth_type: String,  // "totp" or "oauth"
+    pub auth_type: String, // "totp" or "oauth"
     pub has_credentials: bool,
 }
 
@@ -211,7 +211,7 @@ pub struct BrokerInfo {
 pub struct BrokerConfigResponse {
     pub status: String,
     pub broker_name: Option<String>,
-    pub broker_api_key: Option<String>,  // Masked for security
+    pub broker_api_key: Option<String>, // Masked for security
     pub redirect_url: String,
     pub available_brokers: Vec<BrokerInfo>,
 }
@@ -265,7 +265,7 @@ fn mask_api_key(key: &str) -> String {
     if key.len() <= 8 {
         "*".repeat(key.len())
     } else {
-        format!("{}...{}", &key[..4], &key[key.len()-4..])
+        format!("{}...{}", &key[..4], &key[key.len() - 4..])
     }
 }
 
@@ -294,7 +294,9 @@ pub async fn get_broker_config(state: State<'_, AppState>) -> Result<BrokerConfi
         if has_credentials {
             if configured_broker.is_none() || Some(id.to_string()) == default_broker {
                 // Get encrypted credentials from SQLite
-                if let Ok(Some((api_key_enc, api_key_nonce, _, _, _))) = state.sqlite.get_broker_credentials(id) {
+                if let Ok(Some((api_key_enc, api_key_nonce, _, _, _))) =
+                    state.sqlite.get_broker_credentials(id)
+                {
                     if let Ok(api_key) = state.security.decrypt(&api_key_enc, &api_key_nonce) {
                         configured_broker = Some(id.to_string());
                         configured_api_key = Some(mask_api_key(&api_key));
@@ -313,9 +315,9 @@ pub async fn get_broker_config(state: State<'_, AppState>) -> Result<BrokerConfi
 
     // Redirect URL from webhook config
     let webhook_config = state.sqlite.get_webhook_config()?;
-    let redirect_url = webhook_config.ngrok_url.unwrap_or_else(|| {
-        format!("http://{}:{}", webhook_config.host, webhook_config.port)
-    });
+    let redirect_url = webhook_config
+        .ngrok_url
+        .unwrap_or_else(|| format!("http://{}:{}", webhook_config.host, webhook_config.port));
 
     Ok(BrokerConfigResponse {
         status: "success".to_string(),
@@ -391,10 +393,7 @@ pub async fn get_raw_broker_credentials(
 
 /// Check if broker has credentials configured (without retrieving them)
 #[tauri::command]
-pub async fn has_broker_credentials(
-    state: State<'_, AppState>,
-    broker_id: String,
-) -> Result<bool> {
+pub async fn has_broker_credentials(state: State<'_, AppState>, broker_id: String) -> Result<bool> {
     state.sqlite.is_broker_configured(&broker_id)
 }
 
@@ -455,17 +454,28 @@ pub async fn get_analyze_mode(state: State<'_, AppState>) -> Result<AnalyzerMode
     let analyze_mode = state.sqlite.get_analyze_mode().unwrap_or(false);
     Ok(AnalyzerModeStatus {
         analyze_mode,
-        mode: if analyze_mode { "analyzer".to_string() } else { "live".to_string() },
+        mode: if analyze_mode {
+            "analyzer".to_string()
+        } else {
+            "live".to_string()
+        },
     })
 }
 
 /// Set analyzer mode (toggle between live and analyzer)
 #[tauri::command]
-pub async fn set_analyze_mode(state: State<'_, AppState>, enabled: bool) -> Result<AnalyzerModeStatus> {
+pub async fn set_analyze_mode(
+    state: State<'_, AppState>,
+    enabled: bool,
+) -> Result<AnalyzerModeStatus> {
     tracing::info!("Setting analyzer mode to: {}", enabled);
     state.sqlite.set_analyze_mode(enabled)?;
     Ok(AnalyzerModeStatus {
         analyze_mode: enabled,
-        mode: if enabled { "analyzer".to_string() } else { "live".to_string() },
+        mode: if enabled {
+            "analyzer".to_string()
+        } else {
+            "live".to_string()
+        },
     })
 }

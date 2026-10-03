@@ -2,8 +2,8 @@
 //!
 //! Uses file-based storage instead of OS keychain to avoid password prompts.
 
-mod file_storage;
 mod encryption;
+mod file_storage;
 mod hashing;
 
 use crate::error::Result;

@@ -7,12 +7,12 @@ use serde::{Deserialize, Serialize};
 pub struct OrderRequest {
     pub symbol: String,
     pub exchange: String,
-    pub side: String,         // BUY or SELL
+    pub side: String, // BUY or SELL
     pub quantity: i32,
     pub price: f64,
-    pub order_type: String,   // MARKET, LIMIT, SL, SL-M
-    pub product: String,      // CNC, MIS, NRML
-    pub validity: String,     // DAY, IOC
+    pub order_type: String, // MARKET, LIMIT, SL, SL-M
+    pub product: String,    // CNC, MIS, NRML
+    pub validity: String,   // DAY, IOC
     pub trigger_price: Option<f64>,
     pub disclosed_quantity: Option<i32>,
     pub amo: bool,

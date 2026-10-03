@@ -70,8 +70,8 @@ impl SymbolService {
                     instrument_type: s.instrument_type.clone(),
                     lot_size: s.lot_size,
                     tick_size: s.tick_size,
-                    strike: None,  // Not available in SymbolInfo
-                    expiry: None,  // Not available in SymbolInfo
+                    strike: None, // Not available in SymbolInfo
+                    expiry: None, // Not available in SymbolInfo
                 }
             })
             .collect();
@@ -129,10 +129,7 @@ impl SymbolService {
     }
 
     /// Get all instruments for an exchange
-    pub fn get_instruments(
-        state: &AppState,
-        exchange: Option<&str>,
-    ) -> Vec<SymbolSearchResult> {
+    pub fn get_instruments(state: &AppState, exchange: Option<&str>) -> Vec<SymbolSearchResult> {
         state
             .symbol_cache
             .iter()

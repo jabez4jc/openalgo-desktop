@@ -69,8 +69,10 @@ impl WebhookServer {
             }
         };
 
-        info!("Rate limits: API={}/s, Order={}/s, SmartOrder={}/s, Delay={}s",
-              api_rate, order_rate, smart_order_rate, smart_order_delay);
+        info!(
+            "Rate limits: API={}/s, Order={}/s, SmartOrder={}/s, Delay={}s",
+            api_rate, order_rate, smart_order_rate, smart_order_delay
+        );
 
         // Create rate limiter state
         let rate_limiter = Arc::new(RateLimiterState::new(
@@ -96,26 +98,24 @@ impl WebhookServer {
             // ================================================================
             .route("/health", get(handlers::health_check))
             .route("/", get(handlers::health_check))
-
             // ================================================================
             // Dynamic webhook endpoint (strategy-based)
             // POST /webhook/{webhook_id}
             // ================================================================
             .route("/webhook/:webhook_id", post(handlers::webhook_handler))
-
             // Legacy: Support /strategy/webhook/{webhook_id} for compatibility
-            .route("/strategy/webhook/:webhook_id", post(handlers::webhook_handler))
-
+            .route(
+                "/strategy/webhook/:webhook_id",
+                post(handlers::webhook_handler),
+            )
             // ================================================================
             // OAuth Callback (for Fyers, Zerodha, etc.)
             // GET /{broker}/callback?code=xxx&state=xxx
             // ================================================================
             .route("/:broker/callback", get(handlers::oauth_callback))
-
             // ================================================================
             // REST API v1 (OpenAlgo SDK Compatible)
             // ================================================================
-
             // Order placement
             .route("/api/v1/placeorder", post(handlers::place_order))
             .route("/api/v1/placesmartorder", post(handlers::place_smart_order))
@@ -125,11 +125,9 @@ impl WebhookServer {
             .route("/api/v1/closeposition", post(handlers::close_position))
             .route("/api/v1/basketorder", post(handlers::place_basket_order))
             .route("/api/v1/splitorder", post(handlers::place_split_order))
-
             // Order/Position status
             .route("/api/v1/orderstatus", post(handlers::get_order_status))
             .route("/api/v1/openposition", post(handlers::get_open_position))
-
             // Data retrieval
             .route("/api/v1/orderbook", post(handlers::get_orderbook))
             .route("/api/v1/tradebook", post(handlers::get_tradebook))
@@ -137,7 +135,6 @@ impl WebhookServer {
             .route("/api/v1/holdings", post(handlers::get_holdings))
             .route("/api/v1/funds", post(handlers::get_funds))
             .route("/api/v1/quotes", post(handlers::get_quotes))
-
             // Market data
             .route("/api/v1/depth", post(handlers::get_depth))
             .route("/api/v1/symbol", post(handlers::get_symbol))
@@ -147,26 +144,32 @@ impl WebhookServer {
             .route("/api/v1/search", post(handlers::search_symbols))
             .route("/api/v1/expiry", post(handlers::get_expiry))
             .route("/api/v1/instruments", get(handlers::get_instruments))
-            .route("/api/v1/syntheticfuture", post(handlers::get_synthetic_future))
-
+            .route(
+                "/api/v1/syntheticfuture",
+                post(handlers::get_synthetic_future),
+            )
             // Account/Analyzer
             .route("/api/v1/analyzer", post(handlers::get_analyzer_status))
             .route("/api/v1/analyzer/toggle", post(handlers::toggle_analyzer))
             .route("/api/v1/margin", post(handlers::get_margin))
-
             // Options API
             .route("/api/v1/optionchain", post(handlers::get_option_chain))
             .route("/api/v1/optiongreeks", post(handlers::get_option_greeks))
             .route("/api/v1/optionsorder", post(handlers::place_options_order))
             .route("/api/v1/optionsymbol", post(handlers::get_option_symbol))
-            .route("/api/v1/optionsmultiorder", post(handlers::place_options_multi_order))
-
+            .route(
+                "/api/v1/optionsmultiorder",
+                post(handlers::place_options_multi_order),
+            )
             // ================================================================
             // Add state and middleware
             // ================================================================
             .with_state(state)
             // Rate limiting middleware (applied to all API routes)
-            .layer(middleware::from_fn_with_state(rate_limiter.clone(), rate_limit_middleware))
+            .layer(middleware::from_fn_with_state(
+                rate_limiter.clone(),
+                rate_limit_middleware,
+            ))
             .layer(cors)
             .layer(TraceLayer::new_for_http());
 
@@ -183,11 +186,10 @@ impl WebhookServer {
 
         // Spawn server task
         tokio::spawn(async move {
-            let server = axum::serve(listener, app)
-                .with_graceful_shutdown(async {
-                    let _ = shutdown_rx.await;
-                    info!("API server shutting down");
-                });
+            let server = axum::serve(listener, app).with_graceful_shutdown(async {
+                let _ = shutdown_rx.await;
+                info!("API server shutting down");
+            });
 
             if let Err(e) = server.await {
                 error!("API server error: {}", e);

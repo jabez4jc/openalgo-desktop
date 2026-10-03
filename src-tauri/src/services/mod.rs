@@ -26,27 +26,31 @@
 //! - `OptionsService` - Option chain, Greeks, option orders
 //! - `HistoryService` - Historical data
 
-pub mod order_service;
-pub mod position_service;
-pub mod holdings_service;
+pub mod analyzer_service;
 pub mod funds_service;
-pub mod quotes_service;
+pub mod history_service;
+pub mod holdings_service;
+pub mod options_service;
+pub mod order_service;
 pub mod orderbook_service;
+pub mod position_service;
+pub mod quotes_service;
 pub mod smart_order_service;
 pub mod symbol_service;
-pub mod analyzer_service;
-pub mod options_service;
-pub mod history_service;
 
 // Re-export commonly used types and services
-pub use order_service::{OrderService, PlaceOrderResult, ModifyOrderResult, CancelOrderResult};
-pub use position_service::{PositionService, PositionResult, ClosePositionResult};
-pub use holdings_service::{HoldingsService, HoldingsResult};
-pub use funds_service::{FundsService, FundsResult};
-pub use quotes_service::{QuotesService, QuoteResult, DepthResult};
-pub use orderbook_service::{OrderbookService, OrderbookResult, TradebookResult, OrderStatusResult};
-pub use smart_order_service::{SmartOrderService, SmartOrderResult, SplitOrderResult};
-pub use symbol_service::{SymbolService, SymbolSearchResult, ExpiryResult};
 pub use analyzer_service::{AnalyzerService, AnalyzerStatus};
-pub use options_service::{OptionsService, OptionChainResult, OptionGreeks, OptionSymbolResult, SyntheticFutureResult};
-pub use history_service::{HistoryService, HistoryResult, IntervalsResult, CandleData};
+pub use funds_service::{FundsResult, FundsService};
+pub use history_service::{CandleData, HistoryResult, HistoryService, IntervalsResult};
+pub use holdings_service::{HoldingsResult, HoldingsService};
+pub use options_service::{
+    OptionChainResult, OptionGreeks, OptionSymbolResult, OptionsService, SyntheticFutureResult,
+};
+pub use order_service::{CancelOrderResult, ModifyOrderResult, OrderService, PlaceOrderResult};
+pub use orderbook_service::{
+    OrderStatusResult, OrderbookResult, OrderbookService, TradebookResult,
+};
+pub use position_service::{ClosePositionResult, PositionResult, PositionService};
+pub use quotes_service::{DepthResult, QuoteResult, QuotesService};
+pub use smart_order_service::{SmartOrderResult, SmartOrderService, SplitOrderResult};
+pub use symbol_service::{ExpiryResult, SymbolSearchResult, SymbolService};

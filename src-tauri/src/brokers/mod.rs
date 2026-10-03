@@ -1,9 +1,9 @@
 //! Broker adapters module
 
-pub mod types;
 pub mod angel;
-pub mod zerodha;
 pub mod fyers;
+pub mod types;
+pub mod zerodha;
 
 use crate::error::Result;
 use async_trait::async_trait;
@@ -115,7 +115,10 @@ impl BrokerRegistry {
 
         // Register brokers
         brokers.insert("angel".to_string(), Arc::new(angel::AngelBroker::new()));
-        brokers.insert("zerodha".to_string(), Arc::new(zerodha::ZerodhaBroker::new()));
+        brokers.insert(
+            "zerodha".to_string(),
+            Arc::new(zerodha::ZerodhaBroker::new()),
+        );
         brokers.insert("fyers".to_string(), Arc::new(fyers::FyersBroker::new()));
 
         Self { brokers }

@@ -108,11 +108,19 @@ pub struct RateLimiterState {
 
 impl RateLimiterState {
     /// Create new rate limiter state with default values
-    pub fn new(api_rate: u32, order_rate: u32, smart_order_rate: u32, smart_order_delay: f64) -> Self {
+    pub fn new(
+        api_rate: u32,
+        order_rate: u32,
+        smart_order_rate: u32,
+        smart_order_delay: f64,
+    ) -> Self {
         let mut limiters = HashMap::new();
         limiters.insert(RateLimitType::General, TokenBucket::new(api_rate));
         limiters.insert(RateLimitType::Order, TokenBucket::new(order_rate));
-        limiters.insert(RateLimitType::SmartOrder, TokenBucket::new(smart_order_rate));
+        limiters.insert(
+            RateLimitType::SmartOrder,
+            TokenBucket::new(smart_order_rate),
+        );
 
         Self {
             limiters: Mutex::new(limiters),
@@ -122,7 +130,13 @@ impl RateLimiterState {
     }
 
     /// Update rate limits from config
-    pub fn update_config(&self, api_rate: u32, order_rate: u32, smart_order_rate: u32, smart_order_delay: f64) {
+    pub fn update_config(
+        &self,
+        api_rate: u32,
+        order_rate: u32,
+        smart_order_rate: u32,
+        smart_order_delay: f64,
+    ) {
         let mut limiters = self.limiters.lock();
         if let Some(limiter) = limiters.get_mut(&RateLimitType::General) {
             limiter.update_rate(api_rate);
@@ -252,16 +266,14 @@ fn rate_limit_response(retry_after: Duration, limit_type: &str) -> Response {
     let mut response = (StatusCode::TOO_MANY_REQUESTS, body).into_response();
 
     // Add Retry-After header
-    response.headers_mut().insert(
-        "Retry-After",
-        retry_seconds.to_string().parse().unwrap(),
-    );
+    response
+        .headers_mut()
+        .insert("Retry-After", retry_seconds.to_string().parse().unwrap());
 
     // Add rate limit headers
-    response.headers_mut().insert(
-        "X-RateLimit-Type",
-        limit_type.parse().unwrap(),
-    );
+    response
+        .headers_mut()
+        .insert("X-RateLimit-Type", limit_type.parse().unwrap());
 
     response
 }
@@ -304,11 +316,26 @@ mod tests {
 
     #[test]
     fn test_rate_limit_type_detection() {
-        assert_eq!(get_rate_limit_type("/api/v1/placeorder"), RateLimitType::Order);
-        assert_eq!(get_rate_limit_type("/api/v1/placesmartorder"), RateLimitType::SmartOrder);
-        assert_eq!(get_rate_limit_type("/api/v1/quotes"), RateLimitType::General);
-        assert_eq!(get_rate_limit_type("/api/v1/basketorder"), RateLimitType::SmartOrder);
-        assert_eq!(get_rate_limit_type("/api/v1/cancelorder"), RateLimitType::Order);
+        assert_eq!(
+            get_rate_limit_type("/api/v1/placeorder"),
+            RateLimitType::Order
+        );
+        assert_eq!(
+            get_rate_limit_type("/api/v1/placesmartorder"),
+            RateLimitType::SmartOrder
+        );
+        assert_eq!(
+            get_rate_limit_type("/api/v1/quotes"),
+            RateLimitType::General
+        );
+        assert_eq!(
+            get_rate_limit_type("/api/v1/basketorder"),
+            RateLimitType::SmartOrder
+        );
+        assert_eq!(
+            get_rate_limit_type("/api/v1/cancelorder"),
+            RateLimitType::Order
+        );
     }
 
     #[test]

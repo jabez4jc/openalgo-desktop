@@ -24,7 +24,7 @@ pub struct CreateApiKeyResponse {
     pub status: String,
     pub id: i64,
     pub name: String,
-    pub api_key: String,  // Only returned once on creation
+    pub api_key: String, // Only returned once on creation
     pub message: String,
 }
 
@@ -49,28 +49,28 @@ pub async fn create_api_key(
 ) -> Result<CreateApiKeyResponse> {
     tracing::info!("Creating API key: {}", request.name);
 
-    let permissions = request.permissions.unwrap_or_else(|| "read,write".to_string());
+    let permissions = request
+        .permissions
+        .unwrap_or_else(|| "read,write".to_string());
 
-    let (id, api_key) = state.sqlite.create_api_key(
-        &request.name,
-        &permissions,
-        &state.security,
-    )?;
+    let (id, api_key) =
+        state
+            .sqlite
+            .create_api_key(&request.name, &permissions, &state.security)?;
 
     Ok(CreateApiKeyResponse {
         status: "success".to_string(),
         id,
         name: request.name,
-        api_key,  // Only shown once
-        message: "API key created successfully. Save this key - it won't be shown again!".to_string(),
+        api_key, // Only shown once
+        message: "API key created successfully. Save this key - it won't be shown again!"
+            .to_string(),
     })
 }
 
 /// List all API keys (masked)
 #[tauri::command]
-pub async fn list_api_keys(
-    state: State<'_, AppState>,
-) -> Result<ApiKeyListResponse> {
+pub async fn list_api_keys(state: State<'_, AppState>) -> Result<ApiKeyListResponse> {
     tracing::info!("Listing API keys");
 
     let api_keys = state.sqlite.list_api_keys(&state.security)?;

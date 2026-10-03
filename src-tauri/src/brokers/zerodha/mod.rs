@@ -1,7 +1,7 @@
 //! Zerodha Kite broker adapter
 
-use crate::brokers::{AuthResponse, Broker, BrokerCredentials};
 use crate::brokers::types::*;
+use crate::brokers::{AuthResponse, Broker, BrokerCredentials};
 use crate::error::{AppError, Result};
 use async_trait::async_trait;
 use reqwest::Client;
@@ -326,7 +326,9 @@ impl Broker for ZerodhaBroker {
 
         if result.status != "success" {
             return Err(AppError::Auth(
-                result.message.unwrap_or_else(|| "Authentication failed".to_string()),
+                result
+                    .message
+                    .unwrap_or_else(|| "Authentication failed".to_string()),
             ));
         }
 
@@ -350,7 +352,8 @@ impl Broker for ZerodhaBroker {
         let trading_symbol = order.broker_symbol.clone().unwrap_or_else(|| {
             tracing::warn!(
                 "No broker_symbol provided for {}:{}, using original symbol",
-                order.exchange, order.symbol
+                order.exchange,
+                order.symbol
             );
             order.symbol.clone()
         });
@@ -401,7 +404,9 @@ impl Broker for ZerodhaBroker {
 
         if result.status != "success" {
             return Err(AppError::Broker(
-                result.message.unwrap_or_else(|| "Order placement failed".to_string()),
+                result
+                    .message
+                    .unwrap_or_else(|| "Order placement failed".to_string()),
             ));
         }
 
@@ -463,11 +468,16 @@ impl Broker for ZerodhaBroker {
 
         if result.status != "success" {
             return Err(AppError::Broker(
-                result.message.unwrap_or_else(|| "Modify failed".to_string()),
+                result
+                    .message
+                    .unwrap_or_else(|| "Modify failed".to_string()),
             ));
         }
 
-        let final_order_id = result.data.map(|d| d.order_id).unwrap_or_else(|| order_id.to_string());
+        let final_order_id = result
+            .data
+            .map(|d| d.order_id)
+            .unwrap_or_else(|| order_id.to_string());
 
         Ok(OrderResponse {
             order_id: final_order_id,
@@ -500,7 +510,9 @@ impl Broker for ZerodhaBroker {
 
         if result.status != "success" {
             return Err(AppError::Broker(
-                result.message.unwrap_or_else(|| "Order cancellation failed".to_string()),
+                result
+                    .message
+                    .unwrap_or_else(|| "Order cancellation failed".to_string()),
             ));
         }
 
@@ -519,7 +531,9 @@ impl Broker for ZerodhaBroker {
 
         if result.status != "success" {
             return Err(AppError::Broker(
-                result.message.unwrap_or_else(|| "Failed to fetch orders".to_string()),
+                result
+                    .message
+                    .unwrap_or_else(|| "Failed to fetch orders".to_string()),
             ));
         }
 
@@ -562,7 +576,9 @@ impl Broker for ZerodhaBroker {
 
         if result.status != "success" {
             return Err(AppError::Broker(
-                result.message.unwrap_or_else(|| "Failed to fetch trades".to_string()),
+                result
+                    .message
+                    .unwrap_or_else(|| "Failed to fetch trades".to_string()),
             ));
         }
 
@@ -605,7 +621,9 @@ impl Broker for ZerodhaBroker {
 
         if result.status != "success" {
             return Err(AppError::Broker(
-                result.message.unwrap_or_else(|| "Failed to fetch positions".to_string()),
+                result
+                    .message
+                    .unwrap_or_else(|| "Failed to fetch positions".to_string()),
             ));
         }
 
@@ -649,7 +667,9 @@ impl Broker for ZerodhaBroker {
 
         if result.status != "success" {
             return Err(AppError::Broker(
-                result.message.unwrap_or_else(|| "Failed to fetch holdings".to_string()),
+                result
+                    .message
+                    .unwrap_or_else(|| "Failed to fetch holdings".to_string()),
             ));
         }
 
@@ -697,7 +717,9 @@ impl Broker for ZerodhaBroker {
 
         if result.status != "success" {
             return Err(AppError::Broker(
-                result.message.unwrap_or_else(|| "Failed to fetch funds".to_string()),
+                result
+                    .message
+                    .unwrap_or_else(|| "Failed to fetch funds".to_string()),
             ));
         }
 
@@ -765,11 +787,14 @@ impl Broker for ZerodhaBroker {
             .send()
             .await?;
 
-        let result: KiteResponse<std::collections::HashMap<String, KiteQuoteData>> = response.json().await?;
+        let result: KiteResponse<std::collections::HashMap<String, KiteQuoteData>> =
+            response.json().await?;
 
         if result.status != "success" {
             return Err(AppError::Broker(
-                result.message.unwrap_or_else(|| "Failed to fetch quotes".to_string()),
+                result
+                    .message
+                    .unwrap_or_else(|| "Failed to fetch quotes".to_string()),
             ));
         }
 
@@ -790,7 +815,11 @@ impl Broker for ZerodhaBroker {
                     let ltp = q.last_price;
                     let close = q.ohlc.close;
                     let change = ltp - close;
-                    let change_percent = if close > 0.0 { (change / close) * 100.0 } else { 0.0 };
+                    let change_percent = if close > 0.0 {
+                        (change / close) * 100.0
+                    } else {
+                        0.0
+                    };
 
                     Quote {
                         symbol: symbol.clone(),
@@ -808,7 +837,10 @@ impl Broker for ZerodhaBroker {
                         oi: q.oi,
                         change,
                         change_percent,
-                        timestamp: q.last_trade_time.clone().unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
+                        timestamp: q
+                            .last_trade_time
+                            .clone()
+                            .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
                     }
                 })
             })
@@ -836,11 +868,14 @@ impl Broker for ZerodhaBroker {
             .send()
             .await?;
 
-        let result: KiteResponse<std::collections::HashMap<String, KiteQuoteData>> = response.json().await?;
+        let result: KiteResponse<std::collections::HashMap<String, KiteQuoteData>> =
+            response.json().await?;
 
         if result.status != "success" {
             return Err(AppError::Broker(
-                result.message.unwrap_or_else(|| "Failed to fetch depth".to_string()),
+                result
+                    .message
+                    .unwrap_or_else(|| "Failed to fetch depth".to_string()),
             ));
         }
 
@@ -934,7 +969,10 @@ impl Broker for ZerodhaBroker {
                 } else {
                     Some(Self::format_expiry_date(&raw_expiry))
                 };
-                let expiry_nodash = expiry.as_ref().map(|e| e.replace("-", "")).unwrap_or_default();
+                let expiry_nodash = expiry
+                    .as_ref()
+                    .map(|e| e.replace("-", ""))
+                    .unwrap_or_default();
 
                 // Token format: instrument_token::::exchange_token
                 let token = format!("{}::::{}", instrument_token, exchange_token);

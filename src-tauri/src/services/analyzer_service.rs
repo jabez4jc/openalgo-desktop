@@ -27,7 +27,11 @@ impl AnalyzerService {
 
         Ok(AnalyzerStatus {
             analyze_mode,
-            mode: if analyze_mode { "analyze".to_string() } else { "live".to_string() },
+            mode: if analyze_mode {
+                "analyze".to_string()
+            } else {
+                "live".to_string()
+            },
             total_logs,
         })
     }

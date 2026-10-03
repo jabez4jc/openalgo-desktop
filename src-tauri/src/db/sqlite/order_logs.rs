@@ -51,7 +51,12 @@ pub fn create_log(
     )?;
 
     let id = conn.last_insert_rowid();
-    tracing::debug!("Created order log entry: id={}, order_id={:?}, status={}", id, order_id, status);
+    tracing::debug!(
+        "Created order log entry: id={}, order_id={:?}, status={}",
+        id,
+        order_id,
+        status
+    );
 
     Ok(id)
 }
@@ -213,7 +218,11 @@ pub fn clear_old_logs(conn: &Connection, days: i32) -> Result<usize> {
     )?;
 
     if rows > 0 {
-        tracing::info!("Cleared {} old order log entries (older than {} days)", rows, days);
+        tracing::info!(
+            "Cleared {} old order log entries (older than {} days)",
+            rows,
+            days
+        );
     }
 
     Ok(rows)

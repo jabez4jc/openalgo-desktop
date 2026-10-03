@@ -25,10 +25,7 @@ impl FundsService {
     ///
     /// In analyze mode, returns sandbox funds.
     /// Otherwise, returns live broker funds.
-    pub async fn get_funds(
-        state: &AppState,
-        api_key: Option<&str>,
-    ) -> Result<FundsResult> {
+    pub async fn get_funds(state: &AppState, api_key: Option<&str>) -> Result<FundsResult> {
         info!("FundsService::get_funds");
 
         // Check if in analyze mode

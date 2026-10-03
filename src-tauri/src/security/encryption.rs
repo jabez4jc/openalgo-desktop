@@ -27,8 +27,8 @@ impl EncryptionManager {
             )));
         }
 
-        let cipher = Aes256Gcm::new_from_slice(key)
-            .map_err(|e| AppError::Encryption(e.to_string()))?;
+        let cipher =
+            Aes256Gcm::new_from_slice(key).map_err(|e| AppError::Encryption(e.to_string()))?;
 
         Ok(Self { cipher })
     }

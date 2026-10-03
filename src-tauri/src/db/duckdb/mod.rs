@@ -1,7 +1,7 @@
 //! DuckDB database module for historical data (Historify)
 
-pub mod models;
 mod migrations;
+pub mod models;
 
 use crate::error::Result;
 use duckdb::Connection;

@@ -1,6 +1,6 @@
 //! Quote and market data commands
 
-use crate::brokers::types::{Quote, MarketDepth};
+use crate::brokers::types::{MarketDepth, Quote};
 use crate::error::{AppError, Result};
 use crate::state::AppState;
 use serde::Deserialize;
@@ -51,5 +51,7 @@ pub async fn get_market_depth(
         .get(&session.broker_id)
         .ok_or_else(|| AppError::Broker("Broker not found".to_string()))?;
 
-    broker.get_market_depth(&session.auth_token, &exchange, &symbol).await
+    broker
+        .get_market_depth(&session.auth_token, &exchange, &symbol)
+        .await
 }

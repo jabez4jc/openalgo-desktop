@@ -70,10 +70,16 @@ impl OrderService {
                 order.broker_symbol = Some(brsymbol);
             }
             // Set the exchange token (needed for Angel One)
-            info!("Resolved symbol token: {} -> {}", order.symbol, symbol_info.token);
+            info!(
+                "Resolved symbol token: {} -> {}",
+                order.symbol, symbol_info.token
+            );
             order.symbol_token = Some(symbol_info.token);
         } else {
-            warn!("Symbol not found in cache: {}:{}", order.exchange, order.symbol);
+            warn!(
+                "Symbol not found in cache: {}:{}",
+                order.exchange, order.symbol
+            );
         }
 
         // Get broker adapter
@@ -91,7 +97,9 @@ impl OrderService {
                 Ok(PlaceOrderResult {
                     success: true,
                     order_id: Some(response.order_id),
-                    message: response.message.unwrap_or_else(|| "Order placed successfully".to_string()),
+                    message: response
+                        .message
+                        .unwrap_or_else(|| "Order placed successfully".to_string()),
                     mode: "live".to_string(),
                 })
             }
@@ -138,7 +146,9 @@ impl OrderService {
             Ok(response) => Ok(ModifyOrderResult {
                 success: true,
                 order_id: response.order_id,
-                message: response.message.unwrap_or_else(|| "Order modified successfully".to_string()),
+                message: response
+                    .message
+                    .unwrap_or_else(|| "Order modified successfully".to_string()),
             }),
             Err(e) => {
                 error!("Failed to modify order: {}", e);
@@ -170,7 +180,10 @@ impl OrderService {
                     });
                 }
                 Ok(false) => {
-                    return Err(AppError::NotFound(format!("Order {} not found in sandbox", order_id)));
+                    return Err(AppError::NotFound(format!(
+                        "Order {} not found in sandbox",
+                        order_id
+                    )));
                 }
                 Err(e) => {
                     return Err(e);
@@ -223,8 +236,14 @@ impl OrderService {
         let mut results = Vec::new();
         for order in orders {
             // Only cancel pending/open orders
-            if order.status == "PENDING" || order.status == "OPEN" || order.status == "TRIGGER PENDING" {
-                match broker.cancel_order(&auth_token, &order.order_id, None).await {
+            if order.status == "PENDING"
+                || order.status == "OPEN"
+                || order.status == "TRIGGER PENDING"
+            {
+                match broker
+                    .cancel_order(&auth_token, &order.order_id, None)
+                    .await
+                {
                     Ok(_) => {
                         results.push(CancelOrderResult {
                             success: true,

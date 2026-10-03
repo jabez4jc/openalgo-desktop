@@ -33,10 +33,7 @@ impl PositionService {
     ///
     /// In analyze mode, returns sandbox positions.
     /// Otherwise, returns live broker positions.
-    pub async fn get_positions(
-        state: &AppState,
-        api_key: Option<&str>,
-    ) -> Result<PositionResult> {
+    pub async fn get_positions(state: &AppState, api_key: Option<&str>) -> Result<PositionResult> {
         info!("PositionService::get_positions");
 
         // Check if in analyze mode
@@ -91,7 +88,10 @@ impl PositionService {
         product: &str,
         api_key: Option<&str>,
     ) -> Result<ClosePositionResult> {
-        info!("PositionService::close_position - {} {} {}", exchange, symbol, product);
+        info!(
+            "PositionService::close_position - {} {} {}",
+            exchange, symbol, product
+        );
 
         // Get the current position
         let position = Self::get_open_position(state, exchange, symbol, product, api_key).await?;
@@ -150,11 +150,12 @@ impl PositionService {
             disclosed_quantity: None,
             validity: "DAY".to_string(),
             amo: false,
-            broker_symbol: None,  // Set by OrderService from symbol cache
-            symbol_token: None,   // Set by OrderService from symbol cache
+            broker_symbol: None, // Set by OrderService from symbol cache
+            symbol_token: None,  // Set by OrderService from symbol cache
         };
 
-        let result = crate::services::OrderService::place_order(state, order_request, api_key).await?;
+        let result =
+            crate::services::OrderService::place_order(state, order_request, api_key).await?;
 
         Ok(ClosePositionResult {
             success: result.success,
@@ -182,10 +183,15 @@ impl PositionService {
                     &position.symbol,
                     &position.product,
                     api_key,
-                ).await {
+                )
+                .await
+                {
                     Ok(close_result) => results.push(close_result),
                     Err(e) => {
-                        error!("Failed to close position {} {}: {}", position.exchange, position.symbol, e);
+                        error!(
+                            "Failed to close position {} {}: {}",
+                            position.exchange, position.symbol, e
+                        );
                         results.push(ClosePositionResult {
                             success: false,
                             order_id: None,
