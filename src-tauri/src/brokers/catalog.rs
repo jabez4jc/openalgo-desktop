@@ -57,7 +57,9 @@ pub const ALL_BROKERS: &[&str] = &[
 pub fn auth_type(broker: &str) -> AuthType {
     match broker {
         "zerodha" | "fyers" | "upstox" | "dhan" | "arrow" | "paytm" | "pocketful" | "hdfcsky"
-        | "hdfcsecurities" | "flattrade" | "compositedge" | "iiflcapital" => AuthType::OAuth,
+        | "hdfcsecurities" | "flattrade" | "compositedge" | "iiflcapital" | "rmoney" => {
+            AuthType::OAuth
+        }
         _ => AuthType::Form,
     }
 }
@@ -93,6 +95,10 @@ pub fn authorize_url(
             enc(redirect_url),
             enc(state)
         ))
+        }
+        // XTS third-party login; the session comes back as `session`.
+        "compositedge" | "rmoney" => {
+            crate::brokers::families::xts::thirdparty_url(broker, api_key, redirect_url, state)
         }
         _ => None,
     }
@@ -172,6 +178,7 @@ pub fn extract_code(broker: &str, params: &HashMap<String, String>) -> Option<St
         "dhan" | "dhan_sandbox" => get("tokenId")
             .or_else(|| get("token_id"))
             .or_else(|| get("token")),
+        "compositedge" | "rmoney" => get("session"),
         "arrow" | "hdfcsecurities" | "hdfcsky" => get("request_token")
             .or_else(|| get("requestToken"))
             .or_else(|| get("request-token"))

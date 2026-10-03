@@ -1,0 +1,503 @@
+{
+ "session_ok": {
+  "type": "success",
+  "code": "s-user-0001",
+  "description": "Valid User.",
+  "result": {
+   "enums": {},
+   "clientCodes": [
+    "<USER_ID>"
+   ],
+   "exchangeSegmentArray": [],
+   "userID": "<USER_ID>",
+   "isInvestorClient": true,
+   "token": "eyJhbGciOiJIUzI1NiJ9.interactive.sig"
+  }
+ },
+ "session_refused": {
+  "type": "error",
+  "code": "e-user-0004",
+  "description": "Invalid appKey or secretKey"
+ },
+ "market_login_ok": {
+  "type": "success",
+  "code": "s-user-0001",
+  "description": "Request successful",
+  "result": {
+   "token": "eyJhbGciOiJIUzI1NiJ9.market.sig",
+   "userID": "<USER_ID>",
+   "appVersion": "1.0",
+   "application_expiry_date": "2027-01-01"
+  }
+ },
+ "orders": {
+  "type": "success",
+  "code": "s-orders-0001",
+  "description": "Success order book",
+  "result": [
+   {
+    "LoginID": "<USER_ID>",
+    "ClientID": "<USER_ID>",
+    "AppOrderID": 1200001,
+    "OrderReferenceID": "",
+    "GeneratedBy": "TWSAPI",
+    "ExchangeOrderID": "1100000012345678",
+    "OrderCategoryType": "NORMAL",
+    "ExchangeSegment": "NSECM",
+    "ExchangeInstrumentID": 2885,
+    "OrderSide": "BUY",
+    "OrderType": "Limit",
+    "ProductType": "MIS",
+    "TimeInForce": "DAY",
+    "OrderPrice": 2500.5,
+    "OrderQuantity": 10,
+    "OrderStopPrice": 0,
+    "OrderStatus": "New",
+    "OrderAverageTradedPrice": 0.0,
+    "LeavesQuantity": 10,
+    "CumulativeQuantity": 0,
+    "OrderDisclosedQuantity": 0,
+    "OrderGeneratedDateTime": "03-01-2024 09:20:11",
+    "ExchangeTransactTime": "03-01-2024 09:20:11",
+    "LastUpdateDateTime": "03-01-2024 09:20:12",
+    "CancelRejectReason": "",
+    "OrderUniqueIdentifier": "openalgo",
+    "TradingSymbol": "RELIANCE-EQ",
+    "MessageCode": 9004,
+    "MessageVersion": 4
+   },
+   {
+    "LoginID": "<USER_ID>",
+    "ClientID": "<USER_ID>",
+    "AppOrderID": 1200002.0,
+    "OrderReferenceID": "",
+    "GeneratedBy": "TWSAPI",
+    "ExchangeOrderID": "1100000012345678",
+    "OrderCategoryType": "NORMAL",
+    "ExchangeSegment": "NSEFO",
+    "ExchangeInstrumentID": 43210,
+    "OrderSide": "SELL",
+    "OrderType": "Market",
+    "ProductType": "NRML",
+    "TimeInForce": "DAY",
+    "OrderPrice": 0,
+    "OrderQuantity": 50,
+    "OrderStopPrice": 0,
+    "OrderStatus": "Filled",
+    "OrderAverageTradedPrice": 101.25,
+    "LeavesQuantity": 0,
+    "CumulativeQuantity": 50,
+    "OrderDisclosedQuantity": 0,
+    "OrderGeneratedDateTime": "03-01-2024 09:20:11",
+    "ExchangeTransactTime": "03-01-2024 09:20:11",
+    "LastUpdateDateTime": "03-01-2024 09:20:12",
+    "CancelRejectReason": "",
+    "OrderUniqueIdentifier": "openalgo",
+    "TradingSymbol": "NIFTY 25APR 22500 CE",
+    "MessageCode": 9004,
+    "MessageVersion": 4
+   },
+   {
+    "LoginID": "<USER_ID>",
+    "ClientID": "<USER_ID>",
+    "AppOrderID": "1200003",
+    "OrderReferenceID": "",
+    "GeneratedBy": "TWSAPI",
+    "ExchangeOrderID": "1100000012345678",
+    "OrderCategoryType": "NORMAL",
+    "ExchangeSegment": "NSECM",
+    "ExchangeInstrumentID": 3045,
+    "OrderSide": "BUY",
+    "OrderType": "StopLimit",
+    "ProductType": "CNC",
+    "TimeInForce": "DAY",
+    "OrderPrice": 780,
+    "OrderQuantity": 5,
+    "OrderStopPrice": 779,
+    "OrderStatus": "Trigger Pending",
+    "OrderAverageTradedPrice": 0.0,
+    "LeavesQuantity": 5,
+    "CumulativeQuantity": 0,
+    "OrderDisclosedQuantity": 0,
+    "OrderGeneratedDateTime": "03-01-2024 09:20:11",
+    "ExchangeTransactTime": "03-01-2024 09:20:11",
+    "LastUpdateDateTime": "03-01-2024 09:20:12",
+    "CancelRejectReason": "",
+    "OrderUniqueIdentifier": "openalgo",
+    "TradingSymbol": "SBIN-EQ",
+    "MessageCode": 9004,
+    "MessageVersion": 4
+   },
+   {
+    "LoginID": "<USER_ID>",
+    "ClientID": "<USER_ID>",
+    "AppOrderID": 1200004,
+    "OrderReferenceID": "",
+    "GeneratedBy": "TWSAPI",
+    "ExchangeOrderID": "",
+    "OrderCategoryType": "NORMAL",
+    "ExchangeSegment": "NSECM",
+    "ExchangeInstrumentID": 3045,
+    "OrderSide": "SELL",
+    "OrderType": "StopMarket",
+    "ProductType": "MIS",
+    "TimeInForce": "DAY",
+    "OrderPrice": 0,
+    "OrderQuantity": 5,
+    "OrderStopPrice": 760,
+    "OrderStatus": "Rejected",
+    "OrderAverageTradedPrice": 0.0,
+    "LeavesQuantity": 5,
+    "CumulativeQuantity": 0,
+    "OrderDisclosedQuantity": 0,
+    "OrderGeneratedDateTime": "03-01-2024 09:20:11",
+    "ExchangeTransactTime": "03-01-2024 09:20:11",
+    "LastUpdateDateTime": "03-01-2024 09:20:12",
+    "CancelRejectReason": "RMS:Margin Exceeds",
+    "OrderUniqueIdentifier": "openalgo",
+    "TradingSymbol": "SBIN-EQ",
+    "MessageCode": 9004,
+    "MessageVersion": 4
+   },
+   {
+    "LoginID": "<USER_ID>",
+    "ClientID": "<USER_ID>",
+    "AppOrderID": 1200005,
+    "OrderReferenceID": "",
+    "GeneratedBy": "TWSAPI",
+    "ExchangeOrderID": "1100000012345678",
+    "OrderCategoryType": "NORMAL",
+    "ExchangeSegment": "NSECM",
+    "ExchangeInstrumentID": 2885,
+    "OrderSide": "BUY",
+    "OrderType": "Limit",
+    "ProductType": "MIS",
+    "TimeInForce": "DAY",
+    "OrderPrice": 2490,
+    "OrderQuantity": 10,
+    "OrderStopPrice": 0,
+    "OrderStatus": "PartiallyFilled",
+    "OrderAverageTradedPrice": 2490,
+    "LeavesQuantity": 6,
+    "CumulativeQuantity": 4,
+    "OrderDisclosedQuantity": 0,
+    "OrderGeneratedDateTime": "03-01-2024 09:20:11",
+    "ExchangeTransactTime": "03-01-2024 09:20:11",
+    "LastUpdateDateTime": "03-01-2024 09:20:12",
+    "CancelRejectReason": "",
+    "OrderUniqueIdentifier": "openalgo",
+    "TradingSymbol": "RELIANCE-EQ",
+    "MessageCode": 9004,
+    "MessageVersion": 4
+   },
+   {
+    "LoginID": "<USER_ID>",
+    "ClientID": "<USER_ID>",
+    "AppOrderID": 1200006,
+    "OrderReferenceID": "",
+    "GeneratedBy": "TWSAPI",
+    "ExchangeOrderID": "1100000012345678",
+    "OrderCategoryType": "NORMAL",
+    "ExchangeSegment": "NSECM",
+    "ExchangeInstrumentID": 2885,
+    "OrderSide": "BUY",
+    "OrderType": "Limit",
+    "ProductType": "MIS",
+    "TimeInForce": "DAY",
+    "OrderPrice": 2490,
+    "OrderQuantity": 10,
+    "OrderStopPrice": 0,
+    "OrderStatus": "Cancelled",
+    "OrderAverageTradedPrice": 0.0,
+    "LeavesQuantity": 10,
+    "CumulativeQuantity": 0,
+    "OrderDisclosedQuantity": 0,
+    "OrderGeneratedDateTime": "03-01-2024 09:20:11",
+    "ExchangeTransactTime": "03-01-2024 09:20:11",
+    "LastUpdateDateTime": "03-01-2024 09:20:12",
+    "CancelRejectReason": "",
+    "OrderUniqueIdentifier": "openalgo",
+    "TradingSymbol": "RELIANCE-EQ",
+    "MessageCode": 9004,
+    "MessageVersion": 4
+   }
+  ]
+ },
+ "trades": {
+  "type": "success",
+  "code": "s-trades-0001",
+  "description": "Success tradebook",
+  "result": [
+   {
+    "LoginID": "<USER_ID>",
+    "ClientID": "<USER_ID>",
+    "AppOrderID": 1200002,
+    "OrderReferenceID": "",
+    "GeneratedBy": "TWSAPI",
+    "ExchangeOrderID": "1100000012345678",
+    "OrderCategoryType": "NORMAL",
+    "ExchangeSegment": "NSEFO",
+    "ExchangeInstrumentID": 43210,
+    "OrderSide": "SELL",
+    "OrderType": "Market",
+    "ProductType": "NRML",
+    "TimeInForce": "DAY",
+    "OrderPrice": 0,
+    "OrderQuantity": 50,
+    "OrderStopPrice": 0,
+    "OrderStatus": "Filled",
+    "OrderAverageTradedPrice": 101.25,
+    "LeavesQuantity": 0,
+    "CumulativeQuantity": 50,
+    "OrderDisclosedQuantity": 0,
+    "OrderGeneratedDateTime": "03-01-2024 09:20:11",
+    "ExchangeTransactTime": "03-01-2024 09:20:11",
+    "LastUpdateDateTime": "03-01-2024 09:20:12",
+    "CancelRejectReason": "",
+    "OrderUniqueIdentifier": "openalgo",
+    "TradingSymbol": "NIFTY 25APR 22500 CE",
+    "MessageCode": 9004,
+    "MessageVersion": 4,
+    "ExecutionID": "T0001",
+    "LastTradedPrice": 101.25,
+    "LastTradedQuantity": 50
+   },
+   {
+    "LoginID": "<USER_ID>",
+    "ClientID": "<USER_ID>",
+    "AppOrderID": 1200007,
+    "OrderReferenceID": "",
+    "GeneratedBy": "TWSAPI",
+    "ExchangeOrderID": "1100000012345678",
+    "OrderCategoryType": "NORMAL",
+    "ExchangeSegment": "NSECM",
+    "ExchangeInstrumentID": 9999999,
+    "OrderSide": "BUY",
+    "OrderType": "Market",
+    "ProductType": "MIS",
+    "TimeInForce": "DAY",
+    "OrderPrice": 0,
+    "OrderQuantity": 3,
+    "OrderStopPrice": 0,
+    "OrderStatus": "Filled",
+    "OrderAverageTradedPrice": "99.5",
+    "LeavesQuantity": 0,
+    "CumulativeQuantity": 3,
+    "OrderDisclosedQuantity": 0,
+    "OrderGeneratedDateTime": "03-01-2024 09:20:11",
+    "ExchangeTransactTime": "03-01-2024 09:20:11",
+    "LastUpdateDateTime": "03-01-2024 09:20:12",
+    "CancelRejectReason": "",
+    "OrderUniqueIdentifier": "openalgo",
+    "TradingSymbol": "UNKNOWN-EQ",
+    "MessageCode": 9004,
+    "MessageVersion": 4,
+    "ExecutionID": "T0002"
+   }
+  ]
+ },
+ "positions": {
+  "type": "success",
+  "code": "s-portfolio-0001",
+  "description": "Get Net position successfully",
+  "result": {
+   "positionList": [
+    {
+     "AccountID": "<USER_ID>",
+     "TradingSymbol": "RELIANCE",
+     "ExchangeSegment": "NSECM",
+     "ExchangeInstrumentId": "2885",
+     "ProductType": "MIS",
+     "Marketlot": "1",
+     "Multiplier": "1",
+     "BuyAveragePrice": "2501.40",
+     "SellAveragePrice": "0",
+     "OpenBuyQuantity": "10",
+     "OpenSellQuantity": "0",
+     "Quantity": "10",
+     "BuyAmount": "25014.00",
+     "SellAmount": "0",
+     "NetAmount": "-25014.00",
+     "UnrealizedMTM": "12.5",
+     "RealizedMTM": "0",
+     "MTM": "12.5",
+     "BEP": "2501.4",
+     "MessageCode": 9002
+    },
+    {
+     "AccountID": "<USER_ID>",
+     "TradingSymbol": "NIFTY 25APR 22500 CE",
+     "ExchangeSegment": "NSEFO",
+     "ExchangeInstrumentId": "43210",
+     "ProductType": "NRML",
+     "BuyAveragePrice": "0",
+     "SellAveragePrice": "101.25",
+     "OpenBuyQuantity": "0",
+     "OpenSellQuantity": "50",
+     "Quantity": "-50",
+     "BuyAmount": "0",
+     "SellAmount": "5062.5",
+     "UnrealizedMTM": "-40",
+     "RealizedMTM": "0",
+     "MTM": "-40"
+    },
+    {
+     "AccountID": "<USER_ID>",
+     "TradingSymbol": "SBIN",
+     "ExchangeSegment": "NSECM",
+     "ExchangeInstrumentId": "3045",
+     "ProductType": "CNC",
+     "BuyAveragePrice": "780",
+     "SellAveragePrice": "782",
+     "Quantity": "0",
+     "RealizedMTM": "10",
+     "MTM": "10"
+    }
+   ]
+  }
+ },
+ "positions_flat": {
+  "type": "success",
+  "result": [
+   {
+    "TradingSymbol": "SBIN",
+    "ExchangeSegment": "NSECM",
+    "ExchangeInstrumentID": "3045",
+    "ProductType": "MIS",
+    "Quantity": "-5",
+    "SellAveragePrice": "781",
+    "BuyAveragePrice": "0"
+   },
+   {
+    "ExchangeSegment": "NSECM",
+    "Id": 2885,
+    "ProductType": "MIS",
+    "Quantity": "2",
+    "BuyAveragePrice": "2500",
+    "SellAveragePrice": "0"
+   }
+  ]
+ },
+ "holdings": {
+  "type": "success",
+  "code": "s-holding-0005",
+  "description": "Get Holding successfully!",
+  "result": {
+   "RMSHoldings": {
+    "Holdings": {
+     "INE002A01018": {
+      "ISIN": "INE002A01018",
+      "HoldingQuantity": 4,
+      "UtilizedQuantity": 0,
+      "ExchangeNSEInstrumentId": 2885,
+      "ExchangeBSEInstrumentId": 500325,
+      "BuyAvgPrice": 2400.5,
+      "CreatedOn": "2024-01-01T00:00:00",
+      "IsNeedToDelete": false
+     },
+     "INE000Z01011": {
+      "ISIN": "INE000Z01011",
+      "HoldingQuantity": 10,
+      "ExchangeNSEInstrumentId": 0,
+      "BuyAvgPrice": 12
+     }
+    }
+   }
+  }
+ },
+ "balance": {
+  "type": "success",
+  "code": "s-user-0001",
+  "description": "Get Balance successfully",
+  "result": {
+   "BalanceList": [
+    {
+     "limitHeader": "CASH|NSE|MTF",
+     "limitObject": {
+      "RMSSubLimits": {
+       "cashAvailable": "0",
+       "collateral": 0,
+       "marginUtilized": "0",
+       "netMarginAvailable": "0",
+       "MTM": "0",
+       "UnrealizedMTM": "0",
+       "RealizedMTM": "0"
+      },
+      "AccountID": "<USER_ID>"
+     }
+    },
+    {
+     "limitHeader": "ALL|ALL|ALL",
+     "limitObject": {
+      "RMSSubLimits": {
+       "cashAvailable": "100000",
+       "collateral": "2500.456",
+       "marginUtilized": "15000.1",
+       "netMarginAvailable": "85000.999",
+       "MTM": "-27.5",
+       "UnrealizedMTM": "-27.5",
+       "RealizedMTM": "nan"
+      },
+      "AccountID": "<USER_ID>"
+     }
+    }
+   ]
+  }
+ },
+ "place_ok": {
+  "type": "success",
+  "code": "s-orders-0001",
+  "description": "Request sent",
+  "result": {
+   "AppOrderID": 1200010,
+   "OrderUniqueIdentifier": "openalgo",
+   "ClientID": "<USER_ID>"
+  }
+ },
+ "place_rejected": {
+  "type": "error",
+  "code": "e-orders-0005",
+  "description": "Order quantity should be multiple of lot size",
+  "result": {}
+ },
+ "modify_ok": {
+  "type": "success",
+  "code": "s-orders-0002",
+  "description": "Request sent",
+  "result": {
+   "AppOrderID": 1200001,
+   "OrderUniqueIdentifier": "openalgo",
+   "ClientID": "<USER_ID>"
+  }
+ },
+ "cancel_ok": {
+  "type": "success",
+  "code": "s-orders-0003",
+  "description": "Request sent",
+  "result": {
+   "AppOrderID": 1200001,
+   "OrderUniqueIdentifier": "openalgo",
+   "ClientID": "<USER_ID>"
+  }
+ },
+ "invalid_token": {
+  "type": "error",
+  "code": "e-session-0007",
+  "description": "Invalid Token",
+  "result": {}
+ },
+ "margin_ok": {
+  "type": "success",
+  "code": "s-calculatemargin-0001",
+  "description": "Request sent",
+  "result": {
+   "brokerageDeatils": {
+    "IsValid": true,
+    "MarginRequired": 150.75,
+    "MarginAvailable": 9816624.5775,
+    "MarginShortfall": 0,
+    "ErrorMessage": ""
+   }
+  }
+ }
+}

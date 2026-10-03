@@ -9,15 +9,23 @@
 pub mod angel;
 pub mod catalog;
 pub mod common;
+pub mod compositedge;
 pub mod dhan;
 pub mod dhan_sandbox;
+pub mod families;
+pub mod fivepaisaxts;
 pub mod fyers;
 pub mod groww;
+pub mod ibulls;
+pub mod iifl;
+pub mod jainamxts;
 pub mod kotak;
 #[cfg(any(test, feature = "test-support"))]
 pub mod mock;
+pub mod rmoney;
 pub mod types;
 pub mod upstox;
+pub mod wisdom;
 pub mod zerodha;
 
 use crate::error::{AppError, Result};
@@ -265,6 +273,11 @@ pub struct BrokerCredentials {
     pub totp: Option<String>,
     pub request_token: Option<String>,
     pub auth_code: Option<String>,
+    /// Second key pair of the XTS family (market-data session).
+    #[serde(default)]
+    pub api_key_market: Option<String>,
+    #[serde(default)]
+    pub api_secret_market: Option<String>,
 }
 
 impl std::fmt::Debug for BrokerCredentials {
@@ -312,6 +325,13 @@ impl BrokerRegistry {
             Arc::new(dhan::DhanBroker::new(symbols.clone())),
             Arc::new(dhan_sandbox::broker(symbols.clone())),
             Arc::new(kotak::KotakBroker::new(symbols.clone())),
+            Arc::new(fivepaisaxts::broker(symbols.clone())),
+            Arc::new(jainamxts::broker(symbols.clone())),
+            Arc::new(compositedge::broker(symbols.clone())),
+            Arc::new(rmoney::broker(symbols.clone())),
+            Arc::new(ibulls::broker(symbols.clone())),
+            Arc::new(wisdom::broker(symbols.clone())),
+            Arc::new(iifl::broker(symbols.clone())),
         ];
         Self::with_symbols(symbols, brokers)
     }
@@ -379,12 +399,19 @@ mod tests {
             reg.ids(),
             [
                 "angel",
+                "compositedge",
                 "dhan",
                 "dhan_sandbox",
+                "fivepaisaxts",
                 "fyers",
                 "groww",
+                "ibulls",
+                "iifl",
+                "jainamxts",
                 "kotak",
+                "rmoney",
                 "upstox",
+                "wisdom",
                 "zerodha"
             ]
         );
