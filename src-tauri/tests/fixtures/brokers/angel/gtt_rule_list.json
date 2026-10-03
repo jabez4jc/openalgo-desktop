@@ -1,0 +1,10 @@
+{
+  "status": true,
+  "message": "SUCCESS",
+  "errorcode": "",
+  "data": [
+    {"id":"1234567","status":"NEW","createddate":"2026-10-03T10:00:00Z","updateddate":"2026-10-03T10:00:00Z","expirydate":"2027-10-03T10:00:00Z","clientid":"<USER_ID>","tradingsymbol":"SBIN-EQ","symboltoken":"3045","exchange":"NSE","producttype":"DELIVERY","transactiontype":"BUY","price":"901","qty":"1","triggerprice":"900.5","disclosedqty":"0"},
+    {"id":"1234568","status":"ACTIVE","createddate":"2026-10-03T10:01:00Z","updateddate":"2026-10-03T10:01:00Z","expirydate":"2027-10-03T10:01:00Z","clientid":"<USER_ID>","tradingsymbol":"RELIANCE-EQ","symboltoken":"2885","exchange":"NSE","producttype":"MARGIN","transactiontype":"SELL","price":"1500","qty":"2","triggerprice":"1499","disclosedqty":"0"},
+    {"id":"1234569","status":"CANCELLED","createddate":"2026-10-02T10:00:00Z","updateddate":"2026-10-02T11:00:00Z","expirydate":"2027-10-02T10:00:00Z","clientid":"<USER_ID>","tradingsymbol":"SBIN-EQ","symboltoken":"3045","exchange":"NSE","producttype":"DELIVERY","transactiontype":"BUY","price":"850","qty":"1","triggerprice":"849","disclosedqty":"0"}
+  ]
+}

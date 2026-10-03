@@ -1,0 +1,15 @@
+{
+  "status": true,
+  "message": "SUCCESS",
+  "errorcode": "",
+  "data": {
+    "fetched": [
+      {"exchange":"NSE","tradingSymbol":"SBIN-EQ","symbolToken":"3045","ltp":954.1,"open":951.0,"high":957.4,"low":948.2,"close":950.65,"lastTradeQty":5,"exchFeedTime":"03-Oct-2026 10:15:01","exchTradeTime":"03-Oct-2026 10:15:01","netChange":3.45,"percentChange":0.36,"avgPrice":952.87,"tradeVolume":4823170,"opnInterest":0,"lowerCircuit":855.6,"upperCircuit":1045.7,"totBuyQuan":512633,"totSellQuan":689415,"52WeekLow":680.0,"52WeekHigh":980.0,
+       "depth":{"buy":[{"price":954.05,"quantity":120,"orders":3},{"price":954.0,"quantity":300,"orders":5},{"price":953.95,"quantity":845,"orders":9}],
+                "sell":[{"price":954.1,"quantity":77,"orders":2},{"price":954.15,"quantity":523,"orders":4},{"price":954.2,"quantity":1000,"orders":7}]}},
+      {"exchange":"NSE","tradingSymbol":"Nifty 50","symbolToken":"99926000","ltp":22512.35,"open":22450.1,"high":22540.0,"low":22430.55,"close":22480.0,"lastTradeQty":0,"exchFeedTime":"03-Oct-2026 10:15:00","tradeVolume":0,"opnInterest":0,"totBuyQuan":0,"totSellQuan":0,"depth":{"buy":[],"sell":[]}},
+      {"exchange":"NFO","tradingSymbol":"NIFTY27OCT2625000CE","symbolToken":"43210","ltp":150.2,"open":160.0,"high":165.5,"low":148.0,"close":156.95,"lastTradeQty":75,"exchFeedTime":"03-Oct-2026 10:15:00","tradeVolume":1200000,"opnInterest":4567800,"totBuyQuan":90000,"totSellQuan":81000,"depth":{"buy":[{"price":150.15,"quantity":750,"orders":4}],"sell":[{"price":150.25,"quantity":1500,"orders":6}]}}
+    ],
+    "unfetched": []
+  }
+}

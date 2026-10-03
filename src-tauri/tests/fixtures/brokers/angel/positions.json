@@ -1,0 +1,10 @@
+{
+  "status": true,
+  "message": "SUCCESS",
+  "errorcode": "",
+  "data": [
+    {"exchange":"MCX","symboltoken":"440001","producttype":"INTRADAY","tradingsymbol":"CRUDEOIL19OCT26FUT","symbolname":"CRUDEOIL","instrumenttype":"FUTCOM","priceden":"1","pricenum":"1","genden":"1","gennum":"1","precision":"2","multiplier":"-1","boardlotsize":"1","buyqty":"100","sellqty":"0","buyamount":"900800.00","sellamount":"0","symbolgroup":"","strikeprice":"-1","optiontype":"","expirydate":"19OCT2026","lotsize":"100","cfbuyqty":"0","cfsellqty":"0","cfbuyamount":"0","cfsellamount":"0","buyavgprice":"9008.00","sellavgprice":"0","avgnetprice":"9008.00","netvalue":"-900800.00","netqty":"100","totalbuyvalue":"900800.00","totalsellvalue":"0","cfbuyavgprice":"0","cfsellavgprice":"0","totalbuyavgprice":"9008.00","totalsellavgprice":"0","netprice":"9008.00","ltp":"9030.00","pnl":"2200.00","realised":"0","unrealised":"2200.00"},
+    {"exchange":"NFO","symboltoken":"43210","producttype":"CARRYFORWARD","tradingsymbol":"NIFTY27OCT2625000CE","buyqty":"0","sellqty":"75","buyamount":"0","sellamount":"11771.25","cfbuyqty":"0","cfsellqty":"0","avgnetprice":"156.95","netqty":"-75","ltp":"150.20","pnl":"506.25","realised":"0","unrealised":"506.25"},
+    {"exchange":"NSE","symboltoken":"3045","producttype":"INTRADAY","tradingsymbol":"SBIN-EQ","buyqty":"10","sellqty":"10","buyamount":"9500.00","sellamount":"9512.50","cfbuyqty":"0","cfsellqty":"0","avgnetprice":"0","netqty":"0","ltp":"954.10","pnl":"12.50","realised":"12.50","unrealised":"0"}
+  ]
+}

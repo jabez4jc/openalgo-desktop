@@ -1,0 +1,19 @@
+{
+  "status": true,
+  "message": "SUCCESS",
+  "errorcode": "",
+  "data": {
+    "totalMarginRequired": 191119.2,
+    "marginComponents": {
+      "netPremium": 5400.0,
+      "spanMargin": 112760.0,
+      "marginBenefit": 1200.0,
+      "deliveryMargin": 0.0,
+      "nonNFOMargin": 0.0,
+      "totOptionsPremium": 5400.0
+    },
+    "marginBreakup": [
+      {"exchange": "NFO", "productType": "CARRYFORWARD", "totalMarginRequired": 191119.2}
+    ]
+  }
+}

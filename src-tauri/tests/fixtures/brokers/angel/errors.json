@@ -1,0 +1,8 @@
+{
+  "token_expired": {"status": false, "message": "Invalid Token", "errorcode": "AG8001", "data": null},
+  "insufficient_funds": {"status": false, "message": "Insufficient funds. Required margin is 7000.00", "errorcode": "AB4008", "data": null},
+  "login_failed": {"status": false, "message": "Invalid totp", "errorcode": "AB1050", "data": null},
+  "login_ok": {"status": true, "message": "SUCCESS", "errorcode": "", "data": {"jwtToken": "eyJhbGciOiJIUzUxMiJ9.<JWT>.sig", "refreshToken": "eyJhbGciOiJIUzUxMiJ9.<REFRESH>.sig", "feedToken": "eyJhbGciOiJIUzUxMiJ9.<FEED>.sig"}},
+  "modify_ok": {"status": "true", "message": "SUCCESS", "errorcode": "", "data": {"orderid": "261003000000001", "uniqueorderid": "abc"}},
+  "rate_limit_text": "Access denied because of exceeding access rate"
+}

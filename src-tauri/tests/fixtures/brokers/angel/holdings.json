@@ -1,0 +1,12 @@
+{
+  "status": true,
+  "message": "SUCCESS",
+  "errorcode": "",
+  "data": {
+    "holdings": [
+      {"tradingsymbol":"SBIN-EQ","exchange":"NSE","isin":"INE062A01020","t1quantity":"2","realisedquantity":"10","quantity":"10","authorisedquantity":"0","product":"DELIVERY","collateralquantity":null,"collateraltype":null,"haircut":"0","averageprice":"800.00","ltp":"954.10","symboltoken":"3045","close":"950.65","profitandloss":"1541.00","pnlpercentage":"19.26"},
+      {"tradingsymbol":"NEWLISTCO-EQ","exchange":"NSE","isin":"INE000000000","t1quantity":"0","quantity":"3","product":"MTF","averageprice":"100","ltp":null,"close":null,"profitandloss":null,"pnlpercentage":null}
+    ],
+    "totalholding": {"totalholdingvalue":"9541.00","totalinvvalue":"8300.00","totalprofitandloss":"1241.00","totalpnlpercentage":"14.95"}
+  }
+}
