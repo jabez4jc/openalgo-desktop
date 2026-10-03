@@ -1,0 +1,166 @@
+name: Bug report
+description: Something in OpenAlgo Desktop does not work as expected.
+title: "bug: "
+labels: [bug, triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please do not paste API keys, broker passwords,
+        TOTP secrets, access tokens, account ids or email addresses anywhere in
+        this form, including logs and screenshots. Replace them with
+        `<APIKEY>`, `<USER_ID>` and `<EMAIL>`.
+
+  - type: input
+    id: app-version
+    attributes:
+      label: App version
+      description: Shown in Settings > About, or the installer file name.
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows 11
+        - Windows 10
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Linux (Ubuntu / Debian)
+        - Linux (other distribution)
+        - Raspberry Pi OS
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: os-version
+    attributes:
+      label: OS version
+      placeholder: "Windows 11 23H2, macOS 15.1, Ubuntu 24.04, Raspberry Pi OS Bookworm 64-bit"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: arch
+    attributes:
+      label: Architecture
+      options:
+        - x86_64 (Intel / AMD 64-bit)
+        - aarch64 / arm64 (Apple Silicon, Raspberry Pi 64-bit, other ARM)
+        - armv7 (32-bit ARM)
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Raspberry Pi model or device
+      description: Required for Raspberry Pi and other single-board computers. Include RAM size.
+      placeholder: "Raspberry Pi 5, 8 GB"
+
+  - type: dropdown
+    id: install
+    attributes:
+      label: Installer used
+      options:
+        - Windows installer (.exe)
+        - Windows installer (.msi)
+        - macOS disk image (.dmg)
+        - Linux AppImage
+        - Linux .deb
+        - Linux .rpm
+        - Built from source
+    validations:
+      required: true
+
+  - type: input
+    id: broker
+    attributes:
+      label: Broker
+      placeholder: "zerodha, fyers, upstox, dhan, angel, ..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Mode
+      options:
+        - Live
+        - Sandbox (analyzer mode)
+        - Both
+        - Not related to orders
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where does it happen
+      multiple: true
+      options:
+        - Login or broker connection
+        - Orders, positions or holdings
+        - Market data or WebSocket feed
+        - REST API (/api/v1) from an external client
+        - Charts or the trading terminal
+        - Strategies, alerts or webhooks
+        - Historify or historical data
+        - Settings, API keys or logs
+        - Installation, update or startup
+        - Other
+
+  - type: input
+    id: client
+    attributes:
+      label: External client, if any
+      description: Python SDK, TradingView, Amibroker, Chartink, Excel, MCP client, and its version.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you saw, including the exact message shown in the app.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+      description: If it works in OpenAlgo web, say so; behaviour should match the web.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open ...
+        2. Click ...
+        3. See ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant lines from the app log with secrets removed. Pasted as text, not screenshots.
+      render: text
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I removed API keys, passwords, tokens, account ids and emails from everything above.
+          required: true
+        - label: I searched existing issues and this is not a duplicate.
+          required: true

@@ -1,0 +1,73 @@
+# Weekly dependency updates, grouped so a week produces a handful of PRs
+# instead of dozens. Security updates are not grouped and arrive as soon as an
+# advisory is published.
+#
+# The tauri crate (cargo) and @tauri-apps/* (npm) must stay on the same
+# major.minor. Dependabot cannot group across ecosystems, so merge the two
+# "tauri" PRs together.
+
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /src-tauri
+    schedule:
+      interval: weekly
+      day: monday
+      time: "03:00"
+      timezone: Asia/Kolkata
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: chore
+      include: scope
+    labels: [dependencies, rust]
+    groups:
+      tauri:
+        patterns: ["tauri", "tauri-*"]
+      rust-minor-and-patch:
+        update-types: [minor, patch]
+        exclude-patterns: ["tauri", "tauri-*"]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "03:00"
+      timezone: Asia/Kolkata
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: chore
+      include: scope
+    labels: [dependencies, javascript]
+    groups:
+      tauri:
+        patterns: ["@tauri-apps/*"]
+      react:
+        patterns: ["react", "react-dom", "react-router", "react-router-*", "@types/react", "@types/react-dom"]
+      test-tooling:
+        dependency-type: development
+        patterns: ["vitest", "@vitest/*", "@playwright/test", "playwright", "jsdom", "@testing-library/*", "jest-axe", "@types/jest-axe"]
+      build-tooling:
+        dependency-type: development
+        patterns: ["vite", "@vitejs/*", "typescript", "@biomejs/*", "tailwindcss", "@tailwindcss/*"]
+      npm-dev-minor-and-patch:
+        dependency-type: development
+        update-types: [minor, patch]
+      npm-prod-minor-and-patch:
+        dependency-type: production
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directories: ["/", "/.github/actions/*"]
+    schedule:
+      interval: weekly
+      day: monday
+      time: "03:00"
+      timezone: Asia/Kolkata
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+    labels: [dependencies, ci]
+    groups:
+      github-actions:
+        patterns: ["*"]
