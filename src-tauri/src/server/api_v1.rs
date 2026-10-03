@@ -22,7 +22,6 @@ use axum::{
 use serde_json::{json, Value};
 use std::net::IpAddr;
 use std::sync::Arc;
-use std::time::Instant;
 
 type Ctx = State<Arc<AppState>>;
 
@@ -30,7 +29,7 @@ type Ctx = State<Arc<AppState>>;
 /// session is reported as an invalid key. An address that keeps sending bad
 /// keys stops being checked at all for a minute (same answer, no Argon2).
 fn authorize(ctx: &AppState, key: &str, ip: IpAddr) -> bool {
-    let now = Instant::now();
+    let now = ctx.limiter.now();
     if ctx.limiter.is_exhausted(Bucket::ApiKeyFail, ip, now) {
         return false;
     }

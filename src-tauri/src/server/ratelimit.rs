@@ -68,11 +68,25 @@ impl Bucket {
 #[derive(Default)]
 pub struct RateLimiter {
     map: Mutex<HashMap<(Bucket, IpAddr), VecDeque<Instant>>>,
+    /// Tests pin time so a window cannot slide while a slow runner (Windows,
+    /// coverage instrumentation) is still sending the requests that fill it.
+    frozen: Mutex<Option<Instant>>,
 }
 
 impl RateLimiter {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// The instant callers should count a hit at.
+    pub fn now(&self) -> Instant {
+        self.frozen.lock().unwrap_or_else(Instant::now)
+    }
+
+    /// Pin the limiter's clock (tests only); `None` releases it.
+    #[cfg(test)]
+    pub fn freeze(&self, at: Option<Instant>) {
+        *self.frozen.lock() = at;
     }
 
     /// Count a hit. `Err(retry_after)` when over the limit (the hit is not

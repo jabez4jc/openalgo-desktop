@@ -43,6 +43,9 @@ impl H {
             BrokerRegistry::with(vec![mock.clone() as Arc<dyn crate::brokers::Broker>]),
             ist(2026, 10, 5, 10, 0),
         );
+        // Pin the limiter clock: rate-limit tests must not depend on how fast
+        // the runner sends requests.
+        t.ctx.limiter.freeze(Some(std::time::Instant::now()));
         H { t, mock }
     }
 

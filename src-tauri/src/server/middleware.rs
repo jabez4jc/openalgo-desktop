@@ -16,7 +16,6 @@ use axum::{
 use serde_json::json;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::Arc;
-use std::time::Instant;
 
 /// The browser session for this request, if the cookie named one.
 #[derive(Clone, Debug, Default)]
@@ -330,7 +329,7 @@ pub async fn api_rate_limit(
     let bucket = Bucket::for_api_path(req.uri().path());
     if ctx
         .limiter
-        .check(bucket, client_ip(&req), Instant::now())
+        .check(bucket, client_ip(&req), ctx.limiter.now())
         .is_err()
     {
         return json_response(
@@ -343,7 +342,7 @@ pub async fn api_rate_limit(
 
 /// Login-type limits (5 per minute and 25 per hour per IP).
 pub fn login_limited(ctx: &AppState, ip: IpAddr) -> Option<Response> {
-    let now = Instant::now();
+    let now = ctx.limiter.now();
     let over = ctx.limiter.check(Bucket::LoginMinute, ip, now).is_err()
         || ctx.limiter.check(Bucket::LoginHour, ip, now).is_err();
     over.then(|| {

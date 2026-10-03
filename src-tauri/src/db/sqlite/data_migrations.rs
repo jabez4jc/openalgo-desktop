@@ -382,7 +382,10 @@ mod tests {
         // Sandbox logs copied to logs.db without the API key.
         assert_eq!(ctx.logs.count_analyzer_logs().unwrap(), 1);
 
-        // A second start is a no-op (idempotent).
+        // A second start is a no-op (idempotent). Close the first one first:
+        // DuckDB holds an exclusive file lock, and Windows refuses a second
+        // open of the same file even from the same process.
+        drop(ctx);
         let ctx2 = AppState::open(
             dir.path(),
             OpenOptions {
