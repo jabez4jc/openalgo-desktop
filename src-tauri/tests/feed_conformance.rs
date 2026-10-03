@@ -368,11 +368,15 @@ async fn transcript_04_auth_grace_timeout() {
     let elapsed = t0.elapsed();
     tokio::time::resume();
     assert_eq!(got, Some((want_code, want_reason)));
-    // A paused clock may also jump to the server's next timer (the 1 s
-    // close drain) while the close frame is in flight on loopback.
+    // Only the lower bound is meaningful. A paused clock auto-advances
+    // whenever the runtime looks idle, and under load it looks idle while
+    // the close frame is still crossing the real loopback socket, so the
+    // clock can jump past later timers (seen at 57 s on a busy machine).
+    // The exact 4401 "auth timeout" code above already rules out a close
+    // for any other reason, such as the ping timeout.
     assert!(
-        elapsed >= Duration::from_secs(15) && elapsed < Duration::from_millis(16_500),
-        "closed after {:?}",
+        elapsed >= Duration::from_secs(15),
+        "closed before the 15 s grace period: {:?}",
         elapsed
     );
     h.handle.stop().await;
