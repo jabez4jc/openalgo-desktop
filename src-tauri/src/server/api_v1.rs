@@ -167,6 +167,14 @@ pub fn router() -> Router<Arc<AppState>> {
         .route("/api/v1/ping", post(ping))
         .route("/api/v1/analyzer", post(analyzer))
         .route("/api/v1/funds", post(funds))
+        .route(
+            "/api/v1/market/holidays",
+            post(crate::server::routes::market_calendar::holidays),
+        )
+        .route(
+            "/api/v1/market/timings",
+            post(crate::server::routes::market_calendar::timings),
+        )
         .route("/api/v1/analyzer/toggle", post(legacy::toggle_analyzer))
         .route("/api/v1/placeorder", post(legacy::place_order))
         .route("/api/v1/placesmartorder", post(legacy::place_smart_order))

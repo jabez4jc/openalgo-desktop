@@ -35,6 +35,35 @@ export const DEFAULT_WEBSOCKET_URL = import.meta.env.DEV
   ? 'ws://127.0.0.1:8766'
   : 'ws://127.0.0.1:8765'
 
+/**
+ * Brokers whose sign-in is a redirect to the broker's own login page.
+ *
+ * The web builds that address in the browser from the broker API key. The
+ * desktop never sends the key to the page (/auth/broker-config returns
+ * broker_api_key as null), so the local server builds the address, records
+ * the sign-in state and redirects: GET /<broker>/initiate-oauth.
+ */
+const SERVER_OAUTH_BROKERS = new Set([
+  'arrow',
+  'compositedge',
+  'dhan',
+  'flattrade',
+  'fyers',
+  'hdfcsecurities',
+  'hdfcsky',
+  'iiflcapital',
+  'paytm',
+  'pocketful',
+  'upstox',
+  'zerodha',
+])
+
+/** Where to send the browser to sign in to an OAuth broker, or null. */
+export function desktopBrokerLoginUrl(broker: string): string | null {
+  if (!SERVER_OAUTH_BROKERS.has(broker)) return null
+  return `/${encodeURIComponent(broker)}/initiate-oauth`
+}
+
 /** Profile menu entries that exist only in the desktop app. */
 export const desktopProfileMenuItems: NavItem[] = [
   { href: '/settings/server', label: 'Server Settings', icon: Server },

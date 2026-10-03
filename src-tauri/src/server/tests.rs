@@ -461,6 +461,9 @@ async fn bad_api_keys_are_throttled_per_ip() {
 
 fn concrete(path: &str) -> String {
     path.replace("{broker}", "zerodha")
+        .replace("{id}", "1")
+        .replace("{alert_id}", "1")
+        .replace("{exchange}", "NSE")
 }
 
 #[tokio::test]

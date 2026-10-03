@@ -1,0 +1,644 @@
+{
+  "account": [
+    {
+      "name": "funds",
+      "method": "POST",
+      "path": "/api/v1/funds",
+      "body": {
+        "apikey": ""
+      }
+    },
+    {
+      "name": "margin",
+      "method": "POST",
+      "path": "/api/v1/margin",
+      "body": {
+        "apikey": "",
+        "positions": [
+          {
+            "symbol": "BTCUSDFUT",
+            "exchange": "CRYPTO",
+            "action": "BUY",
+            "product": "NRML",
+            "pricetype": "MARKET",
+            "quantity": "1",
+            "price": "0"
+          }
+        ]
+      }
+    },
+    {
+      "name": "orderbook",
+      "method": "POST",
+      "path": "/api/v1/orderbook",
+      "body": {
+        "apikey": ""
+      }
+    },
+    {
+      "name": "positionbook",
+      "method": "POST",
+      "path": "/api/v1/positionbook",
+      "body": {
+        "apikey": ""
+      }
+    },
+    {
+      "name": "tradebook",
+      "method": "POST",
+      "path": "/api/v1/tradebook",
+      "body": {
+        "apikey": ""
+      }
+    }
+  ],
+  "orders": [
+    {
+      "name": "BasketOrder",
+      "method": "POST",
+      "path": "/api/v1/basketorder",
+      "body": {
+        "apikey": "",
+        "strategy": "Crypto Strategy",
+        "orders": [
+          {
+            "symbol": "BTCUSDFUT",
+            "exchange": "CRYPTO",
+            "action": "BUY",
+            "product": "NRML",
+            "pricetype": "MARKET",
+            "quantity": "1",
+            "price": "0",
+            "trigger_price": "0",
+            "disclosed_quantity": "0"
+          },
+          {
+            "symbol": "ETHUSDFUT",
+            "exchange": "CRYPTO",
+            "action": "BUY",
+            "product": "NRML",
+            "pricetype": "MARKET",
+            "quantity": "1",
+            "price": "0",
+            "trigger_price": "0",
+            "disclosed_quantity": "0"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CancelAllOrder",
+      "method": "POST",
+      "path": "/api/v1/cancelallorder",
+      "body": {
+        "apikey": "",
+        "strategy": "Crypto Strategy"
+      }
+    },
+    {
+      "name": "CancelOrder",
+      "method": "POST",
+      "path": "/api/v1/cancelorder",
+      "body": {
+        "apikey": "",
+        "strategy": "Crypto Strategy",
+        "orderid": "27:123456"
+      }
+    },
+    {
+      "name": "CloseAllPositions",
+      "method": "POST",
+      "path": "/api/v1/closeposition",
+      "body": {
+        "apikey": "",
+        "strategy": "Crypto Strategy"
+      }
+    },
+    {
+      "name": "ModifyOrder",
+      "method": "POST",
+      "path": "/api/v1/modifyorder",
+      "body": {
+        "apikey": "",
+        "strategy": "Crypto Strategy",
+        "exchange": "CRYPTO",
+        "symbol": "BTCUSDFUT",
+        "action": "BUY",
+        "product": "NRML",
+        "pricetype": "LIMIT",
+        "quantity": "1",
+        "price": "84000",
+        "trigger_price": "0",
+        "disclosed_quantity": "0",
+        "orderid": "27:123456"
+      }
+    },
+    {
+      "name": "openposition",
+      "method": "POST",
+      "path": "/api/v1/openposition",
+      "body": {
+        "apikey": "",
+        "strategy": "Crypto Strategy",
+        "exchange": "CRYPTO",
+        "symbol": "BTCUSDFUT",
+        "product": "NRML"
+      }
+    },
+    {
+      "name": "optionsmultiorder",
+      "method": "POST",
+      "path": "/api/v1/optionsmultiorder",
+      "body": {
+        "apikey": "",
+        "strategy": "Crypto Options",
+        "underlying": "BTC",
+        "exchange": "CRYPTO",
+        "legs": [
+          {
+            "offset": "ATM",
+            "option_type": "CE",
+            "action": "BUY",
+            "quantity": 1,
+            "expiry_date": "27MAR26",
+            "product": "NRML",
+            "splitsize": 0
+          },
+          {
+            "offset": "ATM",
+            "option_type": "PE",
+            "action": "BUY",
+            "quantity": 1,
+            "expiry_date": "27MAR26",
+            "product": "NRML",
+            "splitsize": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "optionsorder",
+      "method": "POST",
+      "path": "/api/v1/optionsorder",
+      "body": {
+        "apikey": "",
+        "strategy": "Crypto Options",
+        "underlying": "BTC",
+        "exchange": "CRYPTO",
+        "expiry_date": "27MAR26",
+        "offset": "ATM",
+        "option_type": "CE",
+        "action": "BUY",
+        "quantity": 1,
+        "pricetype": "MARKET",
+        "product": "NRML",
+        "splitsize": 0
+      }
+    },
+    {
+      "name": "orderstatus",
+      "method": "POST",
+      "path": "/api/v1/orderstatus",
+      "body": {
+        "apikey": "",
+        "strategy": "Crypto Strategy",
+        "orderid": "27:123456"
+      }
+    },
+    {
+      "name": "PlaceOrder",
+      "method": "POST",
+      "path": "/api/v1/placeorder",
+      "body": {
+        "apikey": "",
+        "strategy": "Crypto Strategy",
+        "exchange": "CRYPTO",
+        "symbol": "BTCUSDFUT",
+        "action": "BUY",
+        "product": "NRML",
+        "pricetype": "MARKET",
+        "quantity": "1",
+        "price": "0",
+        "trigger_price": "0",
+        "disclosed_quantity": "0"
+      }
+    },
+    {
+      "name": "PlaceSmartOrder",
+      "method": "POST",
+      "path": "/api/v1/placesmartorder",
+      "body": {
+        "apikey": "",
+        "strategy": "Crypto Strategy",
+        "exchange": "CRYPTO",
+        "symbol": "BTCUSDFUT",
+        "action": "BUY",
+        "product": "NRML",
+        "pricetype": "MARKET",
+        "quantity": "1",
+        "position_size": "1",
+        "price": "0",
+        "trigger_price": "0",
+        "disclosed_quantity": "0"
+      }
+    },
+    {
+      "name": "SplitOrder",
+      "method": "POST",
+      "path": "/api/v1/splitorder",
+      "body": {
+        "apikey": "",
+        "strategy": "Crypto Strategy",
+        "exchange": "CRYPTO",
+        "symbol": "BTCUSDFUT",
+        "action": "BUY",
+        "product": "NRML",
+        "pricetype": "MARKET",
+        "quantity": "5",
+        "splitsize": "2",
+        "price": "0",
+        "trigger_price": "0"
+      }
+    }
+  ],
+  "data": [
+    {
+      "name": "depth",
+      "method": "POST",
+      "path": "/api/v1/depth",
+      "body": {
+        "apikey": "",
+        "symbol": "BTCUSDFUT",
+        "exchange": "CRYPTO"
+      }
+    },
+    {
+      "name": "expiry",
+      "method": "POST",
+      "path": "/api/v1/expiry",
+      "body": {
+        "apikey": "",
+        "symbol": "BTC",
+        "exchange": "CRYPTO",
+        "instrumenttype": "options"
+      }
+    },
+    {
+      "name": "history (EOD)",
+      "method": "POST",
+      "path": "/api/v1/history",
+      "body": {
+        "apikey": "",
+        "symbol": "BTCUSDFUT",
+        "exchange": "CRYPTO",
+        "interval": "D",
+        "start_date": "2025-01-01",
+        "end_date": "2026-03-20"
+      }
+    },
+    {
+      "name": "history (intraday)",
+      "method": "POST",
+      "path": "/api/v1/history",
+      "body": {
+        "apikey": "",
+        "symbol": "BTCUSDFUT",
+        "exchange": "CRYPTO",
+        "interval": "5m",
+        "start_date": "2026-03-01",
+        "end_date": "2026-03-20"
+      }
+    },
+    {
+      "name": "instruments",
+      "method": "GET",
+      "path": "/api/v1/instruments",
+      "body": {
+        "apikey": "",
+        "exchange": "CRYPTO",
+        "format": "json"
+      }
+    },
+    {
+      "name": "intervals",
+      "method": "POST",
+      "path": "/api/v1/intervals",
+      "body": {
+        "apikey": ""
+      }
+    },
+    {
+      "name": "multioptiongreeks",
+      "method": "POST",
+      "path": "/api/v1/multioptiongreeks",
+      "body": {
+        "apikey": "",
+        "symbols": [
+          {
+            "symbol": "BTC27MAR2685000CE",
+            "exchange": "CRYPTO"
+          },
+          {
+            "symbol": "BTC27MAR2685000PE",
+            "exchange": "CRYPTO"
+          }
+        ]
+      }
+    },
+    {
+      "name": "multiquotes",
+      "method": "POST",
+      "path": "/api/v1/multiquotes",
+      "body": {
+        "apikey": "",
+        "symbols": [
+          {
+            "symbol": "BTCUSDFUT",
+            "exchange": "CRYPTO"
+          },
+          {
+            "symbol": "ETHUSDFUT",
+            "exchange": "CRYPTO"
+          },
+          {
+            "symbol": "SOLUSDFUT",
+            "exchange": "CRYPTO"
+          }
+        ]
+      }
+    },
+    {
+      "name": "optionchain",
+      "method": "POST",
+      "path": "/api/v1/optionchain",
+      "body": {
+        "apikey": "",
+        "underlying": "BTC",
+        "exchange": "CRYPTO",
+        "expiry_date": "27MAR26",
+        "strike_count": 10,
+        "with_greeks": true
+      }
+    },
+    {
+      "name": "optiongreeks",
+      "method": "POST",
+      "path": "/api/v1/optiongreeks",
+      "body": {
+        "apikey": "",
+        "symbol": "BTC27MAR2685000CE",
+        "exchange": "CRYPTO"
+      }
+    },
+    {
+      "name": "optionsymbol",
+      "method": "POST",
+      "path": "/api/v1/optionsymbol",
+      "body": {
+        "apikey": "",
+        "underlying": "BTC",
+        "exchange": "CRYPTO",
+        "expiry_date": "27MAR26",
+        "offset": "ATM",
+        "option_type": "CE"
+      }
+    },
+    {
+      "name": "quotes",
+      "method": "POST",
+      "path": "/api/v1/quotes",
+      "body": {
+        "apikey": "",
+        "symbol": "BTCUSDFUT",
+        "exchange": "CRYPTO"
+      }
+    },
+    {
+      "name": "search",
+      "method": "POST",
+      "path": "/api/v1/search",
+      "body": {
+        "apikey": "",
+        "query": "BTC",
+        "exchange": "CRYPTO"
+      }
+    },
+    {
+      "name": "symbol",
+      "method": "POST",
+      "path": "/api/v1/symbol",
+      "body": {
+        "apikey": "",
+        "symbol": "BTCUSDFUT",
+        "exchange": "CRYPTO"
+      }
+    },
+    {
+      "name": "ticker",
+      "method": "GET",
+      "path": "/api/v1/ticker/CRYPTO:BTCUSDFUT",
+      "params": {
+        "apikey": "",
+        "interval": "D",
+        "from": "2025-01-01",
+        "to": "2026-03-20",
+        "format": "json"
+      }
+    }
+  ],
+  "utilities": [],
+  "websocket": [
+    {
+      "name": "Get Broker Info",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "get_broker_info"
+      },
+      "description": "Get information about the authenticated broker"
+    },
+    {
+      "name": "Get Supported Brokers",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "get_supported_brokers"
+      },
+      "description": "List all brokers supported by the WebSocket server"
+    },
+    {
+      "name": "Ping (Latency Test)",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "ping",
+        "timestamp": 1737345600000
+      },
+      "description": "Test connection latency with ping/pong"
+    },
+    {
+      "name": "Subscribe Depth 20 Levels (Mode 3)",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "subscribe",
+        "symbol": "BTCUSDFUT",
+        "exchange": "CRYPTO",
+        "mode": 3,
+        "depth": 20
+      },
+      "description": "Subscribe to Market Depth with 20 bid/ask levels"
+    },
+    {
+      "name": "Subscribe Depth 30 Levels (Mode 3)",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "subscribe",
+        "symbol": "BTCUSDFUT",
+        "exchange": "CRYPTO",
+        "mode": 3,
+        "depth": 30
+      },
+      "description": "Subscribe to Market Depth with 30 bid/ask levels"
+    },
+    {
+      "name": "Subscribe Depth 5 Levels (Mode 3)",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "subscribe",
+        "symbol": "BTCUSDFUT",
+        "exchange": "CRYPTO",
+        "mode": 3,
+        "depth": 5
+      },
+      "description": "Subscribe to Market Depth with 5 bid/ask levels (default)"
+    },
+    {
+      "name": "Subscribe Depth 50 Levels (Mode 3)",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "subscribe",
+        "symbol": "BTCUSDFUT:50",
+        "exchange": "CRYPTO",
+        "mode": 3,
+        "depth": 50
+      },
+      "description": "Subscribe to Market Depth with 50 bid/ask levels (full depth)"
+    },
+    {
+      "name": "Subscribe LTP (Mode 1)",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "subscribe",
+        "symbol": "BTCUSDFUT",
+        "exchange": "CRYPTO",
+        "mode": 1
+      },
+      "description": "Subscribe to Last Traded Price - minimal data, lowest bandwidth"
+    },
+    {
+      "name": "Subscribe Multiple Symbols",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "subscribe",
+        "symbols": [
+          {
+            "symbol": "BTCUSDFUT",
+            "exchange": "CRYPTO"
+          },
+          {
+            "symbol": "ETHUSDFUT",
+            "exchange": "CRYPTO"
+          }
+        ],
+        "mode": 2
+      },
+      "description": "Subscribe to multiple symbols in a single request"
+    },
+    {
+      "name": "Subscribe Quote (Mode 2)",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "subscribe",
+        "symbol": "BTCUSDFUT",
+        "exchange": "CRYPTO",
+        "mode": 2
+      },
+      "description": "Subscribe to Quote data - includes OHLC, volume, change"
+    },
+    {
+      "name": "Unsubscribe All",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "unsubscribe_all"
+      },
+      "description": "Unsubscribe from all symbols at once"
+    },
+    {
+      "name": "Unsubscribe Depth (Mode 3)",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "unsubscribe",
+        "symbol": "BTCUSDFUT",
+        "exchange": "CRYPTO",
+        "mode": 3
+      },
+      "description": "Unsubscribe from Market Depth data for a symbol"
+    },
+    {
+      "name": "Unsubscribe Depth 50 Levels (Mode 3)",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "unsubscribe",
+        "symbol": "BTCUSDFUT:50",
+        "exchange": "CRYPTO",
+        "mode": 3,
+        "depth": 50
+      },
+      "description": "Unsubscribe from 50-level Market Depth (broker dependent)"
+    },
+    {
+      "name": "Unsubscribe LTP (Mode 1)",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "unsubscribe",
+        "symbol": "BTCUSDFUT",
+        "exchange": "CRYPTO",
+        "mode": 1
+      },
+      "description": "Unsubscribe from LTP data for a symbol"
+    },
+    {
+      "name": "Unsubscribe Quote (Mode 2)",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "unsubscribe",
+        "symbol": "BTCUSDFUT",
+        "exchange": "CRYPTO",
+        "mode": 2
+      },
+      "description": "Unsubscribe from Quote data for a symbol"
+    },
+    {
+      "name": "WebSocket Authenticate",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "authenticate",
+        "apikey": ""
+      },
+      "description": "Authenticate with the WebSocket server using API key"
+    }
+  ]
+}

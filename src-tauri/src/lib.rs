@@ -36,6 +36,7 @@ fn init_logging() {
     let _ = tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(filter))
         .with(tracing_subscriber::fmt::layer())
+        .with(services::error_log::CaptureLayer)
         .try_init();
 }
 
@@ -52,6 +53,9 @@ pub fn run() {
             let (ctx, server) = tauri::async_runtime::block_on(async {
                 let ctx = AppState::open_default(&data_dir)?;
                 session::spawn_expiry_task(ctx.clone());
+                services::system_info::mark_start();
+                services::monitor::start(&ctx);
+                services::health_service::start(&ctx);
                 let server = server::start(ctx.clone()).await.ok();
                 Ok::<_, error::AppError>((ctx, server))
             })?;
