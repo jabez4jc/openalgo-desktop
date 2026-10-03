@@ -1,0 +1,42 @@
+{
+  "status": "success",
+  "data": {
+    "initial": {
+      "type": "",
+      "tradingsymbol": "",
+      "exchange": "",
+      "span": 179780,
+      "exposure": 78359.2,
+      "option_premium": 0,
+      "additional": 0,
+      "bo": 0,
+      "cash": 0,
+      "var": 0,
+      "pnl": {"realised": 0, "unrealised": 0},
+      "leverage": 0,
+      "charges": {"total": 0},
+      "total": 258139.2
+    },
+    "final": {
+      "type": "",
+      "tradingsymbol": "",
+      "exchange": "",
+      "span": 112760,
+      "exposure": 78359.2,
+      "option_premium": 0,
+      "additional": 0,
+      "bo": 0,
+      "cash": 0,
+      "var": 0,
+      "pnl": {"realised": 0, "unrealised": 0},
+      "leverage": 0,
+      "charges": {"total": 0},
+      "total": 191119.2
+    },
+    "orders": [
+      {"type": "equity", "tradingsymbol": "NIFTY26OCT22500CE", "exchange": "NFO", "span": 179780, "exposure": 39179.6, "option_premium": 0, "total": 218959.6},
+      {"type": "equity", "tradingsymbol": "NIFTY26OCT22500PE", "exchange": "NFO", "span": 0, "exposure": 39179.6, "option_premium": 0, "total": 39179.6}
+    ],
+    "charges": {"total": 0}
+  }
+}

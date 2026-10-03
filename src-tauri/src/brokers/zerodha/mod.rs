@@ -1,268 +1,199 @@
-//! Zerodha Kite broker adapter
+//! Zerodha Kite Connect v3 adapter (web `broker/zerodha/**`).
+//!
+//! The session token is `api_key:access_token`, sent as
+//! `Authorization: token api_key:access_token` with `X-Kite-Version: 3`.
 
+mod auth;
+mod data;
+mod funds;
+mod gtt;
+pub mod mapping;
+pub mod master_contract;
+mod orders;
+pub mod streaming;
+#[cfg(test)]
+mod tests;
+
+use crate::brokers::common::http;
+use crate::brokers::common::mapping::{Exchange, Product};
+use crate::brokers::common::ratelimit::Pacer;
+use crate::brokers::common::streaming::BrokerFeed;
+use crate::brokers::common::symbols::SymbolResolver;
 use crate::brokers::types::*;
 use crate::brokers::{AuthResponse, Broker, BrokerCredentials};
 use crate::error::{AppError, Result};
 use async_trait::async_trait;
-use reqwest::Client;
-use serde::Deserialize;
-use sha2::{Digest, Sha256};
+use mapping::KiteEnvelope;
+use reqwest::Method;
+use serde::de::DeserializeOwned;
 
-const BASE_URL: &str = "https://api.kite.trade";
-const MASTER_CONTRACT_URL: &str = "https://api.kite.trade/instruments";
+pub const BASE_URL: &str = "https://api.kite.trade";
 
-/// Zerodha Kite broker implementation
+/// `plugin.json` supported_exchanges (+ BCD, which the master maps).
+pub const SUPPORTED_EXCHANGES: &[Exchange] = &[
+    Exchange::Nse,
+    Exchange::Bse,
+    Exchange::Nfo,
+    Exchange::Bfo,
+    Exchange::Cds,
+    Exchange::Bcd,
+    Exchange::Mcx,
+    Exchange::Nco,
+    Exchange::NseIndex,
+    Exchange::BseIndex,
+    Exchange::McxIndex,
+    Exchange::GlobalIndex,
+];
+
+/// web `BrokerData.timeframe_map`.
+pub const TIMEFRAME_MAP: &[(&str, &str)] = &[
+    ("1m", "minute"),
+    ("3m", "3minute"),
+    ("5m", "5minute"),
+    ("10m", "10minute"),
+    ("15m", "15minute"),
+    ("30m", "30minute"),
+    ("60m", "60minute"),
+    ("1h", "60minute"),
+    ("D", "day"),
+];
+
+/// Request body encodings Kite uses.
+pub(crate) enum Body<'a> {
+    None,
+    Form(&'a [(&'a str, String)]),
+    Json(&'a serde_json::Value),
+}
+
 pub struct ZerodhaBroker {
-    client: Client,
+    http: reqwest::Client,
+    base_url: String,
+    symbols: SymbolResolver,
+    /// Kite limits: orders 10/s, quotes 1/s, historical 3/s, others 10/s.
+    order_pacer: Pacer,
+    quote_pacer: Pacer,
+    history_pacer: Pacer,
+    other_pacer: Pacer,
 }
 
 impl ZerodhaBroker {
-    pub fn new() -> Self {
+    pub fn new(symbols: SymbolResolver) -> Self {
+        Self::with_base_url(symbols, BASE_URL)
+    }
+
+    /// Point the adapter at another host (tests run a local fake Kite).
+    pub fn with_base_url(symbols: SymbolResolver, base_url: impl Into<String>) -> Self {
         Self {
-            // Create HTTP client with connection pooling (matching Flask httpx_client)
-            client: Client::builder()
-                .timeout(std::time::Duration::from_secs(120))
-                .pool_idle_timeout(std::time::Duration::from_secs(120))
-                .pool_max_idle_per_host(20)
-                .build()
-                .expect("Failed to create HTTP client"),
+            http: http::client(),
+            base_url: base_url.into(),
+            symbols,
+            order_pacer: Pacer::per_second(10.0),
+            quote_pacer: Pacer::per_second(1.0),
+            history_pacer: Pacer::per_second(3.0),
+            other_pacer: Pacer::per_second(10.0),
         }
     }
 
-    fn get_headers(&self, auth_token: &str) -> reqwest::header::HeaderMap {
-        let mut headers = reqwest::header::HeaderMap::new();
-        headers.insert("X-Kite-Version", "3".parse().unwrap());
-        headers.insert(
-            "Authorization",
-            format!("token {}", auth_token).parse().unwrap(),
+    pub(crate) fn resolver(&self) -> &SymbolResolver {
+        &self.symbols
+    }
+
+    /// Validate the stored token shape before using it.
+    fn auth_header(auth: &AuthToken) -> Result<String> {
+        match auth.pair() {
+            Some(_) => Ok(format!("token {}", auth.raw())),
+            None => Err(session_expired()),
+        }
+    }
+
+    /// One Kite call. Returns the decoded envelope on success; Kite error
+    /// envelopes become trader-facing errors.
+    pub(crate) async fn call<T: DeserializeOwned>(
+        &self,
+        method: Method,
+        path_and_query: &str,
+        auth: &AuthToken,
+        body: Body<'_>,
+        pacer: Category,
+    ) -> Result<T> {
+        let env: KiteEnvelope<T> = self
+            .call_raw(method, path_and_query, auth, body, pacer)
+            .await?;
+        env.data
+            .ok_or_else(|| AppError::Broker("Zerodha returned no data for this request.".into()))
+    }
+
+    /// Like `call`, but hands back the whole envelope.
+    pub(crate) async fn call_raw<T: DeserializeOwned>(
+        &self,
+        method: Method,
+        path_and_query: &str,
+        auth: &AuthToken,
+        body: Body<'_>,
+        pacer: Category,
+    ) -> Result<KiteEnvelope<T>> {
+        match pacer {
+            Category::Order => self.order_pacer.acquire().await,
+            Category::Quote => self.quote_pacer.acquire().await,
+            Category::History => self.history_pacer.acquire().await,
+            Category::Other => self.other_pacer.acquire().await,
+        }
+        let url = format!("{}{}", self.base_url, path_and_query);
+        let mut req = self
+            .http
+            .request(method, &url)
+            .header("X-Kite-Version", "3")
+            .header("Authorization", Self::auth_header(auth)?);
+        req = match body {
+            Body::None => req,
+            Body::Form(f) => req.form(f),
+            Body::Json(v) => req.json(v),
+        };
+        let resp = req.send().await?;
+        let (status, env): (_, KiteEnvelope<T>) = http::read_json("zerodha", resp).await?;
+        if env.status == "success" {
+            return Ok(env);
+        }
+        tracing::warn!(
+            status = status.as_u16(),
+            error_type = %env.error_type,
+            "Zerodha refused {}: {}",
+            path_and_query.split('?').next().unwrap_or(""),
+            env.message
         );
-        headers
-    }
-
-    /// Generate checksum for Zerodha auth
-    fn generate_checksum(api_key: &str, request_token: &str, api_secret: &str) -> String {
-        let input = format!("{}{}{}", api_key, request_token, api_secret);
-        let mut hasher = Sha256::new();
-        hasher.update(input.as_bytes());
-        format!("{:x}", hasher.finalize())
+        Err(kite_error(&env.error_type, &env.message))
     }
 }
 
-impl Default for ZerodhaBroker {
-    fn default() -> Self {
-        Self::new()
+/// Pacing category of a call.
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum Category {
+    Order,
+    Quote,
+    History,
+    Other,
+}
+
+pub(crate) fn session_expired() -> AppError {
+    AppError::Auth("Your Zerodha session has expired. Log in to Zerodha again.".into())
+}
+
+/// Kite error envelope -> trader-facing error.
+pub(crate) fn kite_error(error_type: &str, message: &str) -> AppError {
+    match error_type {
+        "TokenException" => session_expired(),
+        "PermissionException" => AppError::Broker(
+            "Your Kite Connect app does not have permission for this. Check the app's subscription on the Kite developer console."
+                .into(),
+        ),
+        "NetworkException" => AppError::Broker(
+            "Zerodha could not reach the exchange. Try again in a moment.".into(),
+        ),
+        _ if message.trim().is_empty() => {
+            AppError::Broker("Zerodha refused the request.".into())
+        }
+        _ => AppError::Broker(message.trim().to_string()),
     }
-}
-
-// Zerodha API response structures
-#[derive(Deserialize)]
-struct KiteResponse<T> {
-    status: String,
-    #[serde(default)]
-    data: Option<T>,
-    #[serde(default)]
-    message: Option<String>,
-}
-
-// Order response
-#[derive(Deserialize)]
-struct KiteOrderData {
-    order_id: String,
-    #[serde(default)]
-    exchange_order_id: Option<String>,
-    #[serde(default)]
-    tradingsymbol: String,
-    #[serde(default)]
-    exchange: String,
-    #[serde(default)]
-    transaction_type: String,
-    #[serde(default)]
-    quantity: i32,
-    #[serde(default)]
-    filled_quantity: i32,
-    #[serde(default)]
-    pending_quantity: i32,
-    #[serde(default)]
-    price: f64,
-    #[serde(default)]
-    trigger_price: f64,
-    #[serde(default)]
-    average_price: f64,
-    #[serde(default)]
-    order_type: String,
-    #[serde(default)]
-    product: String,
-    #[serde(default)]
-    status: String,
-    #[serde(default)]
-    validity: String,
-    #[serde(default)]
-    order_timestamp: Option<String>,
-    #[serde(default)]
-    exchange_timestamp: Option<String>,
-    #[serde(default)]
-    status_message: Option<String>,
-}
-
-// Positions response
-#[derive(Deserialize, Default)]
-#[allow(dead_code)]
-struct KitePositionsResponse {
-    #[serde(default)]
-    net: Vec<KitePositionData>,
-    #[serde(default)]
-    day: Vec<KitePositionData>,
-}
-
-#[derive(Deserialize)]
-struct KitePositionData {
-    tradingsymbol: String,
-    exchange: String,
-    #[serde(default)]
-    product: String,
-    #[serde(default)]
-    quantity: i32,
-    #[serde(default)]
-    overnight_quantity: i32,
-    #[serde(default)]
-    average_price: f64,
-    #[serde(default)]
-    last_price: f64,
-    #[serde(default)]
-    pnl: f64,
-    #[serde(default)]
-    realised: f64,
-    #[serde(default)]
-    unrealised: f64,
-    #[serde(default)]
-    buy_quantity: i32,
-    #[serde(default)]
-    buy_value: f64,
-    #[serde(default)]
-    sell_quantity: i32,
-    #[serde(default)]
-    sell_value: f64,
-}
-
-// Holdings response
-#[derive(Deserialize)]
-#[allow(dead_code)]
-struct KiteHoldingData {
-    tradingsymbol: String,
-    exchange: String,
-    #[serde(default)]
-    isin: Option<String>,
-    #[serde(default)]
-    quantity: i32,
-    #[serde(default)]
-    t1_quantity: i32,
-    #[serde(default)]
-    average_price: f64,
-    #[serde(default)]
-    last_price: f64,
-    #[serde(default)]
-    close_price: f64,
-    #[serde(default)]
-    pnl: f64,
-    #[serde(default)]
-    product: String,
-}
-
-// Funds/Margin response
-#[derive(Deserialize, Default)]
-struct KiteMarginResponse {
-    #[serde(default)]
-    equity: Option<KiteMarginSegment>,
-    #[serde(default)]
-    commodity: Option<KiteMarginSegment>,
-}
-
-#[derive(Deserialize, Default)]
-struct KiteMarginSegment {
-    #[serde(default)]
-    net: f64,
-    #[serde(default)]
-    available: KiteMarginAvailable,
-    #[serde(default)]
-    utilised: KiteMarginUtilised,
-}
-
-#[derive(Deserialize, Default)]
-#[allow(dead_code)]
-struct KiteMarginAvailable {
-    #[serde(default)]
-    cash: f64,
-    #[serde(default)]
-    collateral: f64,
-    #[serde(default)]
-    intraday_payin: f64,
-}
-
-#[derive(Deserialize, Default)]
-#[allow(dead_code)]
-struct KiteMarginUtilised {
-    #[serde(default)]
-    debits: f64,
-    #[serde(default)]
-    m2m_realised: f64,
-    #[serde(default)]
-    m2m_unrealised: f64,
-    #[serde(default)]
-    span: f64,
-    #[serde(default)]
-    exposure: f64,
-    #[serde(default)]
-    payout: f64,
-}
-
-// Quote response
-#[derive(Deserialize)]
-#[allow(dead_code)]
-struct KiteQuoteData {
-    #[serde(default)]
-    last_price: f64,
-    #[serde(default)]
-    ohlc: KiteOHLC,
-    #[serde(default)]
-    volume: i64,
-    #[serde(default)]
-    oi: i64,
-    #[serde(default)]
-    depth: KiteDepth,
-    #[serde(default)]
-    last_quantity: i32,
-    #[serde(default)]
-    last_trade_time: Option<String>,
-}
-
-#[derive(Deserialize, Default)]
-struct KiteOHLC {
-    #[serde(default)]
-    open: f64,
-    #[serde(default)]
-    high: f64,
-    #[serde(default)]
-    low: f64,
-    #[serde(default)]
-    close: f64,
-}
-
-#[derive(Deserialize, Default)]
-struct KiteDepth {
-    #[serde(default)]
-    buy: Vec<KiteDepthLevel>,
-    #[serde(default)]
-    sell: Vec<KiteDepthLevel>,
-}
-
-#[derive(Deserialize)]
-struct KiteDepthLevel {
-    #[serde(default)]
-    price: f64,
-    #[serde(default)]
-    quantity: i32,
-    #[serde(default)]
-    orders: i32,
 }
 
 #[async_trait]
@@ -279,805 +210,149 @@ impl Broker for ZerodhaBroker {
         "/logos/zerodha.svg"
     }
 
-    fn requires_totp(&self) -> bool {
-        false // Zerodha uses request_token from OAuth flow
+    fn login_kind(&self) -> LoginKind {
+        LoginKind::Redirect {
+            param: "request_token",
+        }
+    }
+
+    fn supported_exchanges(&self) -> &'static [Exchange] {
+        SUPPORTED_EXCHANGES
+    }
+
+    fn capabilities(&self) -> Capabilities {
+        Capabilities {
+            history: true,
+            multiquotes_batch: true,
+            margin: true,
+            gtt: true,
+            streaming: true,
+            order_feed: true,
+            depth_levels: &[5],
+        }
+    }
+
+    fn timeframe_map(&self) -> &'static [(&'static str, &'static str)] {
+        TIMEFRAME_MAP
+    }
+
+    fn symbols(&self) -> Option<&SymbolResolver> {
+        Some(&self.symbols)
     }
 
     async fn authenticate(&self, credentials: BrokerCredentials) -> Result<AuthResponse> {
-        let request_token = credentials
-            .request_token
-            .ok_or_else(|| AppError::Validation("Request token is required".to_string()))?;
-
-        let api_secret = credentials
-            .api_secret
-            .ok_or_else(|| AppError::Validation("API secret is required".to_string()))?;
-
-        let checksum = Self::generate_checksum(&credentials.api_key, &request_token, &api_secret);
-
-        let params = [
-            ("api_key", credentials.api_key.as_str()),
-            ("request_token", request_token.as_str()),
-            ("checksum", checksum.as_str()),
-        ];
-
-        let response = self
-            .client
-            .post(format!("{}/session/token", BASE_URL))
-            .form(&params)
-            .send()
-            .await?;
-
-        #[derive(Deserialize)]
-        struct SessionResponse {
-            status: String,
-            data: Option<SessionData>,
-            message: Option<String>,
-        }
-
-        #[derive(Deserialize)]
-        struct SessionData {
-            access_token: String,
-            public_token: String,
-            user_id: String,
-            user_name: Option<String>,
-        }
-
-        let result: SessionResponse = response.json().await?;
-
-        if result.status != "success" {
-            return Err(AppError::Auth(
-                result
-                    .message
-                    .unwrap_or_else(|| "Authentication failed".to_string()),
-            ));
-        }
-
-        let data = result
-            .data
-            .ok_or_else(|| AppError::Auth("No data in session response".to_string()))?;
-
-        // Zerodha auth token format: api_key:access_token
-        let auth_token = format!("{}:{}", credentials.api_key, data.access_token);
-
-        Ok(AuthResponse {
-            auth_token,
-            feed_token: Some(data.public_token),
-            user_id: data.user_id,
-            user_name: data.user_name,
-        })
+        auth::authenticate(self, credentials).await
     }
 
-    async fn place_order(&self, auth_token: &str, order: OrderRequest) -> Result<OrderResponse> {
-        // Get broker symbol (trading symbol) - looked up from master contract
-        let trading_symbol = order.broker_symbol.clone().unwrap_or_else(|| {
-            tracing::warn!(
-                "No broker_symbol provided for {}:{}, using original symbol",
-                order.exchange,
-                order.symbol
-            );
-            order.symbol.clone()
-        });
-
-        tracing::info!("Zerodha place_order: tradingsymbol={}", trading_symbol);
-
-        let variety = if order.amo { "amo" } else { "regular" };
-
-        let mut params = vec![
-            ("tradingsymbol", trading_symbol),
-            ("exchange", order.exchange.clone()),
-            ("transaction_type", order.side.clone()),
-            ("order_type", order.order_type.clone()),
-            ("quantity", order.quantity.to_string()),
-            ("product", order.product.clone()),
-            ("validity", order.validity.clone()),
-        ];
-
-        if order.price > 0.0 {
-            params.push(("price", order.price.to_string()));
-        }
-
-        if let Some(tp) = order.trigger_price {
-            params.push(("trigger_price", tp.to_string()));
-        }
-
-        let response = self
-            .client
-            .post(format!("{}/orders/{}", BASE_URL, variety))
-            .headers(self.get_headers(auth_token))
-            .form(&params)
-            .send()
-            .await?;
-
-        #[derive(Deserialize)]
-        struct OrderResult {
-            status: String,
-            data: Option<OrderIdData>,
-            message: Option<String>,
-        }
-
-        #[derive(Deserialize)]
-        struct OrderIdData {
-            order_id: String,
-        }
-
-        let result: OrderResult = response.json().await?;
-
-        if result.status != "success" {
-            return Err(AppError::Broker(
-                result
-                    .message
-                    .unwrap_or_else(|| "Order placement failed".to_string()),
-            ));
-        }
-
-        let data = result
-            .data
-            .ok_or_else(|| AppError::Broker("No order ID in response".to_string()))?;
-
-        Ok(OrderResponse {
-            order_id: data.order_id,
-            message: Some("Order placed successfully".to_string()),
-        })
+    async fn place_order(&self, auth: &AuthToken, order: &ResolvedOrder) -> Result<OrderResponse> {
+        orders::place_order(self, auth, order).await
     }
 
     async fn modify_order(
         &self,
-        auth_token: &str,
-        order_id: &str,
-        order: ModifyOrderRequest,
+        auth: &AuthToken,
+        order: &ResolvedModify,
     ) -> Result<OrderResponse> {
-        let mut params: Vec<(&str, String)> = vec![];
-
-        if let Some(q) = order.quantity {
-            params.push(("quantity", q.to_string()));
-        }
-        if let Some(p) = order.price {
-            params.push(("price", p.to_string()));
-        }
-        if let Some(t) = &order.order_type {
-            params.push(("order_type", t.clone()));
-        }
-        if let Some(tp) = order.trigger_price {
-            params.push(("trigger_price", tp.to_string()));
-        }
-        if let Some(v) = &order.validity {
-            params.push(("validity", v.clone()));
-        }
-
-        let response = self
-            .client
-            .put(format!("{}/orders/regular/{}", BASE_URL, order_id))
-            .headers(self.get_headers(auth_token))
-            .form(&params)
-            .send()
-            .await?;
-
-        #[derive(Deserialize)]
-        struct ModifyResult {
-            status: String,
-            data: Option<ModifyData>,
-            message: Option<String>,
-        }
-
-        #[derive(Deserialize)]
-        struct ModifyData {
-            order_id: String,
-        }
-
-        let result: ModifyResult = response.json().await?;
-
-        if result.status != "success" {
-            return Err(AppError::Broker(
-                result
-                    .message
-                    .unwrap_or_else(|| "Modify failed".to_string()),
-            ));
-        }
-
-        let final_order_id = result
-            .data
-            .map(|d| d.order_id)
-            .unwrap_or_else(|| order_id.to_string());
-
-        Ok(OrderResponse {
-            order_id: final_order_id,
-            message: Some("Order modified successfully".to_string()),
-        })
+        orders::modify_order(self, auth, order).await
     }
 
-    async fn cancel_order(
+    async fn cancel_order(&self, auth: &AuthToken, order_id: &str) -> Result<OrderResponse> {
+        orders::cancel_order(self, auth, order_id).await
+    }
+
+    async fn cancel_all_orders(&self, auth: &AuthToken) -> Result<CancelAllResult> {
+        orders::cancel_all_orders(self, auth).await
+    }
+
+    async fn close_all_positions(&self, auth: &AuthToken) -> Result<CloseAllResult> {
+        orders::close_all_positions(self, auth).await
+    }
+
+    async fn get_open_position(
         &self,
-        auth_token: &str,
-        order_id: &str,
-        variety: Option<&str>,
-    ) -> Result<()> {
-        let variety = variety.unwrap_or("regular");
-
-        let response = self
-            .client
-            .delete(format!("{}/orders/{}/{}", BASE_URL, variety, order_id))
-            .headers(self.get_headers(auth_token))
-            .send()
-            .await?;
-
-        #[derive(Deserialize)]
-        struct CancelResult {
-            status: String,
-            message: Option<String>,
-        }
-
-        let result: CancelResult = response.json().await?;
-
-        if result.status != "success" {
-            return Err(AppError::Broker(
-                result
-                    .message
-                    .unwrap_or_else(|| "Order cancellation failed".to_string()),
-            ));
-        }
-
-        Ok(())
-    }
-
-    async fn get_order_book(&self, auth_token: &str) -> Result<Vec<Order>> {
-        let response = self
-            .client
-            .get(format!("{}/orders", BASE_URL))
-            .headers(self.get_headers(auth_token))
-            .send()
-            .await?;
-
-        let result: KiteResponse<Vec<KiteOrderData>> = response.json().await?;
-
-        if result.status != "success" {
-            return Err(AppError::Broker(
-                result
-                    .message
-                    .unwrap_or_else(|| "Failed to fetch orders".to_string()),
-            ));
-        }
-
-        let orders = result.data.unwrap_or_default();
-
-        Ok(orders
-            .into_iter()
-            .map(|o| Order {
-                order_id: o.order_id,
-                exchange_order_id: o.exchange_order_id,
-                symbol: o.tradingsymbol,
-                exchange: o.exchange,
-                side: o.transaction_type,
-                quantity: o.quantity,
-                filled_quantity: o.filled_quantity,
-                pending_quantity: o.pending_quantity,
-                price: o.price,
-                trigger_price: o.trigger_price,
-                average_price: o.average_price,
-                order_type: o.order_type,
-                product: o.product,
-                status: o.status,
-                validity: o.validity,
-                order_timestamp: o.order_timestamp.unwrap_or_default(),
-                exchange_timestamp: o.exchange_timestamp,
-                rejection_reason: o.status_message,
-            })
-            .collect())
-    }
-
-    async fn get_trade_book(&self, auth_token: &str) -> Result<Vec<Order>> {
-        let response = self
-            .client
-            .get(format!("{}/trades", BASE_URL))
-            .headers(self.get_headers(auth_token))
-            .send()
-            .await?;
-
-        let result: KiteResponse<Vec<KiteOrderData>> = response.json().await?;
-
-        if result.status != "success" {
-            return Err(AppError::Broker(
-                result
-                    .message
-                    .unwrap_or_else(|| "Failed to fetch trades".to_string()),
-            ));
-        }
-
-        let trades = result.data.unwrap_or_default();
-
-        Ok(trades
-            .into_iter()
-            .map(|o| Order {
-                order_id: o.order_id,
-                exchange_order_id: o.exchange_order_id,
-                symbol: o.tradingsymbol,
-                exchange: o.exchange,
-                side: o.transaction_type,
-                quantity: o.quantity,
-                filled_quantity: o.filled_quantity,
-                pending_quantity: o.pending_quantity,
-                price: o.price,
-                trigger_price: o.trigger_price,
-                average_price: o.average_price,
-                order_type: o.order_type,
-                product: o.product,
-                status: o.status,
-                validity: o.validity,
-                order_timestamp: o.order_timestamp.unwrap_or_default(),
-                exchange_timestamp: o.exchange_timestamp,
-                rejection_reason: o.status_message,
-            })
-            .collect())
-    }
-
-    async fn get_positions(&self, auth_token: &str) -> Result<Vec<Position>> {
-        let response = self
-            .client
-            .get(format!("{}/portfolio/positions", BASE_URL))
-            .headers(self.get_headers(auth_token))
-            .send()
-            .await?;
-
-        let result: KiteResponse<KitePositionsResponse> = response.json().await?;
-
-        if result.status != "success" {
-            return Err(AppError::Broker(
-                result
-                    .message
-                    .unwrap_or_else(|| "Failed to fetch positions".to_string()),
-            ));
-        }
-
-        let positions_data = result.data.unwrap_or(KitePositionsResponse {
-            net: vec![],
-            day: vec![],
-        });
-
-        // Use net positions
-        Ok(positions_data
-            .net
-            .into_iter()
-            .map(|p| Position {
-                symbol: p.tradingsymbol,
-                exchange: p.exchange,
-                product: p.product,
-                quantity: p.quantity,
-                overnight_quantity: p.overnight_quantity,
-                average_price: p.average_price,
-                ltp: p.last_price,
-                pnl: p.pnl,
-                realized_pnl: p.realised,
-                unrealized_pnl: p.unrealised,
-                buy_quantity: p.buy_quantity,
-                buy_value: p.buy_value,
-                sell_quantity: p.sell_quantity,
-                sell_value: p.sell_value,
-            })
-            .collect())
-    }
-
-    async fn get_holdings(&self, auth_token: &str) -> Result<Vec<Holding>> {
-        let response = self
-            .client
-            .get(format!("{}/portfolio/holdings", BASE_URL))
-            .headers(self.get_headers(auth_token))
-            .send()
-            .await?;
-
-        let result: KiteResponse<Vec<KiteHoldingData>> = response.json().await?;
-
-        if result.status != "success" {
-            return Err(AppError::Broker(
-                result
-                    .message
-                    .unwrap_or_else(|| "Failed to fetch holdings".to_string()),
-            ));
-        }
-
-        let holdings = result.data.unwrap_or_default();
-
-        Ok(holdings
-            .into_iter()
-            .map(|h| {
-                let quantity = h.quantity;
-                let ltp = h.last_price;
-                let avg_price = h.average_price;
-                let current_value = quantity as f64 * ltp;
-                let pnl_percentage = if avg_price > 0.0 {
-                    ((ltp - avg_price) / avg_price) * 100.0
-                } else {
-                    0.0
-                };
-
-                Holding {
-                    symbol: h.tradingsymbol,
-                    exchange: h.exchange,
-                    isin: h.isin,
-                    quantity,
-                    t1_quantity: h.t1_quantity,
-                    average_price: avg_price,
-                    ltp,
-                    close_price: h.close_price,
-                    pnl: h.pnl,
-                    pnl_percentage,
-                    current_value,
-                }
-            })
-            .collect())
-    }
-
-    async fn get_funds(&self, auth_token: &str) -> Result<Funds> {
-        let response = self
-            .client
-            .get(format!("{}/user/margins", BASE_URL))
-            .headers(self.get_headers(auth_token))
-            .send()
-            .await?;
-
-        let result: KiteResponse<KiteMarginResponse> = response.json().await?;
-
-        if result.status != "success" {
-            return Err(AppError::Broker(
-                result
-                    .message
-                    .unwrap_or_else(|| "Failed to fetch funds".to_string()),
-            ));
-        }
-
-        let margin_data = result.data.unwrap_or(KiteMarginResponse {
-            equity: None,
-            commodity: None,
-        });
-
-        let equity = margin_data.equity.unwrap_or(KiteMarginSegment {
-            net: 0.0,
-            available: KiteMarginAvailable::default(),
-            utilised: KiteMarginUtilised::default(),
-        });
-        let commodity = margin_data.commodity.unwrap_or(KiteMarginSegment {
-            net: 0.0,
-            available: KiteMarginAvailable::default(),
-            utilised: KiteMarginUtilised::default(),
-        });
-
-        let available_cash = equity.net + commodity.net;
-        let used_margin = equity.utilised.debits + commodity.utilised.debits;
-        let collateral = equity.available.collateral + commodity.available.collateral;
-        let span = equity.utilised.span + commodity.utilised.span;
-        let exposure = equity.utilised.exposure + commodity.utilised.exposure;
-        let payin = equity.available.intraday_payin + commodity.available.intraday_payin;
-        let payout = equity.utilised.payout + commodity.utilised.payout;
-
-        Ok(Funds {
-            available_cash,
-            used_margin,
-            total_margin: available_cash + used_margin,
-            opening_balance: payin,
-            payin,
-            payout,
-            span,
-            exposure,
-            collateral,
-        })
-    }
-
-    async fn get_quote(
-        &self,
-        auth_token: &str,
-        symbols: Vec<(String, String)>,
-    ) -> Result<Vec<Quote>> {
-        // Build query string with multiple 'i' parameters
-        let query_params: Vec<String> = symbols
-            .iter()
-            .map(|(symbol, exchange)| {
-                let api_exchange = match exchange.as_str() {
-                    "NSE_INDEX" => "NSE",
-                    "BSE_INDEX" => "BSE",
-                    _ => exchange,
-                };
-                format!("i={}:{}", api_exchange, symbol)
-            })
-            .collect();
-
-        let url = format!("{}/quote?{}", BASE_URL, query_params.join("&"));
-
-        let response = self
-            .client
-            .get(&url)
-            .headers(self.get_headers(auth_token))
-            .send()
-            .await?;
-
-        let result: KiteResponse<std::collections::HashMap<String, KiteQuoteData>> =
-            response.json().await?;
-
-        if result.status != "success" {
-            return Err(AppError::Broker(
-                result
-                    .message
-                    .unwrap_or_else(|| "Failed to fetch quotes".to_string()),
-            ));
-        }
-
-        let quotes_data = result.data.unwrap_or_default();
-
-        Ok(symbols
-            .iter()
-            .filter_map(|(symbol, exchange)| {
-                let api_exchange = match exchange.as_str() {
-                    "NSE_INDEX" => "NSE",
-                    "BSE_INDEX" => "BSE",
-                    _ => exchange,
-                };
-                let key = format!("{}:{}", api_exchange, symbol);
-                quotes_data.get(&key).map(|q| {
-                    let bid = q.depth.buy.first();
-                    let ask = q.depth.sell.first();
-                    let ltp = q.last_price;
-                    let close = q.ohlc.close;
-                    let change = ltp - close;
-                    let change_percent = if close > 0.0 {
-                        (change / close) * 100.0
-                    } else {
-                        0.0
-                    };
-
-                    Quote {
-                        symbol: symbol.clone(),
-                        exchange: exchange.clone(),
-                        ltp,
-                        open: q.ohlc.open,
-                        high: q.ohlc.high,
-                        low: q.ohlc.low,
-                        close,
-                        volume: q.volume,
-                        bid: bid.map(|b| b.price).unwrap_or(0.0),
-                        ask: ask.map(|a| a.price).unwrap_or(0.0),
-                        bid_qty: bid.map(|b| b.quantity).unwrap_or(0),
-                        ask_qty: ask.map(|a| a.quantity).unwrap_or(0),
-                        oi: q.oi,
-                        change,
-                        change_percent,
-                        timestamp: q
-                            .last_trade_time
-                            .clone()
-                            .unwrap_or_else(|| chrono::Utc::now().to_rfc3339()),
-                    }
-                })
-            })
-            .collect())
-    }
-
-    async fn get_market_depth(
-        &self,
-        auth_token: &str,
-        exchange: &str,
+        auth: &AuthToken,
         symbol: &str,
-    ) -> Result<MarketDepth> {
-        let api_exchange = match exchange {
-            "NSE_INDEX" => "NSE",
-            "BSE_INDEX" => "BSE",
-            _ => exchange,
-        };
-
-        let url = format!("{}/quote?i={}:{}", BASE_URL, api_exchange, symbol);
-
-        let response = self
-            .client
-            .get(&url)
-            .headers(self.get_headers(auth_token))
-            .send()
-            .await?;
-
-        let result: KiteResponse<std::collections::HashMap<String, KiteQuoteData>> =
-            response.json().await?;
-
-        if result.status != "success" {
-            return Err(AppError::Broker(
-                result
-                    .message
-                    .unwrap_or_else(|| "Failed to fetch depth".to_string()),
-            ));
-        }
-
-        let quotes_data = result.data.unwrap_or_default();
-        let key = format!("{}:{}", api_exchange, symbol);
-
-        let quote = quotes_data.get(&key);
-
-        let bids: Vec<DepthLevel> = quote
-            .map(|q| {
-                q.depth
-                    .buy
-                    .iter()
-                    .take(5)
-                    .map(|b| DepthLevel {
-                        price: b.price,
-                        quantity: b.quantity,
-                        orders: b.orders,
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
-
-        let asks: Vec<DepthLevel> = quote
-            .map(|q| {
-                q.depth
-                    .sell
-                    .iter()
-                    .take(5)
-                    .map(|a| DepthLevel {
-                        price: a.price,
-                        quantity: a.quantity,
-                        orders: a.orders,
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
-
-        Ok(MarketDepth {
-            symbol: symbol.to_string(),
-            exchange: exchange.to_string(),
-            bids,
-            asks,
-        })
+        exchange: Exchange,
+        product: Product,
+    ) -> Result<i64> {
+        orders::get_open_position(self, auth, symbol, exchange, product).await
     }
 
-    async fn download_master_contract(&self, auth_token: &str) -> Result<Vec<SymbolData>> {
-        // Zerodha provides CSV format for instruments
-        let response = self
-            .client
-            .get(MASTER_CONTRACT_URL)
-            .headers(self.get_headers(auth_token))
-            .send()
-            .await?;
-
-        let csv_text = response.text().await?;
-
-        // Parse CSV
-        let mut symbols = vec![];
-        for line in csv_text.lines().skip(1) {
-            // Skip header
-            let fields: Vec<&str> = line.split(',').collect();
-            if fields.len() >= 12 {
-                let instrument_token = fields[0].to_string();
-                let exchange_token = fields[1].to_string();
-                let brsymbol = fields[2].to_string(); // Original broker symbol
-                let name = fields[3].to_string();
-                let brexchange = fields[11].to_string(); // Original broker exchange
-                let mut exchange = fields[11].to_string();
-                let instrument_type = fields[9].to_string();
-                let segment = fields[10].to_string();
-                let lot_size: i32 = fields[5].parse().unwrap_or(1);
-                let tick_size: f64 = fields[6].parse().unwrap_or(0.05);
-                let raw_expiry = fields[4].to_string();
-                let strike: f64 = fields[7].parse().unwrap_or(0.0);
-
-                // Exchange mapping for indices based on segment
-                if segment == "INDICES" {
-                    exchange = match exchange.as_str() {
-                        "NSE" => "NSE_INDEX".to_string(),
-                        "BSE" => "BSE_INDEX".to_string(),
-                        "MCX" => "MCX_INDEX".to_string(),
-                        "CDS" => "CDS_INDEX".to_string(),
-                        _ => exchange,
-                    };
-                }
-
-                // Format expiry date: 2024-03-28 -> 28-MAR-24
-                let expiry = if raw_expiry.is_empty() {
-                    None
-                } else {
-                    Some(Self::format_expiry_date(&raw_expiry))
-                };
-                let expiry_nodash = expiry
-                    .as_ref()
-                    .map(|e| e.replace("-", ""))
-                    .unwrap_or_default();
-
-                // Token format: instrument_token::::exchange_token
-                let token = format!("{}::::{}", instrument_token, exchange_token);
-
-                // Build proper symbol based on instrument type
-                let symbol = if instrument_type == "FUT" {
-                    // Futures: NAME + EXPIRY + FUT (e.g., NIFTY28MAR24FUT)
-                    format!("{}{}FUT", name, expiry_nodash)
-                } else if instrument_type == "CE" {
-                    // Call options: NAME + EXPIRY + STRIKE + CE
-                    let strike_str = Self::format_strike(strike);
-                    format!("{}{}{}{}", name, expiry_nodash, strike_str, instrument_type)
-                } else if instrument_type == "PE" {
-                    // Put options: NAME + EXPIRY + STRIKE + PE
-                    let strike_str = Self::format_strike(strike);
-                    format!("{}{}{}{}", name, expiry_nodash, strike_str, instrument_type)
-                } else {
-                    // For EQ and other types, use broker symbol as-is
-                    brsymbol.clone()
-                };
-
-                // Normalize index names
-                let symbol = Self::normalize_index_name(&symbol);
-
-                let option_type = if instrument_type == "CE" {
-                    Some("CE".to_string())
-                } else if instrument_type == "PE" {
-                    Some("PE".to_string())
-                } else {
-                    None
-                };
-
-                let strike_opt = if strike > 0.0 { Some(strike) } else { None };
-
-                symbols.push(SymbolData {
-                    symbol,
-                    token,
-                    exchange,
-                    name,
-                    lot_size,
-                    tick_size,
-                    instrument_type,
-                    expiry,
-                    strike: strike_opt,
-                    option_type,
-                    brsymbol: Some(brsymbol),
-                    brexchange: Some(brexchange),
-                });
-            }
-        }
-
-        Ok(symbols)
-    }
-}
-
-impl ZerodhaBroker {
-    /// Format expiry date from 2024-03-28 to 28-MAR-24
-    fn format_expiry_date(date_str: &str) -> String {
-        // Try to parse YYYY-MM-DD format
-        if date_str.len() >= 10 && date_str.contains('-') {
-            let parts: Vec<&str> = date_str.split('-').collect();
-            if parts.len() >= 3 {
-                let year = &parts[0][2..4]; // Last 2 digits
-                let month = match parts[1] {
-                    "01" => "JAN",
-                    "02" => "FEB",
-                    "03" => "MAR",
-                    "04" => "APR",
-                    "05" => "MAY",
-                    "06" => "JUN",
-                    "07" => "JUL",
-                    "08" => "AUG",
-                    "09" => "SEP",
-                    "10" => "OCT",
-                    "11" => "NOV",
-                    "12" => "DEC",
-                    _ => parts[1],
-                };
-                let day = parts[2].split('T').next().unwrap_or(parts[2]); // Handle datetime format
-                return format!("{}-{}-{}", day, month, year);
-            }
-        }
-        date_str.to_uppercase()
+    async fn get_order_book(&self, auth: &AuthToken) -> Result<Vec<Order>> {
+        orders::get_order_book(self, auth).await
     }
 
-    /// Format strike price: remove trailing .0 if whole number
-    fn format_strike(strike: f64) -> String {
-        if strike.fract() == 0.0 {
-            format!("{}", strike as i64)
-        } else {
-            format!("{}", strike)
-        }
+    async fn get_trade_book(&self, auth: &AuthToken) -> Result<Vec<Trade>> {
+        orders::get_trade_book(self, auth).await
     }
 
-    /// Normalize common index names to standard format
-    fn normalize_index_name(symbol: &str) -> String {
-        match symbol {
-            "NIFTY 50" => "NIFTY".to_string(),
-            "NIFTY NEXT 50" => "NIFTYNXT50".to_string(),
-            "NIFTY FIN SERVICE" => "FINNIFTY".to_string(),
-            "NIFTY BANK" => "BANKNIFTY".to_string(),
-            "NIFTY MID SELECT" => "MIDCPNIFTY".to_string(),
-            "INDIA VIX" => "INDIAVIX".to_string(),
-            "SNSX50" => "SENSEX50".to_string(),
-            _ => symbol.to_string(),
-        }
+    async fn get_positions(&self, auth: &AuthToken) -> Result<Vec<Position>> {
+        orders::get_positions(self, auth).await
+    }
+
+    async fn get_holdings(&self, auth: &AuthToken) -> Result<Vec<Holding>> {
+        orders::get_holdings(self, auth).await
+    }
+
+    async fn get_funds(&self, auth: &AuthToken) -> Result<Funds> {
+        funds::get_funds(self, auth).await
+    }
+
+    async fn calculate_margin(&self, auth: &AuthToken, legs: &[MarginLeg]) -> Result<MarginResult> {
+        funds::calculate_margin(self, auth, legs).await
+    }
+
+    async fn get_quote(&self, auth: &AuthToken, key: &QuoteKey) -> Result<Quote> {
+        data::get_quote(self, auth, key).await
+    }
+
+    async fn get_multiquotes(
+        &self,
+        auth: &AuthToken,
+        keys: &[QuoteKey],
+    ) -> Result<Vec<QuoteResult>> {
+        data::get_multiquotes(self, auth, keys).await
+    }
+
+    async fn get_market_depth(&self, auth: &AuthToken, key: &QuoteKey) -> Result<MarketDepth> {
+        data::get_market_depth(self, auth, key).await
+    }
+
+    async fn get_history(&self, auth: &AuthToken, req: &HistoryRequest) -> Result<Vec<Candle>> {
+        data::get_history(self, auth, req).await
+    }
+
+    async fn place_gtt(&self, auth: &AuthToken, req: &GttRequest) -> Result<GttResponse> {
+        gtt::place_gtt(self, auth, req).await
+    }
+
+    async fn modify_gtt(
+        &self,
+        auth: &AuthToken,
+        trigger_id: &str,
+        req: &GttRequest,
+    ) -> Result<GttResponse> {
+        gtt::modify_gtt(self, auth, trigger_id, req).await
+    }
+
+    async fn cancel_gtt(&self, auth: &AuthToken, trigger_id: &str) -> Result<GttResponse> {
+        gtt::cancel_gtt(self, auth, trigger_id).await
+    }
+
+    async fn get_gtt_book(&self, auth: &AuthToken, include_history: bool) -> Result<Vec<GttOrder>> {
+        gtt::get_gtt_book(self, auth, include_history).await
+    }
+
+    async fn download_master_contract(&self, auth: &AuthToken) -> Result<Vec<SymbolData>> {
+        master_contract::download(self, auth).await
+    }
+
+    fn create_feed(&self, auth: &AuthToken) -> Result<Box<dyn BrokerFeed>> {
+        let (api_key, access_token) = auth.pair().ok_or_else(session_expired)?;
+        Ok(Box::new(streaming::KiteFeed::new(
+            api_key,
+            access_token,
+            self.symbols.clone(),
+        )))
     }
 }

@@ -1,0 +1,8 @@
+{
+  "token_expired": {"status": "error", "message": "Incorrect `api_key` or `access_token`.", "data": null, "error_type": "TokenException"},
+  "insufficient_funds": {"status": "error", "message": "Insufficient funds. Required margin is 95417.84 but available margin is 74251.80.", "data": null, "error_type": "MarginException"},
+  "no_permission": {"status": "error", "message": "Insufficient permission for that call.", "data": null, "error_type": "PermissionException"},
+  "session_token_ok": {"status": "success", "data": {"user_type": "individual", "email": "<EMAIL>", "user_name": "Test Trader", "user_shortname": "Trader", "broker": "ZERODHA", "exchanges": ["NSE", "NFO", "BSE", "MCX"], "products": ["CNC", "NRML", "MIS"], "order_types": ["MARKET", "LIMIT", "SL", "SL-M"], "avatar_url": null, "user_id": "<USER_ID>", "api_key": "<APIKEY>", "access_token": "<ACCESS_TOKEN>", "public_token": "<PUBLIC_TOKEN>", "refresh_token": "", "enctoken": "", "login_time": "2026-10-03 08:55:12", "meta": {"demat_consent": "consent"}}},
+  "order_placed": {"status": "success", "data": {"order_id": "151220000000000"}},
+  "gtt_placed": {"status": "success", "data": {"trigger_id": 123}}
+}
