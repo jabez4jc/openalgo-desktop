@@ -27,27 +27,7 @@ export const tools: Tool[] = [
     href: '/strategybuilder/portfolio',
     color: 'bg-violet-500',
   },
-  {
-    title: 'Portfolio Backtester',
-    description:
-      'Backtest a weighted portfolio against an index with real delivery costs, rebalancing rules, crisis periods and a full tearsheet',
-    href: '/portfolio-backtester',
-    color: 'bg-emerald-500',
-  },
-  {
-    title: 'SIP Backtester',
-    description:
-      'What a monthly, weekly or quarterly SIP would actually have returned: XIRR, rupee-cost averaging, start-date sensitivity and how it compares with a lumpsum',
-    href: '/sip-backtester',
-    color: 'bg-emerald-500',
-  },
-  {
-    title: 'Portfolio Analyzer',
-    description:
-      'Grade the holdings you actually own: concentration, co-movement, drawdown resilience and behaviour in past crises',
-    href: '/portfolio-analyzer',
-    color: 'bg-sky-500',
-  },
+  // Desktop: Portfolio Backtester, SIP Backtester and Portfolio Analyzer removed (pandas, out of scope).
   {
     title: 'Option Chain',
     description: 'Real-time option chain with live Greeks, OI data, and quick order placement',

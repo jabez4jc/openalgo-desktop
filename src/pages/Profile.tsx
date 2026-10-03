@@ -223,16 +223,7 @@ const ALERT_CATEGORIES_DATA: {
     label: 'Historify',
     description: 'Historical data jobs, file uploads, downloads, and schedules',
   },
-  {
-    key: 'pythonStrategy',
-    label: 'Python Strategy',
-    description: 'Python strategy uploads, execution, logs, and scheduling',
-  },
-  {
-    key: 'flow',
-    label: 'Flow Workflows',
-    description: 'Visual workflow creation, execution, and management',
-  },
+  // Desktop: Python Strategy and Flow alert categories removed (out of scope).
 ]
 
 const ALERT_CATEGORIES_ADMIN: {
@@ -1648,12 +1639,6 @@ export default function ProfilePage() {
                   <li>
                     <strong>Historify:</strong> Historical data jobs, uploads, downloads (67 toasts
                     - highest volume)
-                  </li>
-                  <li>
-                    <strong>Python Strategy:</strong> Strategy uploads, execution logs, scheduling
-                  </li>
-                  <li>
-                    <strong>Flow:</strong> Visual workflow execution and management
                   </li>
                 </ul>
               </div>

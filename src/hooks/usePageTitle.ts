@@ -41,15 +41,11 @@ const PAGE_TITLES: Record<string, string> = {
   '/oiprofile': 'OI Profile',
   '/websocket/test': 'WebSocket Test',
   '/websocket/order': 'Order Stream',
-  '/python': 'Python Strategies',
-  '/python/new': 'New Python Strategy',
-  '/python/guide': 'Python Strategy Guide',
+  // Desktop: /python and /flow titles removed (out of scope).
   '/strategy': 'Strategies',
   '/strategy/new': 'New Strategy',
   '/chartink': 'Chartink Strategies',
   '/chartink/new': 'New Chartink Strategy',
-  '/flow': 'Flow',
-  '/flow/shortcuts': 'Flow Shortcuts',
   '/leverage': 'Leverage',
   '/admin': 'Admin',
   '/admin/freeze': 'Freeze Qty',
@@ -76,14 +72,11 @@ const PAGE_TITLES: Record<string, string> = {
 
 /** Dynamic route patterns for parameterized routes */
 const DYNAMIC_TITLES: Array<{ pattern: RegExp; title: string }> = [
-  { pattern: /^\/python\/[^/]+\/edit$/, title: 'Edit Strategy' },
-  { pattern: /^\/python\/[^/]+\/logs$/, title: 'Strategy Logs' },
-  { pattern: /^\/python\/[^/]+\/schedule$/, title: 'Schedule Strategy' },
+  // Desktop: /python and /flow patterns removed (out of scope).
   { pattern: /^\/strategy\/[^/]+\/edit$/, title: 'Edit Strategy' },
   { pattern: /^\/strategy\/[^/]+$/, title: 'Strategy' },
   { pattern: /^\/chartink\/[^/]+\/configure$/, title: 'Configure Chartink' },
   { pattern: /^\/chartink\/[^/]+$/, title: 'View Chartink Strategy' },
-  { pattern: /^\/flow\/editor\/[^/]+$/, title: 'Flow Editor' },
   { pattern: /^\/historify\/charts\/[^/]+$/, title: 'Historify Charts' },
   { pattern: /^\/websocket\/test\/\d+$/, title: 'WebSocket Test' },
 ]

@@ -6,7 +6,6 @@ import {
   Boxes,
   CandlestickChart,
   ClipboardList,
-  Code2,
   Database,
   FileBarChart,
   FileStack,
@@ -23,7 +22,6 @@ import {
   Settings,
   TrendingUp,
   User,
-  Workflow,
   Wrench,
   Zap,
 } from 'lucide-react'
@@ -80,9 +78,8 @@ export const profileMenuItems: NavItem[] = [
   { href: '/telegram', label: 'Telegram Bot', icon: MessageSquare },
   { href: '/whatsapp', label: 'WhatsApp Bot', icon: MessageCircle },
   { href: '/holdings', label: 'Holdings', icon: ClipboardList },
-  { href: '/flow', label: 'Flow Editor', icon: Workflow },
   { href: '/scalping', label: 'Scalping', icon: Zap },
-  { href: '/python', label: 'Python Strategies', icon: Code2 },
+  // Desktop: Flow Editor and Python Strategies entries removed (out of scope).
   { href: '/pnl-tracker', label: 'PnL Tracker', icon: BarChart3 },
   { href: '/historify', label: 'Historify', icon: Database },
   { href: '/search/token', label: 'Search', icon: Search },

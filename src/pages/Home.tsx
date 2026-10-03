@@ -60,8 +60,8 @@ const VARSITY_COURSES = 13
 
 // The surfaces that share one broker session and feed inside a single
 // self-hosted instance. Counts come from the code: tools.length is the /tools
-// registry, nodeTypes in components/flow/nodes is the Flow palette, and the
-// indicator count is what openalgo-charts ships.
+// registry and the indicator count is what openalgo-charts ships.
+// Desktop: the Flow desk and backtester mentions are removed (out of scope).
 const platformDesks = [
   {
     icon: Server,
@@ -75,13 +75,13 @@ const platformDesks = [
   },
   {
     icon: Blocks,
-    title: 'No-code strategy builder',
-    desc: 'Flow is a drag-and-drop canvas: wire 61 node types from triggers to indicators, conditions and orders, then activate it to run on its own.',
+    title: 'Strategy module',
+    desc: 'Multi-leg options strategies with stop, target and trailing rules, run and monitored with risk management from one screen.',
   },
   {
     icon: Sigma,
     title: 'Options trading platform',
-    desc: `${tools.length} built-in tools: option chain, Greeks, OI tracker, max pain, vol surface, GEX, IV smile, straddles and arbitrage, plus portfolio and SIP backtesters.`,
+    desc: `${tools.length} built-in tools: option chain, Greeks, OI tracker, max pain, vol surface, GEX, IV smile, straddles, arbitrage and a strategy builder.`,
   },
   {
     icon: Zap,
@@ -277,8 +277,8 @@ export default function Home() {
             </p>
             <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto mb-10">
               Test and Execute your Trading ideas, Connect your favorite Trading Platforms, AI
-              Driven Strategy Development, with a built-in Options &amp; Portfolio Analytics Suite -
-              option chains and Greeks, portfolio and SIP backtesting - across 30+ Brokers.
+              Driven Strategy Development, with a built-in Options Analytics Suite - option chains
+              and Greeks, OI and volatility tools - across 30+ Brokers.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button size="lg" asChild>

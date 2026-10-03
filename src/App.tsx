@@ -11,11 +11,6 @@ import { useBrokerStore } from '@/stores/brokerStore'
 // Lazy load all pages for code splitting
 // Public pages
 const Home = lazy(() => import('@/pages/Home'))
-const PortfolioBacktester = lazy(() => import('@/pages/PortfolioBacktester'))
-const PortfolioBacktesterResults = lazy(() => import('@/pages/PortfolioBacktesterResults'))
-const SipBacktester = lazy(() => import('@/pages/SipBacktester'))
-const SipBacktesterResults = lazy(() => import('@/pages/SipBacktesterResults'))
-const PortfolioAnalyzer = lazy(() => import('@/pages/PortfolioAnalyzer'))
 const Faq = lazy(() => import('@/pages/Faq'))
 const Setup = lazy(() => import('@/pages/Setup'))
 const Login = lazy(() => import('@/pages/Login'))
@@ -82,13 +77,7 @@ const Arbitrage = lazy(() => import('@/pages/Arbitrage'))
 const StrategyBuilder = lazy(() => import('@/pages/StrategyBuilder'))
 const StrategyPortfolio = lazy(() => import('@/pages/StrategyPortfolio'))
 
-// Python Strategy pages
-const PythonStrategyIndex = lazy(() => import('@/pages/python-strategy/PythonStrategyIndex'))
-const NewPythonStrategy = lazy(() => import('@/pages/python-strategy/NewPythonStrategy'))
-const EditPythonStrategy = lazy(() => import('@/pages/python-strategy/EditPythonStrategy'))
-const PythonStrategyLogs = lazy(() => import('@/pages/python-strategy/PythonStrategyLogs'))
-const SchedulePythonStrategy = lazy(() => import('@/pages/python-strategy/SchedulePythonStrategy'))
-const PythonStrategyGuide = lazy(() => import('@/pages/python-strategy/PythonStrategyGuide'))
+// Desktop: Python Strategy Host (/python) is out of scope; it needs a Python runtime.
 
 // Strategy module: multi-leg options strategies with risk management
 const StrategyList = lazy(() => import('@/pages/strategy/List'))
@@ -102,10 +91,7 @@ const NewChartinkStrategy = lazy(() => import('@/pages/chartink/NewChartinkStrat
 const ViewChartinkStrategy = lazy(() => import('@/pages/chartink/ViewChartinkStrategy'))
 const ConfigureChartinkSymbols = lazy(() => import('@/pages/chartink/ConfigureChartinkSymbols'))
 
-// Flow pages
-const FlowIndex = lazy(() => import('@/pages/flow/FlowIndex'))
-const FlowEditor = lazy(() => import('@/pages/flow/FlowEditor'))
-const FlowKeyboardShortcuts = lazy(() => import('@/pages/flow/FlowKeyboardShortcuts'))
+// Desktop: Flow (/flow) is out of scope; its executor is Python.
 
 // Leverage page (crypto brokers only)
 const Leverage = lazy(() => import('@/pages/Leverage'))
@@ -198,20 +184,7 @@ function App() {
                 {/* Phase 4: Charts & Webhook Configuration */}
                 <Route path="/platforms" element={<Platforms />} />
                 <Route path="/tradingview" element={<TradingView />} />
-                <Route path="/portfolio-backtester" element={<PortfolioBacktester />} />
-                <Route
-                  path="/portfolio-backtester/results"
-                  element={<PortfolioBacktesterResults />}
-                />
-                {/* The page moved: /portfolio was ambiguous next to the
-                    analyzer. Redirect rather than 404 an existing bookmark. */}
-                <Route
-                  path="/portfolio"
-                  element={<Navigate to="/portfolio-backtester" replace />}
-                />
-                <Route path="/sip-backtester" element={<SipBacktester />} />
-                <Route path="/sip-backtester/results" element={<SipBacktesterResults />} />
-                <Route path="/portfolio-analyzer" element={<PortfolioAnalyzer />} />
+                {/* Desktop: pandas backtesters (portfolio, SIP, analyzer) are out of scope. */}
                 <Route path="/gocharting" element={<GoCharting />} />
                 <Route path="/pnl-tracker" element={<PnLTracker />} />
                 {/* Phase 4: Sandbox & Analyzer */}
@@ -250,13 +223,6 @@ function App() {
                 <Route path="/websocket/test/20" element={<WebSocketTest depthLevel={20} />} />
                 <Route path="/websocket/test/30" element={<WebSocketTest depthLevel={30} />} />
                 <Route path="/websocket/test/50" element={<WebSocketTest depthLevel={50} />} />
-                {/* Phase 6: Python Strategies */}
-                <Route path="/python" element={<PythonStrategyIndex />} />
-                <Route path="/python/new" element={<NewPythonStrategy />} />
-                <Route path="/python/:strategyId/edit" element={<EditPythonStrategy />} />
-                <Route path="/python/:strategyId/logs" element={<PythonStrategyLogs />} />
-                <Route path="/python/:strategyId/schedule" element={<SchedulePythonStrategy />} />
-                <Route path="/python/guide" element={<PythonStrategyGuide />} />
                 {/* Strategy module. /strategy/new before /strategy/:id so the
                     literal wins over the parameter. */}
                 <Route path="/strategy" element={<StrategyList />} />
@@ -272,9 +238,6 @@ function App() {
                   path="/chartink/:strategyId/configure"
                   element={<ConfigureChartinkSymbols />}
                 />
-                {/* Flow Editor */}
-                <Route path="/flow" element={<FlowIndex />} />
-                <Route path="/flow/shortcuts" element={<FlowKeyboardShortcuts />} />
                 {/* Leverage Configuration (crypto brokers only) */}
                 <Route path="/leverage" element={<LeverageRoute />} />
                 {/* Phase 7: Admin */}
@@ -322,8 +285,6 @@ function App() {
                 <Route path="/historify" element={<Historify />} />
                 <Route path="/historify/charts" element={<HistorifyCharts />} />
                 <Route path="/historify/charts/:symbol" element={<HistorifyCharts />} />
-                {/* Flow Editor (full-width for canvas) */}
-                <Route path="/flow/editor/:id" element={<FlowEditor />} />
               </Route>
 
               {/* 404 Not Found */}
