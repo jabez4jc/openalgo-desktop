@@ -7,6 +7,65 @@ import path from 'path'
 // (5500, next to OpenAlgo web on 5000), so the dev server proxies there.
 const BACKEND = process.env.OPENALGO_DEV_BACKEND || 'http://127.0.0.1:5500'
 
+// Desktop: prefixes that are both a React page and a backend API (for example
+// /logs, /health, /playground). Data requests go to the Rust server; a browser
+// page navigation (Accept: text/html) stays on Vite so React Router renders it.
+const SHARED_PREFIXES = [
+  '/admin',
+  '/logs',
+  '/traffic',
+  '/latency',
+  '/security',
+  '/health',
+  '/playground',
+  '/leverage',
+  '/search',
+  '/sandbox',
+  '/analyzer',
+  '/historify',
+  '/action-center',
+  '/apikey',
+  '/setup',
+  '/pnltracker',
+  '/watchlist',
+  '/alerts',
+  '/chart',
+  '/openscript',
+  '/scalping',
+  '/strategy',
+  '/strategybuilder',
+  '/chartink',
+  '/oiprofile',
+  '/oitracker',
+  '/ivchart',
+  '/gammadensity',
+  '/straddle',
+  '/straddlepnl',
+  '/volsurface',
+  '/gex',
+  '/ivsmile',
+  '/arbitrage',
+  '/telegram',
+  '/whatsapp',
+  '/agent',
+  '/close_position',
+  '/close_all_positions',
+  '/cancel_all_orders',
+  '/cancel_order',
+  '/modify_order',
+  '/modify_gtt_order',
+  '/cancel_gtt_order',
+]
+
+const pageOrApi = {
+  target: BACKEND,
+  changeOrigin: true,
+  bypass(req: { headers: { accept?: string }; url?: string }) {
+    if (req.headers.accept?.includes('text/html')) return req.url
+    return undefined
+  },
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
@@ -64,6 +123,8 @@ export default defineConfig({
         target: BACKEND,
         changeOrigin: true,
       },
+      // Desktop: every other backend prefix, with page navigations bypassed.
+      ...Object.fromEntries(SHARED_PREFIXES.map((p) => [p, pageOrApi])),
     },
   },
   build: {
