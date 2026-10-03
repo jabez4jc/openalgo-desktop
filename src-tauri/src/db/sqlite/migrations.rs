@@ -26,6 +26,7 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         "042_broker_credentials_market",
         m042_broker_credentials_market,
     )?;
+    run_rust_migration(conn, "043_symtoken_master", super::symbol::migrate_symtoken)?;
 
     tracing::info!("Database migrations completed");
     Ok(())

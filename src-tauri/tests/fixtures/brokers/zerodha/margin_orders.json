@@ -1,0 +1,21 @@
+{
+  "status": "success",
+  "data": [
+    {
+      "type": "equity",
+      "tradingsymbol": "SBIN",
+      "exchange": "NSE",
+      "span": 0,
+      "exposure": 0,
+      "option_premium": 0,
+      "additional": 0,
+      "bo": 0,
+      "cash": 0,
+      "var": 190.82,
+      "pnl": {"realised": 0, "unrealised": 0},
+      "leverage": 5,
+      "charges": {"total": 0.83},
+      "total": 190.82
+    }
+  ]
+}

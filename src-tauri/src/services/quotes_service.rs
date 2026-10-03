@@ -42,7 +42,21 @@ impl QuotesService {
             .get(&broker_id)
             .ok_or_else(|| AppError::Broker(format!("Broker '{}' not found", broker_id)))?;
 
-        let quotes = broker.get_quote(auth_token.expose(), symbols).await?;
+        let auth = crate::brokers::types::AuthToken::new(auth_token.expose());
+        let keys: Vec<crate::brokers::types::QuoteKey> = symbols
+            .into_iter()
+            .map(|(exchange, symbol)| crate::brokers::types::QuoteKey::new(exchange, symbol))
+            .collect();
+        let quotes = if keys.len() == 1 {
+            vec![broker.get_quote(&auth, &keys[0]).await?]
+        } else {
+            broker
+                .get_multiquotes(&auth, &keys)
+                .await?
+                .into_iter()
+                .filter_map(|r| r.data)
+                .collect()
+        };
 
         Ok(QuoteResult {
             success: true,
@@ -82,7 +96,10 @@ impl QuotesService {
             .ok_or_else(|| AppError::Broker(format!("Broker '{}' not found", broker_id)))?;
 
         let depth = broker
-            .get_market_depth(auth_token.expose(), exchange, symbol)
+            .get_market_depth(
+                &crate::brokers::types::AuthToken::new(auth_token.expose()),
+                &crate::brokers::types::QuoteKey::new(exchange, symbol),
+            )
             .await?;
 
         Ok(DepthResult {

@@ -1,0 +1,62 @@
+{
+  "status": "success",
+  "data": {
+    "NSE:SBIN": {
+      "instrument_token": 779521,
+      "timestamp": "2026-10-03 10:15:01",
+      "last_trade_time": "2026-10-03 10:15:00",
+      "last_price": 954.1,
+      "last_quantity": 5,
+      "buy_quantity": 512633,
+      "sell_quantity": 689415,
+      "volume": 4823170,
+      "average_price": 952.87,
+      "oi": 0,
+      "oi_day_high": 0,
+      "oi_day_low": 0,
+      "net_change": 0,
+      "lower_circuit_limit": 855.6,
+      "upper_circuit_limit": 1045.7,
+      "ohlc": {"open": 951, "high": 957.4, "low": 948.2, "close": 950.65},
+      "depth": {
+        "buy": [
+          {"price": 954.05, "quantity": 120, "orders": 3},
+          {"price": 954, "quantity": 845, "orders": 12},
+          {"price": 953.95, "quantity": 300, "orders": 4}
+        ],
+        "sell": [
+          {"price": 954.1, "quantity": 77, "orders": 2},
+          {"price": 954.15, "quantity": 410, "orders": 6},
+          {"price": 954.2, "quantity": 95, "orders": 1},
+          {"price": 954.25, "quantity": 1000, "orders": 9},
+          {"price": 954.3, "quantity": 18, "orders": 1}
+        ]
+      }
+    },
+    "NSE:NIFTY 50": {
+      "instrument_token": 256265,
+      "timestamp": "2026-10-03 10:15:01",
+      "last_trade_time": null,
+      "last_price": 22512.35,
+      "last_quantity": 0,
+      "buy_quantity": 0,
+      "sell_quantity": 0,
+      "volume": 0,
+      "average_price": 0,
+      "oi": 0,
+      "net_change": 0,
+      "ohlc": {"open": 22450.1, "high": 22540, "low": 22430.55, "close": 22480}
+    },
+    "MCX:CRUDEOIL26OCTFUT": {
+      "instrument_token": 114310151,
+      "timestamp": "2026-10-03 10:15:01",
+      "last_price": 9008,
+      "last_quantity": 1,
+      "volume": 15000,
+      "average_price": 8890.4,
+      "oi": 11210,
+      "ohlc": {"open": 8715, "high": 9027, "low": 8533, "close": 8734},
+      "depth": {"buy": [], "sell": []}
+    }
+  }
+}

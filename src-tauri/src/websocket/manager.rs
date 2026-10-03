@@ -1,140 +1,157 @@
-//! WebSocket connection manager for real-time market data
+//! Broker-agnostic market-data feed manager (outbound side).
 //!
-//! Supports three broker WebSocket protocols:
-//! - Angel One SmartAPI: Little-endian binary with JSON subscribe
-//! - Zerodha Kite: Big-endian binary with JSON subscribe
-//! - Fyers HSM: Big-endian binary protocol for auth and subscribe
+//! One supervisor task owns the broker socket. It connects with a timeout,
+//! sends the feed's handshake, re-subscribes every registered instrument,
+//! reads frames through the broker's `BrokerFeed::parse`, and publishes
+//! normalised events on a bounded broadcast channel. On error, close, or a
+//! stall (no frame for `stall_timeout`), it closes the old socket and
+//! reconnects with capped exponential backoff and jitter. An authentication
+//! refusal stops the loop until the trader logs in again.
+//!
+//! Subscriptions are reference counted per instrument and mode. The broker
+//! sees one subscription per instrument at its effective (highest) mode; a
+//! registry entry is removed when its last reference goes, so the registry
+//! is bounded by what clients currently hold.
+//!
+//! Resource ownership: the only spawned task is the supervisor, kept as a
+//! `JoinHandle` and aborted (after a graceful stop request) on `disconnect`.
+//! The command channel is bounded; the event channel is a bounded broadcast
+//! whose slow receivers see `Lagged` and skip ahead.
 
+use crate::brokers::common::ratelimit::backoff_delay;
+use crate::brokers::common::streaming::{
+    BrokerFeed, FeedEvent, FeedMode, FeedSubscription, MarketEvent, Message,
+};
 use crate::error::{AppError, Result};
-use byteorder::{BigEndian, LittleEndian, ReadBytesExt};
 use futures_util::{SinkExt, StreamExt};
-use parking_lot::RwLock;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::io::Cursor;
+use parking_lot::Mutex;
+use serde::Serialize;
+use std::collections::{BTreeMap, HashMap};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use tokio::sync::{broadcast, mpsc};
+use std::time::Duration;
+use tokio::sync::{broadcast, mpsc, watch};
 use tokio::task::JoinHandle;
-use tokio_tungstenite::{connect_async, tungstenite::Message};
-use tracing::{debug, error, info, warn};
+use tokio::time::Instant;
+use tokio_tungstenite::tungstenite::Error as WsError;
 
-/// Subscription mode for market data
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
-)]
-pub enum SubscriptionMode {
-    Ltp = 1, // Last traded price only
-    #[default]
-    Quote = 2, // LTP + OHLC + volume
-    SnapQuote = 3, // Quote + best 5 bid/ask (Angel)
-    Full = 4, // Full market depth
+/// Capacity of the event fan-out channel.
+pub const TICK_CHANNEL_CAP: usize = 4096;
+
+/// Tunables (tests shrink the timings).
+#[derive(Debug, Clone)]
+pub struct FeedConfig {
+    pub backoff_base: Duration,
+    pub backoff_max: Duration,
+    /// No frame (data or heartbeat) for this long means the socket is dead.
+    pub stall_timeout: Duration,
+    pub connect_timeout: Duration,
+    /// A connection that lived this long resets the backoff.
+    pub stable_after: Duration,
+    /// Most instruments one connection may carry (Kite: 3000).
+    pub max_instruments: usize,
+    pub command_capacity: usize,
+    pub event_capacity: usize,
 }
 
-/// Market tick data emitted to frontend
-#[derive(Debug, Clone, Serialize)]
-pub struct MarketTick {
-    pub symbol: String,
-    pub exchange: String,
-    pub token: String,
-    pub ltp: f64,
-    pub open: f64,
-    pub high: f64,
-    pub low: f64,
-    pub close: f64,
-    pub volume: i64,
-    pub bid: f64,
-    pub ask: f64,
-    pub bid_qty: i64,
-    pub ask_qty: i64,
-    pub oi: i64,
-    pub timestamp: i64,
-    pub change: f64,
-    pub change_percent: f64,
-}
-
-impl Default for MarketTick {
+impl Default for FeedConfig {
     fn default() -> Self {
         Self {
-            symbol: String::new(),
-            exchange: String::new(),
-            token: String::new(),
-            ltp: 0.0,
-            open: 0.0,
-            high: 0.0,
-            low: 0.0,
-            close: 0.0,
-            volume: 0,
-            bid: 0.0,
-            ask: 0.0,
-            bid_qty: 0,
-            ask_qty: 0,
-            oi: 0,
-            timestamp: 0,
-            change: 0.0,
-            change_percent: 0.0,
+            backoff_base: Duration::from_millis(500),
+            backoff_max: Duration::from_secs(30),
+            stall_timeout: Duration::from_secs(90),
+            connect_timeout: Duration::from_secs(15),
+            stable_after: Duration::from_secs(30),
+            max_instruments: 3000,
+            command_capacity: 256,
+            event_capacity: TICK_CHANNEL_CAP,
         }
     }
 }
 
-/// Market depth level
-#[derive(Debug, Clone, Serialize)]
-pub struct DepthLevel {
-    pub price: f64,
-    pub quantity: i64,
-    pub orders: i32,
-}
-
-/// Market depth data
-#[derive(Debug, Clone, Serialize)]
-pub struct MarketDepth {
-    pub token: String,
-    pub exchange: String,
-    pub buy: Vec<DepthLevel>,
-    pub sell: Vec<DepthLevel>,
-    pub timestamp: i64,
-}
-
-/// WebSocket connection state
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ConnectionState {
+/// Feed state, for the UI and the feed server.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(tag = "state", rename_all = "snake_case")]
+pub enum FeedStatus {
     Disconnected,
-    Connecting,
-    Connected,
+    Connecting {
+        broker: String,
+        attempt: u32,
+    },
+    Connected {
+        broker: String,
+    },
+    Reconnecting {
+        broker: String,
+        attempt: u32,
+        delay_ms: u64,
+    },
+    /// The broker refused the session; log in again to resume.
+    AuthFailed {
+        broker: String,
+        message: String,
+    },
 }
 
-/// Commands to send to WebSocket task
-enum WebSocketCommand {
-    Subscribe(Vec<SubscriptionRequest>),
-    Unsubscribe(Vec<(String, String)>), // (exchange, token)
-    Disconnect,
+/// Counters for monitoring and tests.
+#[derive(Debug, Default)]
+pub struct FeedStats {
+    pub connects: AtomicU64,
+    pub disconnects: AtomicU64,
+    pub stalls: AtomicU64,
+    pub events: AtomicU64,
 }
 
-/// Subscription request
+/// Change to apply on the live socket.
 #[derive(Debug, Clone)]
-pub struct SubscriptionRequest {
-    pub exchange: String,
-    pub token: String,
-    pub mode: SubscriptionMode,
+enum Delta {
+    Subscribe(FeedSubscription),
+    Unsubscribe(FeedSubscription),
+    ModeChange(FeedSubscription, FeedSubscription),
 }
 
-/// Capacity of the tick fan-out channel.
-pub const TICK_CHANNEL_CAP: usize = 4096;
+enum Command {
+    Apply(Vec<Delta>),
+    Stop,
+}
 
-/// Token to symbol mapping for reverse lookup
-type TokenMap = Arc<RwLock<HashMap<String, (String, String)>>>; // token -> (symbol, exchange)
+struct Entry {
+    base: FeedSubscription,
+    modes: BTreeMap<FeedMode, u32>,
+}
 
-/// WebSocket manager for handling market data streams
+impl Entry {
+    fn effective(&self) -> Option<FeedSubscription> {
+        self.modes
+            .keys()
+            .next_back()
+            .map(|m| self.base.with_mode(*m))
+    }
+}
+
+#[derive(Default)]
+struct Registry {
+    entries: HashMap<(String, String), Entry>,
+}
+
+impl Registry {
+    fn effective_all(&self) -> Vec<FeedSubscription> {
+        self.entries.values().filter_map(Entry::effective).collect()
+    }
+}
+
+struct Running {
+    cmd: mpsc::Sender<Command>,
+    task: JoinHandle<()>,
+}
+
 pub struct WebSocketManager {
-    /// Bounded tick fan-out for the (next wave) feed server. Slow receivers
-    /// see `Lagged` and skip ahead; nothing grows.
-    ticks: broadcast::Sender<MarketTick>,
-    /// The one reader task; aborted on disconnect and before reconnecting.
-    task: parking_lot::Mutex<Option<JoinHandle<()>>>,
-    state: RwLock<ConnectionState>,
-    subscriptions: RwLock<HashMap<String, SubscriptionMode>>,
-    sender: RwLock<Option<mpsc::Sender<WebSocketCommand>>>,
-    token_map: TokenMap,
-    broker_id: RwLock<Option<String>>,
+    events: broadcast::Sender<MarketEvent>,
+    status: watch::Sender<FeedStatus>,
+    registry: Arc<Mutex<Registry>>,
+    running: Mutex<Option<Running>>,
+    config: FeedConfig,
+    stats: Arc<FeedStats>,
 }
 
 impl Default for WebSocketManager {
@@ -144,1028 +161,466 @@ impl Default for WebSocketManager {
 }
 
 impl WebSocketManager {
-    /// Create new WebSocket manager
     pub fn new() -> Self {
-        let (ticks, _) = broadcast::channel(TICK_CHANNEL_CAP);
+        Self::with_config(FeedConfig::default())
+    }
+
+    pub fn with_config(config: FeedConfig) -> Self {
+        let (events, _) = broadcast::channel(config.event_capacity.max(1));
+        let (status, _) = watch::channel(FeedStatus::Disconnected);
         Self {
-            ticks,
-            task: parking_lot::Mutex::new(None),
-            state: RwLock::new(ConnectionState::Disconnected),
-            subscriptions: RwLock::new(HashMap::new()),
-            sender: RwLock::new(None),
-            token_map: Arc::new(RwLock::new(HashMap::new())),
-            broker_id: RwLock::new(None),
+            events,
+            status,
+            registry: Arc::new(Mutex::new(Registry::default())),
+            running: Mutex::new(None),
+            config,
+            stats: Arc::new(FeedStats::default()),
         }
     }
 
-    /// Connect to broker WebSocket
-    pub async fn connect(
-        &self,
-        broker_id: &str,
-        client_id: &str,
-        api_key: &str,
-        feed_token: &str,
-    ) -> Result<()> {
-        // Disconnect existing connection first
-        if self.is_connected() {
-            self.disconnect().await?;
-        }
+    /// Normalised ticks, depth and order updates. Receivers must handle
+    /// `RecvError::Lagged` (skip ahead) rather than treat it as fatal.
+    pub fn subscribe_ticks(&self) -> broadcast::Receiver<MarketEvent> {
+        self.events.subscribe()
+    }
 
-        *self.state.write() = ConnectionState::Connecting;
-        *self.broker_id.write() = Some(broker_id.to_string());
+    /// Current feed status.
+    pub fn status(&self) -> FeedStatus {
+        self.status.borrow().clone()
+    }
 
-        let url = match broker_id {
-            "angel" => format!(
-                "wss://smartapisocket.angelone.in/smart-stream?clientCode={}&feedToken={}&apiKey={}",
-                client_id, feed_token, api_key
-            ),
-            "zerodha" => format!(
-                "wss://ws.kite.trade?api_key={}&access_token={}",
-                api_key, feed_token
-            ),
-            "fyers" => "wss://socket.fyers.in/hsm/v1-5/prod".to_string(),
-            _ => return Err(AppError::Broker(format!("Unknown broker: {}", broker_id))),
+    /// Status changes.
+    pub fn watch_status(&self) -> watch::Receiver<FeedStatus> {
+        self.status.subscribe()
+    }
+
+    pub fn stats(&self) -> &FeedStats {
+        &self.stats
+    }
+
+    pub fn is_connected(&self) -> bool {
+        matches!(*self.status.borrow(), FeedStatus::Connected { .. })
+    }
+
+    /// Whether a supervisor task is alive (connected or retrying).
+    pub fn is_running(&self) -> bool {
+        self.running
+            .lock()
+            .as_ref()
+            .is_some_and(|r| !r.task.is_finished())
+    }
+
+    /// Number of distinct instruments currently subscribed.
+    pub fn instrument_count(&self) -> usize {
+        self.registry.lock().entries.len()
+    }
+
+    /// The effective subscription of every registered instrument.
+    pub fn subscriptions(&self) -> Vec<FeedSubscription> {
+        self.registry.lock().effective_all()
+    }
+
+    /// Start (or restart) the feed with this broker adapter. Existing
+    /// subscriptions are kept and sent again on the new socket.
+    pub async fn connect(&self, feed: Box<dyn BrokerFeed>) -> Result<()> {
+        self.stop_task().await;
+        let (tx, rx) = mpsc::channel(self.config.command_capacity.max(1));
+        let ctx = Supervisor {
+            feed,
+            cmd: rx,
+            registry: self.registry.clone(),
+            events: self.events.clone(),
+            status: self.status.clone(),
+            config: self.config.clone(),
+            stats: self.stats.clone(),
         };
+        let task = tokio::spawn(ctx.run());
+        *self.running.lock() = Some(Running { cmd: tx, task });
+        Ok(())
+    }
 
-        info!("Connecting to {} WebSocket...", broker_id);
+    /// Stop the feed and forget every subscription (logout, broker switch).
+    pub async fn disconnect(&self) -> Result<()> {
+        self.stop_task().await;
+        self.registry.lock().entries.clear();
+        self.status.send_replace(FeedStatus::Disconnected);
+        Ok(())
+    }
 
-        // Build request with headers for Angel
-        let request = if broker_id == "angel" {
-            use tokio_tungstenite::tungstenite::http::Request;
-            Request::builder()
-                .uri(&url)
-                .header("Authorization", format!("Bearer {}", feed_token))
-                .header("x-api-key", api_key)
-                .header("x-client-code", client_id)
-                .header("x-feed-token", feed_token)
-                .body(())
-                .map_err(|e| AppError::Internal(format!("Failed to build request: {}", e)))?
-        } else if broker_id == "fyers" {
-            use tokio_tungstenite::tungstenite::http::Request;
-            Request::builder()
-                .uri(&url)
-                .header("Authorization", feed_token)
-                .header("User-Agent", "openalgo-desktop/1.0")
-                .body(())
-                .map_err(|e| AppError::Internal(format!("Failed to build request: {}", e)))?
-        } else {
-            use tokio_tungstenite::tungstenite::http::Request;
-            Request::builder()
-                .uri(&url)
-                .body(())
-                .map_err(|e| AppError::Internal(format!("Failed to build request: {}", e)))?
-        };
-
-        let (ws_stream, _) = connect_async(request).await?;
-        let (mut write, mut read) = ws_stream.split();
-
-        // For Fyers, send authentication message
-        if broker_id == "fyers" {
-            let auth_msg = create_fyers_auth_message(feed_token, "openalgo-desktop");
-            write.send(Message::Binary(auth_msg)).await?;
-            info!("Sent Fyers authentication message");
+    async fn stop_task(&self) {
+        let running = self.running.lock().take();
+        if let Some(r) = running {
+            // Ask for a clean close; abort if the task does not finish soon.
+            let _ = r.cmd.try_send(Command::Stop);
+            let mut task = r.task;
+            if tokio::time::timeout(Duration::from_secs(2), &mut task)
+                .await
+                .is_err()
+            {
+                task.abort();
+                let _ = task.await;
+            }
         }
+    }
 
-        let (tx, mut rx) = mpsc::channel::<WebSocketCommand>(100);
-        *self.sender.write() = Some(tx);
-        *self.state.write() = ConnectionState::Connected;
+    /// Add references; the broker is told only about instruments whose
+    /// effective mode changed.
+    pub async fn subscribe(&self, subs: Vec<FeedSubscription>) -> Result<()> {
+        let deltas = {
+            let mut reg = self.registry.lock();
+            let new_instruments = subs
+                .iter()
+                .filter(|s| !reg.entries.contains_key(&s.instrument_key()))
+                .map(|s| s.instrument_key())
+                .collect::<std::collections::HashSet<_>>()
+                .len();
+            if reg.entries.len() + new_instruments > self.config.max_instruments {
+                return Err(AppError::Validation(format!(
+                    "You can stream at most {} instruments at once. Unsubscribe some before adding more.",
+                    self.config.max_instruments
+                )));
+            }
+            let mut deltas = Vec::new();
+            for s in subs {
+                let entry = reg
+                    .entries
+                    .entry(s.instrument_key())
+                    .or_insert_with(|| Entry {
+                        base: s.clone(),
+                        modes: BTreeMap::new(),
+                    });
+                let before = entry.effective();
+                *entry.modes.entry(s.mode).or_insert(0) += 1;
+                let after = entry.effective();
+                match (before, after) {
+                    (None, Some(a)) => deltas.push(Delta::Subscribe(a)),
+                    (Some(b), Some(a)) if b.mode != a.mode => deltas.push(Delta::ModeChange(b, a)),
+                    _ => {}
+                }
+            }
+            deltas
+        };
+        self.apply(deltas).await;
+        Ok(())
+    }
 
-        let tick_tx = self.ticks.clone();
-        let broker = broker_id.to_string();
-        let token_map = self.token_map.clone();
+    /// Drop references; an instrument with none left is unsubscribed.
+    pub async fn unsubscribe(&self, subs: Vec<FeedSubscription>) -> Result<()> {
+        let deltas = {
+            let mut reg = self.registry.lock();
+            let mut deltas = Vec::new();
+            for s in subs {
+                let key = s.instrument_key();
+                let Some(entry) = reg.entries.get_mut(&key) else {
+                    continue;
+                };
+                let before = entry.effective();
+                if let Some(n) = entry.modes.get_mut(&s.mode) {
+                    *n -= 1;
+                    if *n == 0 {
+                        entry.modes.remove(&s.mode);
+                    }
+                }
+                let after = entry.effective();
+                match (before, after) {
+                    (Some(b), None) => {
+                        reg.entries.remove(&key);
+                        deltas.push(Delta::Unsubscribe(b));
+                    }
+                    (Some(b), Some(a)) if b.mode != a.mode => deltas.push(Delta::ModeChange(b, a)),
+                    _ => {}
+                }
+            }
+            deltas
+        };
+        self.apply(deltas).await;
+        Ok(())
+    }
 
-        info!("{} WebSocket connected", broker_id);
+    /// Drop every subscription (the feed stays connected).
+    pub async fn unsubscribe_all(&self) -> Result<()> {
+        let deltas: Vec<Delta> = {
+            let mut reg = self.registry.lock();
+            let all = reg.effective_all();
+            reg.entries.clear();
+            all.into_iter().map(Delta::Unsubscribe).collect()
+        };
+        self.apply(deltas).await;
+        Ok(())
+    }
 
-        // Spawn WebSocket handler task
-        let handle = tokio::spawn(async move {
-            let mut heartbeat_interval =
-                tokio::time::interval(tokio::time::Duration::from_secs(30));
+    async fn apply(&self, deltas: Vec<Delta>) {
+        if deltas.is_empty() {
+            return;
+        }
+        let tx = self.running.lock().as_ref().map(|r| r.cmd.clone());
+        if let Some(tx) = tx {
+            // Bounded: back-pressure rather than unbounded growth. If the
+            // task is gone the registry still holds the state for the next
+            // connection.
+            let _ = tx.send(Command::Apply(deltas)).await;
+        }
+    }
+}
 
+impl Drop for WebSocketManager {
+    fn drop(&mut self) {
+        if let Some(r) = self.running.get_mut().take() {
+            r.task.abort();
+        }
+    }
+}
+
+/// Why one socket session ended.
+enum SessionEnd {
+    Stopped,
+    Lost,
+    Stalled,
+    AuthFailed(String),
+}
+
+struct Supervisor {
+    feed: Box<dyn BrokerFeed>,
+    cmd: mpsc::Receiver<Command>,
+    registry: Arc<Mutex<Registry>>,
+    events: broadcast::Sender<MarketEvent>,
+    status: watch::Sender<FeedStatus>,
+    config: FeedConfig,
+    stats: Arc<FeedStats>,
+}
+
+impl Supervisor {
+    async fn run(mut self) {
+        let broker = self.feed.broker().to_string();
+        let mut attempt: u32 = 0;
+        loop {
+            self.status.send_replace(FeedStatus::Connecting {
+                broker: broker.clone(),
+                attempt,
+            });
+            let started = Instant::now();
+            let end = self.connect_once(&broker).await;
+            match end {
+                SessionEnd::Stopped => {
+                    self.status.send_replace(FeedStatus::Disconnected);
+                    return;
+                }
+                SessionEnd::AuthFailed(message) => {
+                    tracing::warn!(broker = %broker, "Market data feed refused the session");
+                    self.status.send_replace(FeedStatus::AuthFailed {
+                        broker: broker.clone(),
+                        message,
+                    });
+                    // Do not hammer the broker with a dead token; wait for
+                    // a stop (logout) or a new `connect`.
+                    while let Some(cmd) = self.cmd.recv().await {
+                        if matches!(cmd, Command::Stop) {
+                            break;
+                        }
+                    }
+                    return;
+                }
+                SessionEnd::Lost | SessionEnd::Stalled => {}
+            }
+            self.stats.disconnects.fetch_add(1, Ordering::Relaxed);
+            if started.elapsed() >= self.config.stable_after {
+                attempt = 0;
+            }
+            let delay = backoff_delay(attempt, self.config.backoff_base, self.config.backoff_max);
+            attempt = attempt.saturating_add(1);
+            self.status.send_replace(FeedStatus::Reconnecting {
+                broker: broker.clone(),
+                attempt,
+                delay_ms: delay.as_millis() as u64,
+            });
+            tracing::info!(broker = %broker, attempt, "Market data feed reconnecting in {:?}", delay);
+            // Sleep, still answering commands (registry already holds the
+            // state; a stop ends the loop).
+            let sleep = tokio::time::sleep(delay);
+            tokio::pin!(sleep);
             loop {
                 tokio::select! {
-                    // Handle incoming messages
-                    msg = read.next() => {
-                        match msg {
-                            Some(Ok(Message::Binary(data))) => {
-                                // Parse binary data based on broker protocol
-                                let ticks = parse_broker_ticks(&broker, &data, &token_map);
-                                for tick in ticks {
-                                    // No receiver yet is normal; ignore.
-                                    let _ = tick_tx.send(tick);
-                                }
-                            }
-                            Some(Ok(Message::Text(text))) => {
-                                debug!("Received text message: {}", text);
-                                // Handle JSON responses (subscription confirmations, etc.)
-                            }
-                            Some(Ok(Message::Ping(_data))) => {
-                                debug!("Received ping, sending pong");
-                                // Pong is handled automatically by tungstenite
-                            }
-                            Some(Ok(Message::Pong(_))) => {
-                                debug!("Received pong");
-                            }
-                            Some(Ok(Message::Close(_))) => {
-                                info!("WebSocket closed by server");
-                                break;
-                            }
-                            Some(Err(e)) => {
-                                error!("WebSocket error: {}", e);
-                                break;
-                            }
-                            None => {
-                                info!("WebSocket stream ended");
-                                break;
-                            }
-                            _ => {}
+                    _ = &mut sleep => break,
+                    cmd = self.cmd.recv() => match cmd {
+                        None | Some(Command::Stop) => {
+                            self.status.send_replace(FeedStatus::Disconnected);
+                            return;
                         }
-                    }
-
-                    // Handle outgoing commands
-                    cmd = rx.recv() => {
-                        match cmd {
-                            Some(WebSocketCommand::Subscribe(requests)) => {
-                                let msg = create_subscribe_message(&broker, &requests);
-                                if let Err(e) = write.send(msg).await {
-                                    error!("Failed to send subscribe: {}", e);
-                                }
-                            }
-                            Some(WebSocketCommand::Unsubscribe(symbols)) => {
-                                let msg = create_unsubscribe_message(&broker, &symbols);
-                                if let Err(e) = write.send(msg).await {
-                                    error!("Failed to send unsubscribe: {}", e);
-                                }
-                            }
-                            Some(WebSocketCommand::Disconnect) => {
-                                let _ = write.close().await;
-                                break;
-                            }
-                            None => break,
-                        }
-                    }
-
-                    // Send heartbeat
-                    _ = heartbeat_interval.tick() => {
-                        match broker.as_str() {
-                            "angel" => {
-                                if let Err(e) = write.send(Message::Text("ping".to_string())).await {
-                                    warn!("Failed to send heartbeat: {}", e);
-                                }
-                            }
-                            "zerodha" => {
-                                // Zerodha uses 1-byte heartbeat
-                                if let Err(e) = write.send(Message::Binary(vec![0])).await {
-                                    warn!("Failed to send heartbeat: {}", e);
-                                }
-                            }
-                            _ => {}
-                        }
+                        Some(Command::Apply(_)) => {}
                     }
                 }
             }
-
-            info!("{} WebSocket task ended", broker);
-        });
-        if let Some(old) = self.task.lock().replace(handle) {
-            old.abort();
         }
-
-        Ok(())
     }
 
-    /// Receive ticks (bounded; a slow receiver gets `Lagged`).
-    pub fn subscribe_ticks(&self) -> broadcast::Receiver<MarketTick> {
-        self.ticks.subscribe()
-    }
-
-    /// Subscribe to symbols
-    pub async fn subscribe(&self, requests: Vec<SubscriptionRequest>) -> Result<()> {
-        // Update token map
-        {
-            let mut map = self.token_map.write();
-            for req in &requests {
-                map.insert(req.token.clone(), (req.token.clone(), req.exchange.clone()));
+    async fn connect_once(&mut self, broker: &str) -> SessionEnd {
+        let request = match self.feed.ws_request() {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::error!(broker, "Market data feed request could not be built: {}", e);
+                return SessionEnd::AuthFailed(e.client_message());
             }
-        }
-
-        // Update subscriptions
-        {
-            let mut subs = self.subscriptions.write();
-            for req in &requests {
-                let key = format!("{}:{}", req.exchange, req.token);
-                subs.insert(key, req.mode);
-            }
-        }
-
-        // Clone sender before await to avoid holding lock across await point
-        let tx = {
-            let sender = self.sender.read();
-            sender.clone()
         };
-
-        if let Some(tx) = tx {
-            tx.send(WebSocketCommand::Subscribe(requests))
-                .await
-                .map_err(|e| AppError::Internal(format!("Failed to send subscribe: {}", e)))?;
-        } else {
-            return Err(AppError::Internal("WebSocket not connected".to_string()));
-        }
-        Ok(())
-    }
-
-    /// Unsubscribe from symbols
-    pub async fn unsubscribe(&self, symbols: Vec<(String, String)>) -> Result<()> {
-        // Remove from subscriptions
-        {
-            let mut subs = self.subscriptions.write();
-            for (exchange, token) in &symbols {
-                let key = format!("{}:{}", exchange, token);
-                subs.remove(&key);
-            }
-        }
-
-        // Clone sender before await to avoid holding lock across await point
-        let tx = {
-            let sender = self.sender.read();
-            sender.clone()
-        };
-
-        if let Some(tx) = tx {
-            tx.send(WebSocketCommand::Unsubscribe(symbols))
-                .await
-                .map_err(|e| AppError::Internal(format!("Failed to send unsubscribe: {}", e)))?;
-        }
-        Ok(())
-    }
-
-    /// Disconnect WebSocket
-    pub async fn disconnect(&self) -> Result<()> {
-        // Clone sender before await to avoid holding lock across await point
-        let tx = {
-            let sender = self.sender.read();
-            sender.clone()
-        };
-
-        if let Some(tx) = tx {
-            // Bounded wait: a stuck reader must not stall logout.
-            let _ = tokio::time::timeout(
-                std::time::Duration::from_secs(2),
-                tx.send(WebSocketCommand::Disconnect),
-            )
-            .await;
-        }
-        if let Some(task) = self.task.lock().take() {
-            task.abort();
-        }
-        *self.state.write() = ConnectionState::Disconnected;
-        *self.sender.write() = None;
-        *self.broker_id.write() = None;
-        self.subscriptions.write().clear();
-        self.token_map.write().clear();
-        Ok(())
-    }
-
-    /// Check if connected
-    pub fn is_connected(&self) -> bool {
-        matches!(*self.state.read(), ConnectionState::Connected)
-    }
-
-    /// Get current broker
-    pub fn get_broker(&self) -> Option<String> {
-        self.broker_id.read().clone()
-    }
-
-    /// Register token to symbol mapping
-    pub fn register_symbol(&self, token: &str, symbol: &str, exchange: &str) {
-        let mut map = self.token_map.write();
-        map.insert(
-            token.to_string(),
-            (symbol.to_string(), exchange.to_string()),
-        );
-    }
-}
-
-// ============================================================================
-// Binary Protocol Parsing
-// ============================================================================
-
-/// Parse broker-specific binary tick data
-fn parse_broker_ticks(broker: &str, data: &[u8], token_map: &TokenMap) -> Vec<MarketTick> {
-    match broker {
-        "angel" => parse_angel_ticks(data, token_map),
-        "zerodha" => parse_zerodha_ticks(data, token_map),
-        "fyers" => parse_fyers_ticks(data, token_map),
-        _ => vec![],
-    }
-}
-
-/// Parse Angel One binary tick (little-endian)
-///
-/// Structure:
-/// - Byte 0: Subscription mode (1=LTP, 2=Quote, 3=SnapQuote)
-/// - Byte 1: Exchange type
-/// - Bytes 2-26: Token (25 bytes, null-terminated)
-/// - Bytes 27-34: Sequence number (int64)
-/// - Bytes 35-42: Exchange timestamp (int64)
-/// - Bytes 43-50: LTP (int64, in paise)
-/// - Quote mode adds OHLCV at bytes 51-122
-/// - SnapQuote adds depth at bytes 123+
-fn parse_angel_ticks(data: &[u8], token_map: &TokenMap) -> Vec<MarketTick> {
-    if data.len() < 51 {
-        return vec![];
-    }
-
-    let mut cursor = Cursor::new(data);
-
-    let mode = cursor.read_u8().unwrap_or(0);
-    let exchange_type = cursor.read_u8().unwrap_or(0);
-
-    // Parse token (25 bytes, null-terminated)
-    let mut token_bytes = [0u8; 25];
-    if cursor.get_ref().len() >= 27 {
-        token_bytes.copy_from_slice(&data[2..27]);
-    }
-    let token = String::from_utf8_lossy(&token_bytes)
-        .trim_end_matches('\0')
-        .trim()
-        .to_string();
-
-    cursor.set_position(27);
-    let _sequence = cursor.read_i64::<LittleEndian>().unwrap_or(0);
-    let timestamp = cursor.read_i64::<LittleEndian>().unwrap_or(0);
-    let ltp_paise = cursor.read_i64::<LittleEndian>().unwrap_or(0);
-
-    let exchange = match exchange_type {
-        1 => "NSE",
-        2 => "NFO",
-        3 => "BSE",
-        4 => "BFO",
-        5 => "MCX",
-        7 => "NCX",
-        13 => "CDS",
-        _ => "NSE",
-    };
-
-    // Look up symbol from token map
-    let (symbol, _) = token_map
-        .read()
-        .get(&token)
-        .cloned()
-        .unwrap_or((token.clone(), exchange.to_string()));
-
-    let mut tick = MarketTick {
-        symbol,
-        exchange: exchange.to_string(),
-        token,
-        ltp: ltp_paise as f64 / 100.0,
-        timestamp,
-        ..Default::default()
-    };
-
-    // Parse Quote mode fields (mode 2 or 3)
-    if mode >= 2 && data.len() >= 123 {
-        cursor.set_position(51);
-        let _ltq = cursor.read_i64::<LittleEndian>().unwrap_or(0);
-        let _avg_price = cursor.read_i64::<LittleEndian>().unwrap_or(0);
-        let volume = cursor.read_i64::<LittleEndian>().unwrap_or(0);
-        let total_buy_qty = cursor.read_f64::<LittleEndian>().unwrap_or(0.0);
-        let total_sell_qty = cursor.read_f64::<LittleEndian>().unwrap_or(0.0);
-        let open = cursor.read_i64::<LittleEndian>().unwrap_or(0);
-        let high = cursor.read_i64::<LittleEndian>().unwrap_or(0);
-        let low = cursor.read_i64::<LittleEndian>().unwrap_or(0);
-        let close = cursor.read_i64::<LittleEndian>().unwrap_or(0);
-
-        tick.open = open as f64 / 100.0;
-        tick.high = high as f64 / 100.0;
-        tick.low = low as f64 / 100.0;
-        tick.close = close as f64 / 100.0;
-        tick.volume = volume;
-        tick.bid_qty = total_buy_qty as i64;
-        tick.ask_qty = total_sell_qty as i64;
-
-        // Calculate change
-        if tick.close > 0.0 {
-            tick.change = tick.ltp - tick.close;
-            tick.change_percent = (tick.change / tick.close) * 100.0;
-        }
-    }
-
-    // Parse SnapQuote mode fields (mode 3)
-    if mode == 3 && data.len() >= 347 {
-        cursor.set_position(131);
-        tick.oi = cursor.read_i64::<LittleEndian>().unwrap_or(0);
-
-        // Parse best 5 bid/ask (simplified - just get best bid/ask)
-        cursor.set_position(147);
-        // Each level: flag(2) + qty(8) + price(8) + orders(2) = 20 bytes
-        // First 5 are sell, next 5 are buy
-        if data.len() >= 167 {
-            let _sell_flag = cursor.read_i16::<LittleEndian>().unwrap_or(0);
-            tick.ask_qty = cursor.read_i64::<LittleEndian>().unwrap_or(0);
-            tick.ask = cursor.read_i64::<LittleEndian>().unwrap_or(0) as f64 / 100.0;
-        }
-        if data.len() >= 247 {
-            cursor.set_position(247); // 147 + 5*20
-            let _buy_flag = cursor.read_i16::<LittleEndian>().unwrap_or(0);
-            tick.bid_qty = cursor.read_i64::<LittleEndian>().unwrap_or(0);
-            tick.bid = cursor.read_i64::<LittleEndian>().unwrap_or(0) as f64 / 100.0;
-        }
-    }
-
-    vec![tick]
-}
-
-/// Parse Zerodha Kite binary tick (big-endian)
-///
-/// Structure:
-/// - First 2 bytes: Number of packets (Big Endian unsigned short)
-/// - Each packet: 2-byte length header + data
-/// - LTP mode: 8 bytes (token + ltp)
-/// - Quote mode: 44 bytes
-/// - Full mode: 184+ bytes with market depth
-fn parse_zerodha_ticks(data: &[u8], token_map: &TokenMap) -> Vec<MarketTick> {
-    if data.len() < 4 {
-        return vec![];
-    }
-
-    let mut cursor = Cursor::new(data);
-    let num_packets = cursor.read_u16::<BigEndian>().unwrap_or(0) as usize;
-
-    let mut ticks = Vec::with_capacity(num_packets);
-    let mut offset = 2usize;
-
-    for _ in 0..num_packets {
-        if offset + 2 > data.len() {
-            break;
-        }
-
-        let packet_len = u16::from_be_bytes([data[offset], data[offset + 1]]) as usize;
-        offset += 2;
-
-        if offset + packet_len > data.len() || packet_len < 8 {
-            break;
-        }
-
-        let packet = &data[offset..offset + packet_len];
-        if let Some(tick) = parse_zerodha_packet(packet, token_map) {
-            ticks.push(tick);
-        }
-
-        offset += packet_len;
-    }
-
-    ticks
-}
-
-/// Parse single Zerodha packet
-fn parse_zerodha_packet(packet: &[u8], token_map: &TokenMap) -> Option<MarketTick> {
-    if packet.len() < 8 {
-        return None;
-    }
-
-    let mut cursor = Cursor::new(packet);
-    let instrument_token = cursor.read_u32::<BigEndian>().unwrap_or(0);
-    let ltp_paise = cursor.read_i32::<BigEndian>().unwrap_or(0);
-
-    let token = instrument_token.to_string();
-
-    // Determine exchange from token (Zerodha encodes exchange in token)
-    // Token format: exchange_code * 256 + index
-    let exchange_code = instrument_token / 256;
-    let exchange = match exchange_code % 256 {
-        1 => "NSE",
-        2 => "NFO",
-        3 => "BSE",
-        4 => "BFO",
-        5 => "MCX",
-        6 => "CDS",
-        _ => "NSE",
-    };
-
-    let (symbol, _) = token_map
-        .read()
-        .get(&token)
-        .cloned()
-        .unwrap_or((token.clone(), exchange.to_string()));
-
-    let mut tick = MarketTick {
-        symbol,
-        exchange: exchange.to_string(),
-        token,
-        ltp: ltp_paise as f64 / 100.0,
-        timestamp: chrono::Utc::now().timestamp_millis(),
-        ..Default::default()
-    };
-
-    // Quote mode (44 bytes)
-    if packet.len() >= 44 {
-        cursor.set_position(8);
-        let _ltq = cursor.read_i32::<BigEndian>().unwrap_or(0);
-        let _avg_price = cursor.read_i32::<BigEndian>().unwrap_or(0);
-        let volume = cursor.read_i32::<BigEndian>().unwrap_or(0);
-        let total_buy_qty = cursor.read_i32::<BigEndian>().unwrap_or(0);
-        let total_sell_qty = cursor.read_i32::<BigEndian>().unwrap_or(0);
-        let open = cursor.read_i32::<BigEndian>().unwrap_or(0);
-        let high = cursor.read_i32::<BigEndian>().unwrap_or(0);
-        let low = cursor.read_i32::<BigEndian>().unwrap_or(0);
-        let close = cursor.read_i32::<BigEndian>().unwrap_or(0);
-
-        tick.open = open as f64 / 100.0;
-        tick.high = high as f64 / 100.0;
-        tick.low = low as f64 / 100.0;
-        tick.close = close as f64 / 100.0;
-        tick.volume = volume as i64;
-        tick.bid_qty = total_buy_qty as i64;
-        tick.ask_qty = total_sell_qty as i64;
-
-        if tick.close > 0.0 {
-            tick.change = tick.ltp - tick.close;
-            tick.change_percent = (tick.change / tick.close) * 100.0;
-        }
-    }
-
-    // Full mode with depth (184+ bytes)
-    if packet.len() >= 184 {
-        cursor.set_position(44);
-        let _ltt = cursor.read_i32::<BigEndian>().unwrap_or(0);
-        tick.oi = cursor.read_i32::<BigEndian>().unwrap_or(0) as i64;
-
-        // Parse best bid/ask from depth (offset 64)
-        if packet.len() >= 76 {
-            cursor.set_position(64);
-            // Buy side first level
-            tick.bid_qty = cursor.read_i32::<BigEndian>().unwrap_or(0) as i64;
-            tick.bid = cursor.read_i32::<BigEndian>().unwrap_or(0) as f64 / 100.0;
-            let _buy_orders = cursor.read_i16::<BigEndian>().unwrap_or(0);
-            let _padding = cursor.read_i16::<BigEndian>().unwrap_or(0);
-
-            // Sell side starts at 64 + 60 = 124
-            cursor.set_position(124);
-            tick.ask_qty = cursor.read_i32::<BigEndian>().unwrap_or(0) as i64;
-            tick.ask = cursor.read_i32::<BigEndian>().unwrap_or(0) as f64 / 100.0;
-        }
-    }
-
-    Some(tick)
-}
-
-/// Parse Fyers HSM binary tick (big-endian)
-///
-/// Response types:
-/// - Type 1: Authentication response
-/// - Type 4: Subscription acknowledgment
-/// - Type 6: Data feed (market data)
-/// - Type 13: Master data
-fn parse_fyers_ticks(data: &[u8], token_map: &TokenMap) -> Vec<MarketTick> {
-    if data.len() < 7 {
-        return vec![];
-    }
-
-    let mut cursor = Cursor::new(data);
-    let _data_len = cursor.read_u16::<BigEndian>().unwrap_or(0);
-
-    // Skip to message type (typically at byte 2 or after length)
-    let msg_type = data.get(2).copied().unwrap_or(0);
-
-    // We only care about type 6 (data feed)
-    if msg_type != 6 {
-        return vec![];
-    }
-
-    // Skip header (5 bytes reserved)
-    cursor.set_position(7);
-
-    let scrip_count = if data.len() >= 9 {
-        cursor.read_u16::<BigEndian>().unwrap_or(0) as usize
-    } else {
-        return vec![];
-    };
-
-    let mut ticks = Vec::new();
-    let mut offset = 9usize;
-
-    for _ in 0..scrip_count {
-        if offset >= data.len() {
-            break;
-        }
-
-        let data_type = data[offset];
-        offset += 1;
-
-        match data_type {
-            83 => {
-                // Snapshot (0x53 = 'S')
-                if let Some((tick, new_offset)) = parse_fyers_snapshot(&data[offset..], token_map) {
-                    ticks.push(tick);
-                    offset += new_offset;
-                } else {
-                    break;
+        let connect = tokio_tungstenite::connect_async(request);
+        let ws = match tokio::time::timeout(self.config.connect_timeout, connect).await {
+            Ok(Ok((ws, _))) => ws,
+            Ok(Err(WsError::Http(resp))) => {
+                let code = resp.status().as_u16();
+                tracing::warn!(broker, status = code, "Market data feed handshake refused");
+                if self.feed.is_auth_failure(Some(code)) {
+                    return SessionEnd::AuthFailed(
+                        "The broker refused the live market data session. Log in to your broker again."
+                            .into(),
+                    );
                 }
+                return SessionEnd::Lost;
             }
-            85 => {
-                // Update (0x55 = 'U')
-                // Updates reference previous snapshots - simplified parsing
-                if offset + 3 <= data.len() {
-                    let _topic_id = u16::from_be_bytes([data[offset], data[offset + 1]]);
-                    let field_count = data[offset + 2] as usize;
-                    offset += 3 + (field_count * 4);
-                } else {
-                    break;
-                }
+            Ok(Err(e)) => {
+                tracing::debug!(broker, "Market data feed connect failed: {}", e);
+                return SessionEnd::Lost;
             }
-            _ => break,
-        }
-    }
-
-    ticks
-}
-
-/// Parse Fyers snapshot data
-fn parse_fyers_snapshot(data: &[u8], _token_map: &TokenMap) -> Option<(MarketTick, usize)> {
-    if data.len() < 10 {
-        return None;
-    }
-
-    let mut offset = 0usize;
-
-    // Topic ID (2 bytes)
-    let _topic_id = u16::from_be_bytes([data[offset], data[offset + 1]]);
-    offset += 2;
-
-    // Topic name length and value
-    let name_len = data[offset] as usize;
-    offset += 1;
-    let topic_name = if offset + name_len <= data.len() {
-        String::from_utf8_lossy(&data[offset..offset + name_len]).to_string()
-    } else {
-        return None;
-    };
-    offset += name_len;
-
-    // Field count
-    if offset >= data.len() {
-        return None;
-    }
-    let field_count = data[offset] as usize;
-    offset += 1;
-
-    // Fyers data fields order:
-    // ltp, vol_traded_today, last_traded_time, exch_feed_time,
-    // bid_size, ask_size, bid_price, ask_price, last_traded_qty,
-    // tot_buy_qty, tot_sell_qty, avg_trade_price, OI, low_price,
-    // high_price, Yhigh, Ylow, lower_ckt, upper_ckt, open_price,
-    // prev_close_price, type, symbol
-
-    let mut fields = vec![0i32; field_count];
-    for field in fields.iter_mut() {
-        if offset + 4 > data.len() {
-            break;
-        }
-        *field = i32::from_be_bytes([
-            data[offset],
-            data[offset + 1],
-            data[offset + 2],
-            data[offset + 3],
-        ]);
-        offset += 4;
-    }
-
-    // Skip 2 bytes
-    offset += 2;
-
-    // Multiplier and precision
-    let multiplier = if offset + 2 <= data.len() {
-        u16::from_be_bytes([data[offset], data[offset + 1]]) as f64
-    } else {
-        100.0
-    };
-    offset += 2;
-
-    let _precision = if offset < data.len() { data[offset] } else { 2 };
-    offset += 1;
-
-    // Parse string fields: exchange, exchange_token, symbol
-    let mut strings = Vec::new();
-    for _ in 0..3 {
-        if offset >= data.len() {
-            break;
-        }
-        let str_len = data[offset] as usize;
-        offset += 1;
-        if offset + str_len <= data.len() {
-            strings.push(String::from_utf8_lossy(&data[offset..offset + str_len]).to_string());
-            offset += str_len;
-        }
-    }
-
-    let exchange = strings.first().cloned().unwrap_or_default();
-    let token = strings.get(1).cloned().unwrap_or_default();
-    let symbol = strings.get(2).cloned().unwrap_or(topic_name);
-
-    // Divisor for price conversion
-    let divisor = if multiplier > 0.0 { multiplier } else { 100.0 };
-
-    let ltp = fields.first().copied().unwrap_or(0) as f64 / divisor;
-    let close = fields.get(20).copied().unwrap_or(0) as f64 / divisor;
-
-    let tick = MarketTick {
-        symbol,
-        exchange,
-        token,
-        ltp,
-        open: fields.get(19).copied().unwrap_or(0) as f64 / divisor,
-        high: fields.get(14).copied().unwrap_or(0) as f64 / divisor,
-        low: fields.get(13).copied().unwrap_or(0) as f64 / divisor,
-        close,
-        volume: fields.get(1).copied().unwrap_or(0) as i64,
-        bid: fields.get(6).copied().unwrap_or(0) as f64 / divisor,
-        ask: fields.get(7).copied().unwrap_or(0) as f64 / divisor,
-        bid_qty: fields.get(4).copied().unwrap_or(0) as i64,
-        ask_qty: fields.get(5).copied().unwrap_or(0) as i64,
-        oi: fields.get(12).copied().unwrap_or(0) as i64,
-        timestamp: fields.get(3).copied().unwrap_or(0) as i64 * 1000,
-        change: if close > 0.0 { ltp - close } else { 0.0 },
-        change_percent: if close > 0.0 {
-            ((ltp - close) / close) * 100.0
-        } else {
-            0.0
-        },
-    };
-
-    Some((tick, offset))
-}
-
-// ============================================================================
-// Subscribe/Unsubscribe Message Creation
-// ============================================================================
-
-/// Create subscribe message for broker
-fn create_subscribe_message(broker: &str, requests: &[SubscriptionRequest]) -> Message {
-    match broker {
-        "angel" => create_angel_subscribe(requests),
-        "zerodha" => create_zerodha_subscribe(requests),
-        "fyers" => create_fyers_subscribe(requests),
-        _ => Message::Text("{}".to_string()),
-    }
-}
-
-/// Create unsubscribe message for broker
-fn create_unsubscribe_message(broker: &str, symbols: &[(String, String)]) -> Message {
-    match broker {
-        "angel" => create_angel_unsubscribe(symbols),
-        "zerodha" => create_zerodha_unsubscribe(symbols),
-        "fyers" => create_fyers_unsubscribe(symbols),
-        _ => Message::Text("{}".to_string()),
-    }
-}
-
-/// Angel One subscribe (JSON)
-fn create_angel_subscribe(requests: &[SubscriptionRequest]) -> Message {
-    // Group tokens by exchange type
-    let mut token_lists: HashMap<u8, Vec<String>> = HashMap::new();
-
-    for req in requests {
-        let exchange_type = match req.exchange.to_uppercase().as_str() {
-            "NSE" => 1,
-            "NFO" => 2,
-            "BSE" => 3,
-            "BFO" => 4,
-            "MCX" => 5,
-            "NCX" => 7,
-            "CDS" => 13,
-            _ => 1,
+            Err(_) => {
+                tracing::debug!(broker, "Market data feed connect timed out");
+                return SessionEnd::Lost;
+            }
         };
-        token_lists
-            .entry(exchange_type)
-            .or_default()
-            .push(req.token.clone());
+        self.stats.connects.fetch_add(1, Ordering::Relaxed);
+        let (mut write, mut read) = ws.split();
+        let end = self.session(broker, &mut write, &mut read).await;
+        // Close before reconnecting so the descriptor is released on every
+        // path; bounded so a dead peer cannot hold us.
+        let _ = tokio::time::timeout(Duration::from_secs(2), write.close()).await;
+        drop(write);
+        drop(read);
+        end
     }
 
-    let token_list: Vec<serde_json::Value> = token_lists
-        .into_iter()
-        .map(|(exchange_type, tokens)| {
-            serde_json::json!({
-                "exchangeType": exchange_type,
-                "tokens": tokens
-            })
-        })
-        .collect();
-
-    // Use the highest mode requested
-    let mode = requests.iter().map(|r| r.mode as u8).max().unwrap_or(2);
-
-    let msg = serde_json::json!({
-        "correlationID": format!("sub_{}", chrono::Utc::now().timestamp_millis()),
-        "action": 1,
-        "params": {
-            "mode": mode,
-            "tokenList": token_list
-        }
-    });
-
-    Message::Text(msg.to_string())
-}
-
-/// Angel One unsubscribe (JSON)
-fn create_angel_unsubscribe(symbols: &[(String, String)]) -> Message {
-    let mut token_lists: HashMap<u8, Vec<String>> = HashMap::new();
-
-    for (exchange, token) in symbols {
-        let exchange_type = match exchange.to_uppercase().as_str() {
-            "NSE" => 1,
-            "NFO" => 2,
-            "BSE" => 3,
-            "BFO" => 4,
-            "MCX" => 5,
-            "NCX" => 7,
-            "CDS" => 13,
-            _ => 1,
-        };
-        token_lists
-            .entry(exchange_type)
-            .or_default()
-            .push(token.clone());
-    }
-
-    let token_list: Vec<serde_json::Value> = token_lists
-        .into_iter()
-        .map(|(exchange_type, tokens)| {
-            serde_json::json!({
-                "exchangeType": exchange_type,
-                "tokens": tokens
-            })
-        })
-        .collect();
-
-    let msg = serde_json::json!({
-        "correlationID": format!("unsub_{}", chrono::Utc::now().timestamp_millis()),
-        "action": 0,
-        "params": {
-            "mode": 1,
-            "tokenList": token_list
-        }
-    });
-
-    Message::Text(msg.to_string())
-}
-
-/// Zerodha Kite subscribe (JSON)
-fn create_zerodha_subscribe(requests: &[SubscriptionRequest]) -> Message {
-    let tokens: Vec<u32> = requests
-        .iter()
-        .filter_map(|r| r.token.parse().ok())
-        .collect();
-
-    // First subscribe
-    let sub_msg = serde_json::json!({
-        "a": "subscribe",
-        "v": tokens
-    });
-
-    // Then set mode
-    let mode = match requests
-        .iter()
-        .map(|r| r.mode)
-        .max()
-        .unwrap_or(SubscriptionMode::Quote)
+    async fn send_all<S>(write: &mut S, frames: Vec<Message>) -> bool
+    where
+        S: futures_util::Sink<Message, Error = WsError> + Unpin,
     {
-        SubscriptionMode::Ltp => "ltp",
-        SubscriptionMode::Quote => "quote",
-        SubscriptionMode::Full | SubscriptionMode::SnapQuote => "full",
-    };
-
-    let mode_msg = serde_json::json!({
-        "a": "mode",
-        "v": [mode, tokens]
-    });
-
-    // Send as combined message (Zerodha accepts batch)
-    Message::Text(format!("{}\n{}", sub_msg, mode_msg))
-}
-
-/// Zerodha Kite unsubscribe (JSON)
-fn create_zerodha_unsubscribe(symbols: &[(String, String)]) -> Message {
-    let tokens: Vec<u32> = symbols
-        .iter()
-        .filter_map(|(_, token)| token.parse().ok())
-        .collect();
-
-    let msg = serde_json::json!({
-        "a": "unsubscribe",
-        "v": tokens
-    });
-
-    Message::Text(msg.to_string())
-}
-
-/// Fyers HSM authentication message (binary)
-fn create_fyers_auth_message(hsm_key: &str, source: &str) -> Vec<u8> {
-    let mode = "P"; // Production
-    let buffer_size = 18 + hsm_key.len() + source.len();
-
-    let mut buffer = Vec::with_capacity(buffer_size);
-
-    // Data length (buffer_size - 2)
-    buffer.extend_from_slice(&((buffer_size - 2) as u16).to_be_bytes());
-
-    // Request type = 1 (authentication)
-    buffer.push(1);
-
-    // Field count = 4
-    buffer.push(4);
-
-    // Field-1: AuthToken (HSM key)
-    buffer.push(1); // Field ID
-    buffer.extend_from_slice(&(hsm_key.len() as u16).to_be_bytes());
-    buffer.extend_from_slice(hsm_key.as_bytes());
-
-    // Field-2: Mode
-    buffer.push(2); // Field ID
-    buffer.extend_from_slice(&1u16.to_be_bytes());
-    buffer.extend_from_slice(mode.as_bytes());
-
-    // Field-3: Unknown flag
-    buffer.push(3); // Field ID
-    buffer.extend_from_slice(&1u16.to_be_bytes());
-    buffer.push(1);
-
-    // Field-4: Source
-    buffer.push(4); // Field ID
-    buffer.extend_from_slice(&(source.len() as u16).to_be_bytes());
-    buffer.extend_from_slice(source.as_bytes());
-
-    buffer
-}
-
-/// Fyers HSM subscribe message (binary)
-fn create_fyers_subscribe(requests: &[SubscriptionRequest]) -> Message {
-    let channel = 11u8; // Default channel
-
-    // Build scrips data
-    let mut scrips_data = Vec::new();
-    scrips_data.extend_from_slice(&(requests.len() as u16).to_be_bytes());
-
-    for req in requests {
-        // Fyers symbol format: exchange:symbol (e.g., "NSE:RELIANCE-EQ")
-        let fyers_symbol = format!("{}:{}", req.exchange, req.token);
-        let symbol_bytes = fyers_symbol.as_bytes();
-        scrips_data.push(symbol_bytes.len() as u8);
-        scrips_data.extend_from_slice(symbol_bytes);
+        for f in frames {
+            if write.send(f).await.is_err() {
+                return false;
+            }
+        }
+        true
     }
 
-    // Build complete message
-    let data_len = 6 + scrips_data.len();
-    let mut buffer = Vec::with_capacity(data_len + 2);
-
-    buffer.extend_from_slice(&(data_len as u16).to_be_bytes());
-    buffer.push(4); // Request type = 4 (subscription)
-    buffer.push(2); // Field count = 2
-
-    // Field-1: Symbols
-    buffer.push(1); // Field ID
-    buffer.extend_from_slice(&(scrips_data.len() as u16).to_be_bytes());
-    buffer.extend_from_slice(&scrips_data);
-
-    // Field-2: Channel
-    buffer.push(2); // Field ID
-    buffer.extend_from_slice(&1u16.to_be_bytes());
-    buffer.push(channel);
-
-    Message::Binary(buffer)
-}
-
-/// Fyers HSM unsubscribe message (binary)
-fn create_fyers_unsubscribe(symbols: &[(String, String)]) -> Message {
-    let channel = 11u8;
-
-    // Build scrips data
-    let mut scrips_data = Vec::new();
-    scrips_data.extend_from_slice(&(symbols.len() as u16).to_be_bytes());
-
-    for (exchange, token) in symbols {
-        let fyers_symbol = format!("{}:{}", exchange, token);
-        let symbol_bytes = fyers_symbol.as_bytes();
-        scrips_data.push(symbol_bytes.len() as u8);
-        scrips_data.extend_from_slice(symbol_bytes);
+    async fn session<S, R>(&mut self, broker: &str, write: &mut S, read: &mut R) -> SessionEnd
+    where
+        S: futures_util::Sink<Message, Error = WsError> + Unpin,
+        R: futures_util::Stream<Item = std::result::Result<Message, WsError>> + Unpin,
+    {
+        if !Self::send_all(write, self.feed.on_connected()).await {
+            return SessionEnd::Lost;
+        }
+        let mut subscribed = false;
+        if !self.feed.awaits_auth_ack() {
+            if !self.resubscribe(write).await {
+                return SessionEnd::Lost;
+            }
+            subscribed = true;
+            self.status.send_replace(FeedStatus::Connected {
+                broker: broker.to_string(),
+            });
+        }
+        let heartbeat = self.feed.heartbeat();
+        let hb_period = heartbeat
+            .as_ref()
+            .map(|(d, _)| *d)
+            .unwrap_or(Duration::from_secs(3600));
+        let mut hb = tokio::time::interval_at(Instant::now() + hb_period, hb_period);
+        let check = (self.config.stall_timeout / 4).max(Duration::from_millis(10));
+        let mut watchdog = tokio::time::interval_at(Instant::now() + check, check);
+        let mut last_rx = Instant::now();
+        loop {
+            tokio::select! {
+                msg = read.next() => {
+                    let msg = match msg {
+                        Some(Ok(m)) => m,
+                        Some(Err(e)) => {
+                            tracing::debug!(broker, "Market data feed read error: {}", e);
+                            return SessionEnd::Lost;
+                        }
+                        None => return SessionEnd::Lost,
+                    };
+                    last_rx = Instant::now();
+                    if let Message::Close(_) = msg {
+                        return SessionEnd::Lost;
+                    }
+                    for ev in self.feed.parse(&msg) {
+                        match ev {
+                            FeedEvent::AuthFailed(m) => return SessionEnd::AuthFailed(m),
+                            FeedEvent::AuthOk => {
+                                if !subscribed {
+                                    if !self.resubscribe(write).await {
+                                        return SessionEnd::Lost;
+                                    }
+                                    subscribed = true;
+                                    self.status.send_replace(FeedStatus::Connected {
+                                        broker: broker.to_string(),
+                                    });
+                                }
+                            }
+                            FeedEvent::Heartbeat => {}
+                            e @ (FeedEvent::Tick(_) | FeedEvent::Depth(_) | FeedEvent::OrderUpdate(_)) => {
+                                self.stats.events.fetch_add(1, Ordering::Relaxed);
+                                // No receiver yet is normal; nothing is retained.
+                                let _ = self.events.send(Arc::new(e));
+                            }
+                        }
+                    }
+                }
+                cmd = self.cmd.recv() => match cmd {
+                    None | Some(Command::Stop) => return SessionEnd::Stopped,
+                    Some(Command::Apply(deltas)) => {
+                        if !subscribed {
+                            continue; // sent with the full set after the ack
+                        }
+                        let mut frames = Vec::new();
+                        for d in deltas {
+                            frames.extend(match d {
+                                Delta::Subscribe(s) => self.feed.subscribe_frames(std::slice::from_ref(&s)),
+                                Delta::Unsubscribe(s) => self.feed.unsubscribe_frames(std::slice::from_ref(&s)),
+                                Delta::ModeChange(old, new) => self.feed.mode_change_frames(&old, &new),
+                            });
+                        }
+                        if !Self::send_all(write, frames).await {
+                            return SessionEnd::Lost;
+                        }
+                    }
+                },
+                _ = hb.tick(), if heartbeat.is_some() => {
+                    if let Some((_, m)) = &heartbeat {
+                        if write.send(m.clone()).await.is_err() {
+                            return SessionEnd::Lost;
+                        }
+                    }
+                }
+                _ = watchdog.tick() => {
+                    if last_rx.elapsed() >= self.config.stall_timeout {
+                        tracing::warn!(broker, "Market data feed stalled; reconnecting");
+                        self.stats.stalls.fetch_add(1, Ordering::Relaxed);
+                        return SessionEnd::Stalled;
+                    }
+                }
+            }
+        }
     }
 
-    // Build complete message (action 5 = unsubscribe)
-    let data_len = 6 + scrips_data.len();
-    let mut buffer = Vec::with_capacity(data_len + 2);
-
-    buffer.extend_from_slice(&(data_len as u16).to_be_bytes());
-    buffer.push(5); // Request type = 5 (unsubscription)
-    buffer.push(2); // Field count = 2
-
-    // Field-1: Symbols
-    buffer.push(1);
-    buffer.extend_from_slice(&(scrips_data.len() as u16).to_be_bytes());
-    buffer.extend_from_slice(&scrips_data);
-
-    // Field-2: Channel
-    buffer.push(2);
-    buffer.extend_from_slice(&1u16.to_be_bytes());
-    buffer.push(channel);
-
-    Message::Binary(buffer)
+    async fn resubscribe<S>(&mut self, write: &mut S) -> bool
+    where
+        S: futures_util::Sink<Message, Error = WsError> + Unpin,
+    {
+        let subs = self.registry.lock().effective_all();
+        if subs.is_empty() {
+            return true;
+        }
+        let frames = self.feed.subscribe_frames(&subs);
+        Self::send_all(write, frames).await
+    }
 }
+
+#[cfg(test)]
+mod tests;

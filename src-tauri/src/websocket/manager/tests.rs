@@ -1,0 +1,307 @@
+//! Manager tests against a local fake WebSocket server on an ephemeral port.
+
+use super::*;
+use crate::brokers::mock::MockFeed;
+use futures_util::{SinkExt, StreamExt};
+use tokio::net::TcpListener;
+use tokio_tungstenite::tungstenite::handshake::server::{ErrorResponse, Request, Response};
+
+fn fast() -> FeedConfig {
+    FeedConfig {
+        backoff_base: Duration::from_millis(5),
+        backoff_max: Duration::from_millis(20),
+        stall_timeout: Duration::from_secs(5),
+        connect_timeout: Duration::from_secs(2),
+        stable_after: Duration::from_secs(60),
+        max_instruments: 3,
+        command_capacity: 16,
+        event_capacity: 64,
+    }
+}
+
+fn sub(symbol: &str, mode: FeedMode) -> FeedSubscription {
+    FeedSubscription {
+        symbol: symbol.into(),
+        exchange: "NSE".into(),
+        token: "1".into(),
+        brsymbol: symbol.into(),
+        brexchange: "NSE".into(),
+        mode,
+        depth: 5,
+    }
+}
+
+/// Server that records every text frame per connection index and runs
+/// `script(conn_index)`: send these frames, then close (true) or hold.
+async fn server(
+    script: impl Fn(usize) -> (Vec<String>, bool) + Send + Sync + 'static,
+) -> (String, Arc<Mutex<Vec<(usize, String)>>>, JoinHandle<()>) {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("ws://{}", listener.local_addr().unwrap());
+    let seen: Arc<Mutex<Vec<(usize, String)>>> = Arc::default();
+    let seen2 = seen.clone();
+    let script = Arc::new(script);
+    let task = tokio::spawn(async move {
+        let mut n = 0usize;
+        let mut conns = tokio::task::JoinSet::new();
+        while let Ok((tcp, _)) = listener.accept().await {
+            let idx = n;
+            n += 1;
+            let seen = seen2.clone();
+            let script = script.clone();
+            conns.spawn(async move {
+                let Ok(ws) = tokio_tungstenite::accept_async(tcp).await else {
+                    return;
+                };
+                let (mut w, mut r) = ws.split();
+                let (frames, close) = script(idx);
+                // Wait for the first client frame (the subscribe) if any is due.
+                let reader = tokio::spawn(async move {
+                    while let Some(Ok(m)) = r.next().await {
+                        if let Message::Text(t) = m {
+                            seen.lock().push((idx, t));
+                        }
+                    }
+                });
+                tokio::time::sleep(Duration::from_millis(50)).await;
+                for f in frames {
+                    let _ = w.send(Message::Text(f)).await;
+                }
+                if close {
+                    let _ = w.close().await;
+                    reader.abort();
+                } else {
+                    let _ = reader.await;
+                }
+            });
+        }
+    });
+    (url, seen, task)
+}
+
+async fn wait_for(mut f: impl FnMut() -> bool) {
+    for _ in 0..400 {
+        if f() {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    panic!("condition not reached");
+}
+
+#[tokio::test]
+async fn resubscribes_after_reconnect_and_publishes_ticks() {
+    let tick = r#"{"t":"SBIN","x":"NSE","p":954.1}"#.to_string();
+    let (url, seen, srv) = server(move |i| (vec![tick.clone()], i == 0)).await;
+    let m = WebSocketManager::with_config(fast());
+    let mut rx = m.subscribe_ticks();
+    m.subscribe(vec![sub("SBIN", FeedMode::Quote)])
+        .await
+        .unwrap();
+    m.connect(Box::new(MockFeed::new(url))).await.unwrap();
+    let mut ticks = 0;
+    while ticks < 2 {
+        let ev = tokio::time::timeout(Duration::from_secs(5), rx.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        if let FeedEvent::Tick(t) = &*ev {
+            assert_eq!(
+                (t.symbol.as_str(), t.exchange.as_str(), t.ltp),
+                ("SBIN", "NSE", 954.1)
+            );
+            ticks += 1;
+        }
+    }
+    wait_for(|| seen.lock().iter().any(|(i, _)| *i == 1)).await;
+    let frames = seen.lock().clone();
+    for conn in [0, 1] {
+        assert!(
+            frames
+                .iter()
+                .any(|(i, f)| *i == conn && f.contains("NSE:SBIN:2")),
+            "connection {} was not resubscribed: {:?}",
+            conn,
+            frames
+        );
+    }
+    assert!(m.stats().connects.load(Ordering::Relaxed) >= 2);
+    assert!(m.is_connected());
+    m.disconnect().await.unwrap();
+    assert!(!m.is_running());
+    assert_eq!(m.status(), FeedStatus::Disconnected);
+    assert_eq!(m.instrument_count(), 0);
+    srv.abort();
+}
+
+#[tokio::test]
+async fn subscriptions_are_reference_counted_with_effective_mode() {
+    let (url, seen, srv) = server(|_| (vec![], false)).await;
+    let m = WebSocketManager::with_config(fast());
+    m.connect(Box::new(MockFeed::new(url))).await.unwrap();
+    wait_for(|| m.is_connected()).await;
+    m.subscribe(vec![sub("SBIN", FeedMode::Ltp)]).await.unwrap();
+    m.subscribe(vec![sub("SBIN", FeedMode::Ltp)]).await.unwrap();
+    m.subscribe(vec![sub("SBIN", FeedMode::Quote)])
+        .await
+        .unwrap();
+    assert_eq!(m.instrument_count(), 1);
+    assert_eq!(m.subscriptions()[0].mode, FeedMode::Quote);
+    m.unsubscribe(vec![sub("SBIN", FeedMode::Quote)])
+        .await
+        .unwrap();
+    assert_eq!(m.subscriptions()[0].mode, FeedMode::Ltp);
+    m.unsubscribe(vec![sub("SBIN", FeedMode::Ltp)])
+        .await
+        .unwrap();
+    assert_eq!(m.instrument_count(), 1);
+    m.unsubscribe(vec![sub("SBIN", FeedMode::Ltp)])
+        .await
+        .unwrap();
+    assert_eq!(m.instrument_count(), 0);
+    // Unknown unsubscribe is a no-op.
+    m.unsubscribe(vec![sub("TCS", FeedMode::Ltp)])
+        .await
+        .unwrap();
+    wait_for(|| seen.lock().len() >= 6).await;
+    let frames: Vec<String> = seen.lock().iter().map(|(_, f)| f.clone()).collect();
+    assert_eq!(
+        frames,
+        [
+            r#"{"sub":["NSE:SBIN:1"]}"#,
+            r#"{"unsub":["NSE:SBIN:1"]}"#,
+            r#"{"sub":["NSE:SBIN:2"]}"#,
+            r#"{"unsub":["NSE:SBIN:2"]}"#,
+            r#"{"sub":["NSE:SBIN:1"]}"#,
+            r#"{"unsub":["NSE:SBIN:1"]}"#,
+        ][..]
+    );
+    // Instrument cap.
+    m.subscribe(vec![
+        sub("A", FeedMode::Ltp),
+        sub("B", FeedMode::Ltp),
+        sub("C", FeedMode::Ltp),
+    ])
+    .await
+    .unwrap();
+    let e = m
+        .subscribe(vec![sub("D", FeedMode::Ltp)])
+        .await
+        .unwrap_err();
+    assert!(e.client_message().contains("at most 3 instruments"));
+    m.unsubscribe_all().await.unwrap();
+    assert_eq!(m.instrument_count(), 0);
+    m.disconnect().await.unwrap();
+    srv.abort();
+}
+
+#[tokio::test]
+async fn stall_watchdog_reconnects_a_silent_socket() {
+    let (url, _seen, srv) = server(|_| (vec![], false)).await;
+    let m = WebSocketManager::with_config(FeedConfig {
+        stall_timeout: Duration::from_millis(150),
+        ..fast()
+    });
+    m.connect(Box::new(MockFeed::new(url))).await.unwrap();
+    wait_for(|| m.stats().stalls.load(Ordering::Relaxed) >= 2).await;
+    assert!(m.stats().connects.load(Ordering::Relaxed) >= 2);
+    m.disconnect().await.unwrap();
+    srv.abort();
+}
+
+#[tokio::test]
+async fn handshake_refusal_stops_reconnecting() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("ws://{}", listener.local_addr().unwrap());
+    let attempts = Arc::new(AtomicU64::new(0));
+    let a2 = attempts.clone();
+    let srv = tokio::spawn(async move {
+        while let Ok((tcp, _)) = listener.accept().await {
+            a2.fetch_add(1, Ordering::Relaxed);
+            let _ = tokio_tungstenite::accept_hdr_async(tcp, |_: &Request, _: Response| {
+                let mut resp = ErrorResponse::new(Some("forbidden".into()));
+                *resp.status_mut() = tokio_tungstenite::tungstenite::http::StatusCode::FORBIDDEN;
+                Err(resp)
+            })
+            .await;
+        }
+    });
+    let m = WebSocketManager::with_config(fast());
+    m.connect(Box::new(MockFeed::new(url))).await.unwrap();
+    wait_for(|| matches!(m.status(), FeedStatus::AuthFailed { .. })).await;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert_eq!(attempts.load(Ordering::Relaxed), 1);
+    assert_eq!(m.stats().connects.load(Ordering::Relaxed), 0);
+    match m.status() {
+        FeedStatus::AuthFailed { message, .. } => {
+            assert!(message.contains("Log in to your broker again"))
+        }
+        other => panic!("{:?}", other),
+    }
+    m.disconnect().await.unwrap();
+    assert!(!m.is_running());
+    srv.abort();
+}
+
+#[tokio::test]
+async fn auth_failed_frame_stops_the_loop() {
+    let (url, _seen, srv) = server(|_| (vec![r#"{"auth":"denied"}"#.to_string()], false)).await;
+    let m = WebSocketManager::with_config(fast());
+    m.connect(Box::new(MockFeed::new(url))).await.unwrap();
+    wait_for(|| matches!(m.status(), FeedStatus::AuthFailed { .. })).await;
+    assert_eq!(m.stats().connects.load(Ordering::Relaxed), 1);
+    m.disconnect().await.unwrap();
+    srv.abort();
+}
+
+#[tokio::test]
+async fn unreachable_feed_backs_off_and_stops_cleanly() {
+    // Bind then drop: nothing listens on this port any more.
+    let port = {
+        let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        l.local_addr().unwrap().port()
+    };
+    let m = WebSocketManager::with_config(fast());
+    let mut status = m.watch_status();
+    m.connect(Box::new(MockFeed::new(format!("ws://127.0.0.1:{}", port))))
+        .await
+        .unwrap();
+    let mut reconnects = 0;
+    while reconnects < 3 {
+        status.changed().await.unwrap();
+        if let FeedStatus::Reconnecting { delay_ms, .. } = &*status.borrow() {
+            assert!(*delay_ms <= 20);
+            reconnects += 1;
+        }
+    }
+    m.disconnect().await.unwrap();
+    assert!(!m.is_running());
+}
+
+#[tokio::test]
+async fn lagging_receivers_skip_ahead() {
+    let ticks: Vec<String> = (0..200)
+        .map(|i| format!(r#"{{"t":"SBIN","x":"NSE","p":{}}}"#, i))
+        .collect();
+    let (url, _seen, srv) = server(move |_| (ticks.clone(), false)).await;
+    let m = WebSocketManager::with_config(FeedConfig {
+        event_capacity: 8,
+        ..fast()
+    });
+    let mut rx = m.subscribe_ticks();
+    m.connect(Box::new(MockFeed::new(url))).await.unwrap();
+    wait_for(|| m.stats().events.load(Ordering::Relaxed) >= 200).await;
+    let mut lagged = false;
+    let mut got = 0;
+    loop {
+        match rx.try_recv() {
+            Ok(_) => got += 1,
+            Err(broadcast::error::TryRecvError::Lagged(_)) => lagged = true,
+            Err(_) => break,
+        }
+    }
+    assert!(lagged);
+    assert!(got <= 8);
+    m.disconnect().await.unwrap();
+    srv.abort();
+}

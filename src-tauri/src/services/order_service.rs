@@ -62,25 +62,8 @@ impl OrderService {
         // Get broker session - either from API key or current session
         let (auth_token, broker_id) = Self::get_auth(state, api_key)?;
 
-        // Look up broker-specific symbol and token from cache
-        let mut order = order;
-        if let Some(symbol_info) = state.get_symbol_by_name(&order.exchange, &order.symbol) {
-            if let Some(brsymbol) = symbol_info.brsymbol {
-                info!("Resolved broker symbol: {} -> {}", order.symbol, brsymbol);
-                order.broker_symbol = Some(brsymbol);
-            }
-            // Set the exchange token (needed for Angel One)
-            info!(
-                "Resolved symbol token: {} -> {}",
-                order.symbol, symbol_info.token
-            );
-            order.symbol_token = Some(symbol_info.token);
-        } else {
-            warn!(
-                "Symbol not found in cache: {}:{}",
-                order.exchange, order.symbol
-            );
-        }
+        // Validate and resolve against the symbol master once.
+        let resolved = crate::brokers::types::ResolvedOrder::resolve(&order, &state.symbols)?;
 
         // Get broker adapter
         let broker = state
@@ -89,7 +72,13 @@ impl OrderService {
             .ok_or_else(|| AppError::Broker(format!("Broker '{}' not found", broker_id)))?;
 
         // Place order via broker
-        match broker.place_order(auth_token.expose(), order.clone()).await {
+        match broker
+            .place_order(
+                &crate::brokers::types::AuthToken::new(auth_token.expose()),
+                &resolved,
+            )
+            .await
+        {
             Ok(response) => {
                 // Log the order
                 Self::log_order(state, "placeorder", &order, &response, api_key);
@@ -142,8 +131,13 @@ impl OrderService {
             .get(&broker_id)
             .ok_or_else(|| AppError::Broker(format!("Broker '{}' not found", broker_id)))?;
 
+        let resolved =
+            crate::brokers::types::ResolvedModify::resolve(order_id, &order, &state.symbols)?;
         match broker
-            .modify_order(auth_token.expose(), order_id, order)
+            .modify_order(
+                &crate::brokers::types::AuthToken::new(auth_token.expose()),
+                &resolved,
+            )
             .await
         {
             Ok(response) => Ok(ModifyOrderResult {
@@ -201,8 +195,12 @@ impl OrderService {
             .get(&broker_id)
             .ok_or_else(|| AppError::Broker(format!("Broker '{}' not found", broker_id)))?;
 
+        let _ = variety; // Kite and Angel cancel through the regular variety, like the web.
         broker
-            .cancel_order(auth_token.expose(), order_id, variety)
+            .cancel_order(
+                &crate::brokers::types::AuthToken::new(auth_token.expose()),
+                order_id,
+            )
             .await?;
 
         Ok(CancelOrderResult {
@@ -235,37 +233,23 @@ impl OrderService {
             .get(&broker_id)
             .ok_or_else(|| AppError::Broker(format!("Broker '{}' not found", broker_id)))?;
 
-        // Get all open orders
-        let orders = broker.get_order_book(auth_token.expose()).await?;
-
-        let mut results = Vec::new();
-        for order in orders {
-            // Only cancel pending/open orders
-            if order.status == "PENDING"
-                || order.status == "OPEN"
-                || order.status == "TRIGGER PENDING"
-            {
-                match broker
-                    .cancel_order(auth_token.expose(), &order.order_id, None)
-                    .await
-                {
-                    Ok(_) => {
-                        results.push(CancelOrderResult {
-                            success: true,
-                            order_id: order.order_id.clone(),
-                            message: "Cancelled".to_string(),
-                        });
-                    }
-                    Err(e) => {
-                        results.push(CancelOrderResult {
-                            success: false,
-                            order_id: order.order_id.clone(),
-                            message: e.to_string(),
-                        });
-                    }
-                }
-            }
-        }
+        let result = broker
+            .cancel_all_orders(&crate::brokers::types::AuthToken::new(auth_token.expose()))
+            .await?;
+        let mut results: Vec<CancelOrderResult> = result
+            .cancelled
+            .into_iter()
+            .map(|order_id| CancelOrderResult {
+                success: true,
+                order_id,
+                message: "Cancelled".to_string(),
+            })
+            .collect();
+        results.extend(result.failed.into_iter().map(|order_id| CancelOrderResult {
+            success: false,
+            order_id,
+            message: "The broker did not cancel this order.".to_string(),
+        }));
 
         Ok(results)
     }

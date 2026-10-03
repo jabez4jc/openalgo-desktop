@@ -1,0 +1,58 @@
+{
+  "status": "success",
+  "data": [
+    {
+      "tradingsymbol": "SBIN",
+      "exchange": "NSE",
+      "instrument_token": 779521,
+      "isin": "INE062A01020",
+      "product": "CNC",
+      "price": 0,
+      "quantity": 10,
+      "used_quantity": 0,
+      "t1_quantity": 2,
+      "realised_quantity": 10,
+      "authorised_quantity": 0,
+      "authorised_date": "2026-10-03 00:00:00",
+      "opening_quantity": 10,
+      "collateral_quantity": 0,
+      "collateral_type": "",
+      "discrepancy": false,
+      "average_price": 800,
+      "last_price": 954.1,
+      "close_price": 950,
+      "pnl": 1541,
+      "day_change": 4.1,
+      "day_change_percentage": 0.4315
+    },
+    {
+      "tradingsymbol": "NEWLISTCO",
+      "exchange": "BSE",
+      "instrument_token": 0,
+      "isin": "INE000X01010",
+      "product": "CNC",
+      "price": null,
+      "quantity": 5,
+      "t1_quantity": 0,
+      "average_price": 120.5,
+      "last_price": null,
+      "close_price": null,
+      "pnl": null,
+      "day_change": null,
+      "day_change_percentage": null
+    },
+    {
+      "tradingsymbol": "RELIANCE",
+      "exchange": "BSE",
+      "instrument_token": 128083204,
+      "isin": "INE002A01018",
+      "product": "MTF",
+      "quantity": 1,
+      "t1_quantity": 0,
+      "average_price": 1100,
+      "last_price": 1167.7,
+      "close_price": 1160,
+      "pnl": 67.7
+    }
+  ]
+}

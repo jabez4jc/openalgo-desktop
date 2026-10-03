@@ -53,6 +53,11 @@ pub enum AppError {
     #[error("Not found: {0}")]
     NotFound(String),
 
+    /// The connected broker does not offer this capability (GTT, margin,
+    /// streaming, ...). The web answers these with 501.
+    #[error("Unsupported by broker: {0}")]
+    Unsupported(&'static str),
+
     #[error("Configuration error: {0}")]
     Config(String),
 
@@ -103,6 +108,7 @@ impl AppError {
             AppError::Broker(_) => "BROKER_ERROR",
             AppError::Validation(_) => "VALIDATION_ERROR",
             AppError::NotFound(_) => "NOT_FOUND",
+            AppError::Unsupported(_) => "UNSUPPORTED",
             AppError::Config(_) => "CONFIG_ERROR",
             AppError::Io(_) => "IO_ERROR",
             AppError::Internal(_) => "INTERNAL_ERROR",
@@ -120,6 +126,12 @@ impl AppError {
             | AppError::Broker(m)
             | AppError::Validation(m)
             | AppError::NotFound(m) => m.clone(),
+            AppError::Unsupported(what) => {
+                format!(
+                    "{} is not available for your broker.",
+                    unsupported_label(what)
+                )
+            }
             AppError::Http(_) | AppError::WebSocket(_) => {
                 "Could not reach the broker. Check your internet connection and try again."
                     .to_string()
@@ -132,6 +144,25 @@ impl AppError {
                     .to_string()
             }
             _ => "An unexpected error occurred".to_string(),
+        }
+    }
+}
+
+/// Trader-facing name of an optional broker capability.
+fn unsupported_label(what: &str) -> String {
+    match what {
+        "gtt" => "GTT orders".to_string(),
+        "margin" => "Margin calculation".to_string(),
+        "history" => "Historical data".to_string(),
+        "streaming" => "Live market data".to_string(),
+        "depth" => "Market depth".to_string(),
+        "close_all" => "Closing all positions".to_string(),
+        other => {
+            let mut c = other.chars();
+            match c.next() {
+                Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+                None => "This feature".to_string(),
+            }
         }
     }
 }
@@ -179,5 +210,11 @@ mod tests {
         assert_eq!(e.client_message(), "An unexpected error occurred");
         let e = AppError::Broker("Insufficient funds".into());
         assert_eq!(e.client_message(), "Insufficient funds");
+        let e = AppError::Unsupported("gtt");
+        assert_eq!(
+            e.client_message(),
+            "GTT orders is not available for your broker."
+        );
+        assert_eq!(e.code(), "UNSUPPORTED");
     }
 }

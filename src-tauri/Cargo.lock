@@ -3531,6 +3531,7 @@ dependencies = [
  "http-body-util",
  "keyring",
  "mime_guess",
+ "openalgo-desktop",
  "parking_lot",
  "png 0.17.16",
  "proptest",

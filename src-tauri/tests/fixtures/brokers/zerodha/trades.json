@@ -1,0 +1,48 @@
+{
+  "status": "success",
+  "data": [
+    {
+      "trade_id": "10000001",
+      "order_id": "26100378391337",
+      "exchange": "NFO",
+      "tradingsymbol": "NIFTY26O0622400PE",
+      "instrument_token": 10012674,
+      "product": "NRML",
+      "average_price": 103.6,
+      "quantity": 65,
+      "exchange_order_id": "1100000034567812",
+      "transaction_type": "BUY",
+      "fill_timestamp": "2026-10-03 09:43:52",
+      "order_timestamp": "09:43:52",
+      "exchange_timestamp": "2026-10-03 09:43:52"
+    },
+    {
+      "trade_id": "10000002",
+      "order_id": "26100393945609",
+      "exchange": "MCX",
+      "tradingsymbol": "CRUDEOIL26OCTFUT",
+      "instrument_token": 114310151,
+      "product": "NRML",
+      "average_price": 9008,
+      "quantity": 1,
+      "exchange_order_id": "250000000123456",
+      "transaction_type": "BUY",
+      "fill_timestamp": null,
+      "order_timestamp": "2026-10-03 09:42:37",
+      "exchange_timestamp": "2026-10-03 09:42:37"
+    },
+    {
+      "trade_id": "10000003",
+      "order_id": "26100399990000",
+      "exchange": "MCX",
+      "tradingsymbol": "GOLDPETAL26OCTFUT",
+      "instrument_token": 114314247,
+      "product": "NRML",
+      "average_price": 11250,
+      "quantity": 2,
+      "transaction_type": "SELL",
+      "fill_timestamp": "2026-10-03 10:01:05",
+      "order_timestamp": "2026-10-03 10:01:05"
+    }
+  ]
+}

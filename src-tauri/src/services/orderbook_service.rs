@@ -57,7 +57,9 @@ impl OrderbookService {
             .get(&broker_id)
             .ok_or_else(|| AppError::Broker(format!("Broker '{}' not found", broker_id)))?;
 
-        let orders = broker.get_order_book(auth_token.expose()).await?;
+        let orders = broker
+            .get_order_book(&crate::brokers::types::AuthToken::new(auth_token.expose()))
+            .await?;
 
         Ok(OrderbookResult {
             success: true,
@@ -87,7 +89,12 @@ impl OrderbookService {
             .get(&broker_id)
             .ok_or_else(|| AppError::Broker(format!("Broker '{}' not found", broker_id)))?;
 
-        let trades = broker.get_trade_book(auth_token.expose()).await?;
+        let trades: Vec<Order> = broker
+            .get_trade_book(&crate::brokers::types::AuthToken::new(auth_token.expose()))
+            .await?
+            .into_iter()
+            .map(Order::from)
+            .collect();
 
         Ok(TradebookResult {
             success: true,

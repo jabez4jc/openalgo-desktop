@@ -306,8 +306,6 @@ impl OptionsService {
             disclosed_quantity: None,
             validity: "DAY".to_string(),
             amo: false,
-            broker_symbol: None, // Set by OrderService from symbol cache
-            symbol_token: None,  // Set by OrderService from symbol cache
         };
 
         OrderService::place_order(state, order_request, api_key).await
@@ -357,8 +355,6 @@ impl OptionsService {
                 disclosed_quantity: None,
                 validity: "DAY".to_string(),
                 amo: false,
-                broker_symbol: None, // Set by OrderService from symbol cache
-                symbol_token: None,  // Set by OrderService from symbol cache
             };
 
             match OrderService::place_order(state, order_request, api_key).await {
@@ -436,25 +432,23 @@ impl OptionsService {
         strike: f64,
         expiry_date: Option<&str>,
     ) -> Result<OptionSymbolResult> {
-        // Search for matching symbol in cache
-        // This is a simplified implementation - actual matching depends on broker symbol format
-        for entry in state.symbol_cache.iter() {
-            let s = entry.value();
-            if s.exchange.eq_ignore_ascii_case(exchange)
-                && s.symbol.starts_with(underlying)
-                && s.instrument_type.contains(option_type)
-            {
-                // Check if strike matches (would need to parse from symbol)
-                // For now, return first match as placeholder
-                return Ok(OptionSymbolResult {
-                    symbol: s.symbol.clone(),
-                    token: s.token.clone(),
-                    exchange: s.exchange.clone(),
-                    strike,
-                    option_type: option_type.to_string(),
-                    expiry: expiry_date.unwrap_or("").to_string(),
-                });
-            }
+        // Exact match on the master's underlying, strike, type and expiry.
+        let q = crate::brokers::common::symbols::ContractQuery {
+            exchange,
+            underlying,
+            expiry: expiry_date,
+            strike: Some(strike),
+            instrument_type: Some(option_type),
+        };
+        if let Some(s) = state.symbols.contracts(&q).into_iter().next() {
+            return Ok(OptionSymbolResult {
+                symbol: s.symbol,
+                token: s.token,
+                exchange: s.exchange,
+                strike: s.strike,
+                option_type: option_type.to_string(),
+                expiry: s.expiry,
+            });
         }
 
         Err(AppError::NotFound(format!(

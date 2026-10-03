@@ -42,7 +42,9 @@ impl HoldingsService {
             .get(&broker_id)
             .ok_or_else(|| AppError::Broker(format!("Broker '{}' not found", broker_id)))?;
 
-        let holdings = broker.get_holdings(auth_token.expose()).await?;
+        let holdings = broker
+            .get_holdings(&crate::brokers::types::AuthToken::new(auth_token.expose()))
+            .await?;
 
         Ok(HoldingsResult {
             success: true,
@@ -93,6 +95,7 @@ impl HoldingsService {
                 Holding {
                     symbol: sh.symbol,
                     exchange: sh.exchange,
+                    product: "CNC".to_string(),
                     isin: None,
                     quantity: sh.quantity,
                     t1_quantity: 0,
