@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: OpenAlgo documentation
+    url: https://docs.openalgo.in
+    about: Setup guides, API reference and broker notes.
+  - name: Security issue
+    url: https://github.com/marketcalls/openalgo-desktop/security/advisories/new
+    about: Report vulnerabilities privately, not as a public issue.

@@ -1,0 +1,35 @@
+name: Linux Tauri 2 system dependencies
+description: >
+  Installs the system packages Tauri 2 needs to compile, test and bundle on
+  Ubuntu 22.04 (x86_64 and aarch64). Kept in one place so every Linux job
+  builds against the same WebKitGTK 4.1 / GTK 3 stack.
+
+runs:
+  using: composite
+  steps:
+    - name: Install apt packages
+      shell: bash
+      run: |
+        # Tauri 2 prerequisites (https://v2.tauri.app/start/prerequisites/#linux)
+        # plus what this app's crates link against:
+        #   libdbus-1-dev, pkg-config  keyring (Linux Secret Service)
+        #   libxdo-dev                 menu accelerators
+        #   file, xdg-utils            AppImage bundling
+        # libappindicator3-dev and libayatana-appindicator3-dev conflict on
+        # 22.04; only libappindicator3-dev is installed (what tauri-action
+        # documents).
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          build-essential \
+          curl \
+          wget \
+          file \
+          xdg-utils \
+          pkg-config \
+          patchelf \
+          libssl-dev \
+          libdbus-1-dev \
+          libxdo-dev \
+          libwebkit2gtk-4.1-dev \
+          libappindicator3-dev \
+          librsvg2-dev

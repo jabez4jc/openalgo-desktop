@@ -1,0 +1,205 @@
+name: Security Scan
+
+# Weekly, on demand, and on any PR or push that changes a lockfile, a
+# manifest or this scanning configuration.
+#
+# Gating policy (what fails the job):
+#   cargo-audit   any vulnerability advisory for src-tauri/Cargo.lock that is
+#                 not ignored in .github/deny.toml. Unmaintained / unsound /
+#                 yanked notices are reported in the JSON artifact only.
+#   cargo-deny    advisories, licenses, bans and sources per .github/deny.toml.
+#   npm-audit     production dependencies (--omit=dev) with a HIGH or CRITICAL
+#                 advisory. Moderate and low are reported in the JSON artifact
+#                 and must be triaged, but do not fail. Dev-only tooling (vite,
+#                 vitest, playwright, biome) never ships in the installer.
+#   gitleaks      any secret in the full git history not in the allowlist in
+#                 .github/gitleaks.toml.
+#   trivy         report only (SARIF to Code Scanning); gating is done by the
+#                 language-native auditors above so there is one source of
+#                 truth per ecosystem.
+
+on:
+  schedule:
+    - cron: "0 2 * * 1" # Monday 02:00 UTC, same slot as the web repo
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - package.json
+      - package-lock.json
+      - src-tauri/Cargo.toml
+      - src-tauri/Cargo.lock
+      - .github/deny.toml
+      - .github/gitleaks.toml
+      - .github/workflows/security.yml
+  push:
+    branches: [main]
+    paths:
+      - package.json
+      - package-lock.json
+      - src-tauri/Cargo.toml
+      - src-tauri/Cargo.lock
+      - .github/deny.toml
+      - .github/gitleaks.toml
+      - .github/workflows/security.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_TERM_COLOR: always
+  # Code Scanning uploads need security-events: write, which a PR from a fork
+  # never gets; skip the upload there instead of failing.
+  CAN_UPLOAD_SARIF: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+
+jobs:
+  cargo-audit:
+    name: cargo-audit (RustSec)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      - name: JSON report (all findings, never fails)
+        run: cargo audit --file src-tauri/Cargo.lock --json > cargo-audit.json || true
+      - name: Fail on vulnerabilities (ignores come from .github/deny.toml)
+        run: |
+          ignore_args=()
+          while IFS= read -r id; do
+            ignore_args+=(--ignore "$id")
+          done < <(grep -vE '^[[:space:]]*#' .github/deny.toml | grep -oE 'RUSTSEC-[0-9]{4}-[0-9]{4}' | sort -u)
+          echo "Advisories accepted in deny.toml: $(( ${#ignore_args[@]} / 2 ))"
+          cargo audit --file src-tauri/Cargo.lock "${ignore_args[@]}"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: cargo-audit
+          path: cargo-audit.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+  cargo-deny:
+    name: cargo-deny
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
+      - name: SARIF report (never fails)
+        run: |
+          cargo deny --manifest-path src-tauri/Cargo.toml --config .github/deny.toml --locked \
+            --format sarif check advisories bans licenses sources > cargo-deny.sarif || true
+          if ! jq -e . cargo-deny.sarif > /dev/null 2>&1; then
+            echo "::warning::cargo-deny SARIF missing or invalid; uploading an empty report."
+            # shellcheck disable=SC2016 # literal "$schema" key, not a variable
+            printf '%s\n' '{"$schema":"https://json.schemastore.org/sarif-2.1.0.json","version":"2.1.0","runs":[{"tool":{"driver":{"name":"cargo-deny","rules":[]}},"results":[]}]}' > cargo-deny.sarif
+          fi
+      - name: Upload SARIF
+        if: always() && env.CAN_UPLOAD_SARIF == 'true'
+        continue-on-error: true # Code Scanning may be disabled on the repo
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: cargo-deny.sarif
+          category: cargo-deny
+      - name: Check advisories, bans, licenses, sources
+        run: |
+          cargo deny --manifest-path src-tauri/Cargo.toml --config .github/deny.toml --locked \
+            check advisories bans licenses sources
+
+  npm-audit:
+    name: npm audit (production deps)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+      - name: JSON report (all severities, never fails)
+        run: npm audit --omit=dev --json > npm-audit.json || true
+      - name: Fail on high or critical
+        run: npm audit --omit=dev --audit-level=high
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: npm-audit
+          path: npm-audit.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+  gitleaks:
+    name: gitleaks (full history)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/install-gitleaks
+      - name: Scan full git history
+        id: scan
+        run: |
+          gitleaks git --config .github/gitleaks.toml --redact \
+            --report-format sarif --report-path gitleaks.sarif --exit-code 1 .
+      - name: Upload SARIF
+        if: always() && env.CAN_UPLOAD_SARIF == 'true' && hashFiles('gitleaks.sarif') != ''
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: gitleaks.sarif
+          category: gitleaks
+
+  trivy:
+    name: trivy fs
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v6
+      - name: Trivy filesystem scan (lockfiles and secrets)
+        # Pinned to a commit, not a tag: trivy-action tags were re-pointed
+        # in a 2026 supply-chain incident. Dependabot keeps the pin current.
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret
+          skip-dirs: node_modules,src-tauri/target,dist
+          severity: CRITICAL,HIGH,MEDIUM
+          format: sarif
+          output: trivy.sarif
+          exit-code: "0"
+      - name: Upload SARIF
+        if: always() && env.CAN_UPLOAD_SARIF == 'true' && hashFiles('trivy.sarif') != ''
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy.sarif
+          category: trivy-fs
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: trivy
+          path: trivy.sarif
+          if-no-files-found: ignore
+          retention-days: 30

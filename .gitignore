@@ -21,7 +21,8 @@ build/
 .next/
 out/
 
-# Tauri build output
+# Tauri / Cargo build output (any target dir, incl. CARGO_TARGET_DIR overrides)
+target/
 src-tauri/target/
 src-tauri/gen/
 src-tauri/WixTools/
@@ -31,15 +32,21 @@ src-tauri/*.nsis.log
 # Rust / Cargo
 # ============================================================================
 **/*.rs.bk
-Cargo.lock
+# Cargo.lock IS committed: this is an application, and CI builds with --locked.
+# Coverage / profiling output from cargo-llvm-cov and friends
+*.profraw
+*.profdata
+lcov.info
 
 # ============================================================================
 # Environment & Config
 # ============================================================================
 .env
 .env.*
+*.env
 !.env.example
 *.local
+# The desktop app has no .env; these patterns are defensive only.
 
 # ============================================================================
 # Database Files
@@ -77,6 +84,10 @@ checkpoints.json
 .settings/
 *.code-workspace
 
+# Claude Code local worktrees and settings
+.claude/worktrees/
+.claude/settings.local.json
+
 # ============================================================================
 # OS Generated Files
 # ============================================================================
@@ -97,6 +108,22 @@ coverage/
 *.lcov
 test-results/
 playwright-report/
+blob-report/
+playwright/.cache/
+junit*.xml
+vitest-junit.xml
+
+# Raw captures that may still carry real credentials, account ids or emails.
+# Only scrubbed fixtures (with <APIKEY>, <USER_ID>, <EMAIL> placeholders) are
+# committed under tests/fixtures/; raw recordings stay local.
+*.har
+captures/
+capture-raw/
+scratch/
+scratchpad/
+tests/fixtures/**/raw/
+tests/fixtures/**/*.raw.json
+tests/fixtures/**/*.raw.txt
 
 # ============================================================================
 # TypeScript

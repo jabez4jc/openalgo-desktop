@@ -1,0 +1,77 @@
+# cargo-deny configuration for src-tauri.
+#
+# Lives in .github/ (not the repo root) so CI owns it; every invocation passes
+#   cargo deny --manifest-path src-tauri/Cargo.toml check --config .github/deny.toml
+# Run the same command locally before adding a dependency.
+#
+# RUSTSEC ids listed under [advisories].ignore are also ignored by the
+# cargo-audit job in security.yml (it greps this file), so this is the single
+# place an advisory is accepted. Every ignore needs a reason and a review date.
+
+[graph]
+# Only the platforms we ship. Prunes Android/iOS/wasm-only crates from every
+# check so they cannot fail the build.
+targets = [
+  "x86_64-unknown-linux-gnu",
+  "aarch64-unknown-linux-gnu",
+  "x86_64-pc-windows-msvc",
+  "aarch64-apple-darwin",
+  "x86_64-apple-darwin",
+]
+all-features = false
+
+[advisories]
+# Vulnerability advisories always fail. Unmaintained and unsound notices fail
+# only for crates we depend on directly; transitive ones (for example the gtk-rs
+# GTK3 bindings pulled in by Tauri on Linux) are reported by cargo-audit's JSON
+# artifact instead of breaking the build.
+unmaintained = "workspace"
+unsound = "workspace"
+yanked = "warn"
+ignore = [
+  # { id = "RUSTSEC-0000-0000", reason = "why it does not apply; review by YYYY-MM-DD" },
+]
+
+[licenses]
+# OpenAlgo Desktop is AGPL-3.0. Everything below is AGPL-compatible.
+allow = [
+  "0BSD",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "BSL-1.0",
+  "CC0-1.0",
+  "CDLA-Permissive-2.0",
+  "ISC",
+  "MIT",
+  "MIT-0",
+  "MPL-2.0",
+  "Unicode-3.0",
+  "Unlicense",
+  "Zlib",
+  "AGPL-3.0-only",
+  "AGPL-3.0-or-later",
+]
+confidence-threshold = 0.8
+unused-allowed-license = "allow"
+
+[licenses.private]
+# Our own crate(s) with publish = false are not license-checked.
+ignore = true
+
+[bans]
+# Tauri pulls several majors of windows-sys, syn, bitflags and friends; report
+# duplicates without failing.
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+highlight = "all"
+
+[sources]
+unknown-registry = "deny"
+# A git dependency must be added to allow-git explicitly, with the reason in
+# the PR description.
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
