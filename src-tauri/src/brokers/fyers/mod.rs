@@ -1,480 +1,525 @@
-//! Fyers broker adapter
+//! Fyers API v3 adapter (web `broker/fyers/**`).
+//!
+//! The session token is `app_id:access_token`, sent verbatim in
+//! `Authorization`.
+//!
+//! next wave: history (`/data/history` with resolution map and chunking),
+//! margin (`multiorder/margin`), exit-all via `DELETE /positions`, the HSM
+//! streaming feed (hsm_key from the JWT, `sf|`/`if|`/`dp|` topics), quote
+//! batching beyond 50 symbols, OI on quotes and BSE index renames are not
+//! ported yet; those calls report `Unsupported` rather than answering with
+//! partial data.
 
 #![allow(non_snake_case)]
 
+use crate::brokers::common::de::{f64_lenient, i64_lenient, string_lenient};
+use crate::brokers::common::http;
+use crate::brokers::common::mapping::Exchange;
+use crate::brokers::common::master_contract::format_expiry;
+use crate::brokers::common::symbols::{SymToken, SymbolResolver};
 use crate::brokers::types::*;
 use crate::brokers::{AuthResponse, Broker, BrokerCredentials};
 use crate::error::{AppError, Result};
 use async_trait::async_trait;
-use reqwest::Client;
-use serde::{Deserialize, Deserializer, Serialize};
+use reqwest::Method;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+use std::collections::HashMap;
 
-const BASE_URL: &str = "https://api-t1.fyers.in/api/v3";
+const API_URL: &str = "https://api-t1.fyers.in/api/v3";
+const DATA_URL: &str = "https://api-t1.fyers.in/data";
 
-// ============================================================================
-// Flexible Deserialization Helpers
-// ============================================================================
+const SUPPORTED_EXCHANGES: &[Exchange] = &[
+    Exchange::Nse,
+    Exchange::Bse,
+    Exchange::Nfo,
+    Exchange::Bfo,
+    Exchange::Cds,
+    Exchange::Mcx,
+    Exchange::NseIndex,
+    Exchange::BseIndex,
+];
 
-/// Deserialize a value that could be either a string or an integer
-fn deserialize_string_or_int<'de, D>(deserializer: D) -> std::result::Result<i64, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum StringOrInt {
-        String(String),
-        Int(i64),
-    }
+/// web `BrokerData.timeframe_map` (history itself is next wave).
+const TIMEFRAME_MAP: &[(&str, &str)] = &[
+    ("5s", "5S"),
+    ("10s", "10S"),
+    ("15s", "15S"),
+    ("30s", "30S"),
+    ("45s", "45S"),
+    ("1m", "1"),
+    ("2m", "2"),
+    ("3m", "3"),
+    ("5m", "5"),
+    ("10m", "10"),
+    ("15m", "15"),
+    ("20m", "20"),
+    ("30m", "30"),
+    ("1h", "60"),
+    ("2h", "120"),
+    ("4h", "240"),
+    ("D", "1D"),
+];
 
-    match StringOrInt::deserialize(deserializer)? {
-        StringOrInt::String(s) => s.parse().map_err(serde::de::Error::custom),
-        StringOrInt::Int(i) => Ok(i),
-    }
-}
-
-/// Deserialize an optional value that could be either a string or an integer
-fn deserialize_optional_string_or_int<'de, D>(
-    deserializer: D,
-) -> std::result::Result<Option<i64>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum StringOrInt {
-        String(String),
-        Int(i64),
-        Null,
-    }
-
-    match Option::<StringOrInt>::deserialize(deserializer)? {
-        Some(StringOrInt::String(s)) if s.is_empty() => Ok(None),
-        Some(StringOrInt::String(s)) => s.parse().map(Some).map_err(serde::de::Error::custom),
-        Some(StringOrInt::Int(i)) => Ok(Some(i)),
-        Some(StringOrInt::Null) | None => Ok(None),
-    }
-}
-
-/// Deserialize a value that could be either a string or a float
-fn deserialize_string_or_float<'de, D>(deserializer: D) -> std::result::Result<f64, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum StringOrFloat {
-        String(String),
-        Float(f64),
-        Int(i64),
-    }
-
-    match StringOrFloat::deserialize(deserializer)? {
-        StringOrFloat::String(s) => s.parse().map_err(serde::de::Error::custom),
-        StringOrFloat::Float(f) => Ok(f),
-        StringOrFloat::Int(i) => Ok(i as f64),
-    }
-}
-
-/// Deserialize an optional value that could be either a string or a float
-fn deserialize_optional_string_or_float<'de, D>(
-    deserializer: D,
-) -> std::result::Result<Option<f64>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum StringOrFloat {
-        String(String),
-        Float(f64),
-        Int(i64),
-        Null,
-    }
-
-    match Option::<StringOrFloat>::deserialize(deserializer)? {
-        Some(StringOrFloat::String(s)) if s.is_empty() => Ok(None),
-        Some(StringOrFloat::String(s)) => s.parse().map(Some).map_err(serde::de::Error::custom),
-        Some(StringOrFloat::Float(f)) => Ok(Some(f)),
-        Some(StringOrFloat::Int(i)) => Ok(Some(i as f64)),
-        Some(StringOrFloat::Null) | None => Ok(None),
-    }
-}
-
-// ============================================================================
-// Fyers API Response Types
-// ============================================================================
-
-/// Generic Fyers API response wrapper
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-struct FyersResponse<T> {
-    s: String,
-    #[serde(default)]
-    code: Option<i32>,
-    message: Option<String>,
-    #[serde(flatten)]
-    data: Option<T>,
-}
-
-/// Order book response data
-#[derive(Debug, Deserialize)]
-struct OrderBookData {
-    orderBook: Option<Vec<FyersOrderData>>,
-}
-
-/// Trade book response data
-#[derive(Debug, Deserialize)]
-struct TradeBookData {
-    tradeBook: Option<Vec<FyersTradeData>>,
-}
-
-/// Positions response data
-#[derive(Debug, Deserialize)]
-struct PositionsData {
-    netPositions: Option<Vec<FyersPositionData>>,
-}
-
-/// Holdings response data
-#[derive(Debug, Deserialize)]
-struct HoldingsData {
-    holdings: Option<Vec<FyersHoldingData>>,
-}
-
-/// Funds response data
-#[derive(Debug, Deserialize)]
-struct FundsResponseData {
-    fund_limit: Option<Vec<FundLimitEntry>>,
-}
-
-/// Fyers order data from API
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-struct FyersOrderData {
-    id: Option<String>,
-    symbol: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_optional_string_or_int")]
-    exchange: Option<i64>,
-    #[serde(default, deserialize_with = "deserialize_optional_string_or_int")]
-    segment: Option<i64>,
-    #[serde(default, deserialize_with = "deserialize_optional_string_or_int")]
-    side: Option<i64>,
-    #[serde(
-        rename = "type",
-        default,
-        deserialize_with = "deserialize_optional_string_or_int"
-    )]
-    order_type: Option<i64>,
-    #[serde(default, deserialize_with = "deserialize_optional_string_or_int")]
-    status: Option<i64>,
-    #[serde(default, deserialize_with = "deserialize_optional_string_or_int")]
-    qty: Option<i64>,
-    #[serde(default, deserialize_with = "deserialize_optional_string_or_int")]
-    filledQty: Option<i64>,
-    #[serde(default, deserialize_with = "deserialize_optional_string_or_float")]
-    limitPrice: Option<f64>,
-    #[serde(default, deserialize_with = "deserialize_optional_string_or_float")]
-    stopPrice: Option<f64>,
-    #[serde(default, deserialize_with = "deserialize_optional_string_or_float")]
-    tradedPrice: Option<f64>,
-    productType: Option<String>,
-    orderDateTime: Option<String>,
-    message: Option<String>,
-}
-
-/// Fyers trade data from API
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-struct FyersTradeData {
-    symbol: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_optional_string_or_int")]
-    exchange: Option<i64>,
-    #[serde(default, deserialize_with = "deserialize_optional_string_or_int")]
-    segment: Option<i64>,
-    #[serde(default, deserialize_with = "deserialize_optional_string_or_int")]
-    side: Option<i64>,
-    productType: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_optional_string_or_int")]
-    tradedQty: Option<i64>,
-    #[serde(default, deserialize_with = "deserialize_optional_string_or_float")]
-    tradePrice: Option<f64>,
-    #[serde(default, deserialize_with = "deserialize_optional_string_or_float")]
-    tradeValue: Option<f64>,
-    orderNumber: Option<String>,
-    orderDateTime: Option<String>,
-}
-
-/// Fyers position data from API
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-struct FyersPositionData {
-    symbol: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_optional_string_or_int")]
-    exchange: Option<i64>,
-    #[serde(default, deserialize_with = "deserialize_optional_string_or_int")]
-    segment: Option<i64>,
-    #[serde(default, deserialize_with = "deserialize_optional_string_or_int")]
-    netQty: Option<i64>,
-    #[serde(default, deserialize_with = "deserialize_optional_string_or_float")]
-    netAvg: Option<f64>,
-    #[serde(default, deserialize_with = "deserialize_optional_string_or_float")]
-    ltp: Option<f64>,
-    #[serde(default, deserialize_with = "deserialize_optional_string_or_float")]
-    pl: Option<f64>,
-    #[serde(default, deserialize_with = "deserialize_optional_string_or_float")]
-    realized_profit: Option<f64>,
-    #[serde(default, deserialize_with = "deserialize_optional_string_or_float")]
-    unrealized_profit: Option<f64>,
-    productType: Option<String>,
-}
-
-/// Fyers holding data from API
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-struct FyersHoldingData {
-    symbol: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_optional_string_or_int")]
-    exchange: Option<i64>,
-    #[serde(default, deserialize_with = "deserialize_optional_string_or_int")]
-    segment: Option<i64>,
-    #[serde(default, deserialize_with = "deserialize_optional_string_or_int")]
-    quantity: Option<i64>,
-    #[serde(default, deserialize_with = "deserialize_optional_string_or_float")]
-    costPrice: Option<f64>,
-    #[serde(default, deserialize_with = "deserialize_optional_string_or_float")]
-    ltp: Option<f64>,
-    #[serde(default, deserialize_with = "deserialize_optional_string_or_float")]
-    pl: Option<f64>,
-    holdingType: Option<String>,
-}
-
-/// Fund limit entry from API
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-struct FundLimitEntry {
-    title: Option<String>,
-    #[serde(default, deserialize_with = "deserialize_string_or_float")]
-    equityAmount: f64,
-    #[serde(default, deserialize_with = "deserialize_string_or_float")]
-    commodityAmount: f64,
-}
-
-/// Quote data from Fyers /data/quotes endpoint
-#[derive(Debug, Deserialize)]
-struct QuotesResponse {
-    s: String,
-    d: Option<Vec<QuoteItem>>,
-}
-
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-struct QuoteItem {
-    s: Option<String>,
-    n: Option<String>,
-    v: Option<QuoteValues>,
-}
-
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-struct QuoteValues {
-    #[serde(default, deserialize_with = "deserialize_string_or_float")]
-    bid: f64,
-    #[serde(default, deserialize_with = "deserialize_string_or_float")]
-    ask: f64,
-    #[serde(default, deserialize_with = "deserialize_string_or_float")]
-    open_price: f64,
-    #[serde(default, deserialize_with = "deserialize_string_or_float")]
-    high_price: f64,
-    #[serde(default, deserialize_with = "deserialize_string_or_float")]
-    low_price: f64,
-    #[serde(default, deserialize_with = "deserialize_string_or_float")]
-    lp: f64,
-    #[serde(default, deserialize_with = "deserialize_string_or_float")]
-    prev_close_price: f64,
-    #[serde(default, deserialize_with = "deserialize_string_or_int")]
-    volume: i64,
-    #[serde(default)]
-    ch: Option<f64>,
-    #[serde(default)]
-    chp: Option<f64>,
-}
-
-/// Market depth response from Fyers /data/depth endpoint
-#[derive(Debug, Deserialize)]
-struct DepthResponse {
-    s: String,
-    d: Option<std::collections::HashMap<String, DepthData>>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
-struct DepthData {
-    bids: Option<Vec<FyersDepthLevel>>,
-    #[serde(rename = "ask")]
-    asks: Option<Vec<FyersDepthLevel>>,
-    #[serde(default, deserialize_with = "deserialize_string_or_float")]
-    o: f64,
-    #[serde(default, deserialize_with = "deserialize_string_or_float")]
-    h: f64,
-    #[serde(default, deserialize_with = "deserialize_string_or_float")]
-    l: f64,
-    #[serde(default, deserialize_with = "deserialize_string_or_float")]
-    ltp: f64,
-    #[serde(default, deserialize_with = "deserialize_string_or_float")]
-    c: f64,
-    #[serde(default, deserialize_with = "deserialize_string_or_int")]
-    v: i64,
-    #[serde(default, deserialize_with = "deserialize_string_or_int")]
-    oi: i64,
-    #[serde(default, deserialize_with = "deserialize_string_or_int")]
-    totalbuyqty: i64,
-    #[serde(default, deserialize_with = "deserialize_string_or_int")]
-    totalsellqty: i64,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
-struct FyersDepthLevel {
-    #[serde(default, deserialize_with = "deserialize_string_or_float")]
-    price: f64,
-    #[serde(default, deserialize_with = "deserialize_string_or_int")]
-    volume: i64,
-}
-
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-/// Map Fyers exchange/segment codes to exchange name
-fn get_exchange_name(exchange_code: i64, segment_code: i64) -> String {
-    match (exchange_code, segment_code) {
-        (10, 10) => "NSE".to_string(),
-        (10, 11) => "NFO".to_string(),
-        (10, 12) => "CDS".to_string(),
-        (12, 10) => "BSE".to_string(),
-        (12, 11) => "BFO".to_string(),
-        (11, 20) => "MCX".to_string(),
-        _ => "NSE".to_string(),
-    }
-}
-
-/// Map Fyers status code to order status string
-fn map_order_status(status: i64) -> String {
-    match status {
-        1 => "CANCELLED".to_string(),
-        2 => "COMPLETE".to_string(),
-        4 => "TRIGGER PENDING".to_string(),
-        5 => "REJECTED".to_string(),
-        6 => "OPEN".to_string(),
-        _ => "UNKNOWN".to_string(),
-    }
-}
-
-/// Map Fyers side code to BUY/SELL
-fn map_side(side: i64) -> String {
-    match side {
-        1 => "BUY".to_string(),
-        -1 => "SELL".to_string(),
-        _ => "UNKNOWN".to_string(),
-    }
-}
-
-/// Map Fyers order type code to order type string
-fn map_order_type(order_type: i64) -> String {
-    match order_type {
-        1 => "LIMIT".to_string(),
-        2 => "MARKET".to_string(),
-        3 => "SL-M".to_string(),
-        4 => "SL".to_string(),
-        _ => "MARKET".to_string(),
-    }
-}
-
-/// Map Fyers product type to standard format
-fn map_product_type(product: &str) -> String {
-    match product {
-        "CNC" => "CNC".to_string(),
-        "INTRADAY" => "MIS".to_string(),
-        "MARGIN" => "NRML".to_string(),
-        "CO" => "CO".to_string(),
-        "BO" => "BO".to_string(),
-        _ => product.to_string(),
-    }
-}
-
-/// Map standard product type to Fyers format
-fn map_product_to_fyers(product: &str) -> String {
-    match product {
-        "CNC" => "CNC".to_string(),
-        "MIS" => "INTRADAY".to_string(),
-        "NRML" => "MARGIN".to_string(),
-        "CO" => "CO".to_string(),
-        "BO" => "BO".to_string(),
-        _ => product.to_string(),
-    }
-}
-
-// ============================================================================
-// FyersBroker Implementation
-// ============================================================================
-
-/// Fyers broker implementation
 pub struct FyersBroker {
-    client: Client,
+    http: reqwest::Client,
+    symbols: SymbolResolver,
+}
+
+fn session_expired() -> AppError {
+    AppError::Auth("Your Fyers session has expired. Log in to Fyers again.".into())
+}
+
+/// `sha256("app_id:app_secret")` hex.
+fn app_id_hash(api_key: &str, api_secret: &str) -> String {
+    let mut h = Sha256::new();
+    h.update(format!("{}:{}", api_key, api_secret).as_bytes());
+    hex::encode(h.finalize())
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct Envelope {
+    #[serde(deserialize_with = "string_lenient")]
+    s: String,
+    #[serde(deserialize_with = "i64_lenient")]
+    code: i64,
+    #[serde(deserialize_with = "string_lenient")]
+    message: String,
+    #[serde(deserialize_with = "string_lenient")]
+    id: String,
+    #[serde(flatten)]
+    rest: HashMap<String, Value>,
 }
 
 impl FyersBroker {
-    pub fn new() -> Self {
+    pub fn new(symbols: SymbolResolver) -> Self {
         Self {
-            // Create HTTP client with connection pooling (matching Flask httpx_client)
-            // - pool_idle_timeout: Keep idle connections for 120 seconds
-            // - pool_max_idle_per_host: Max 20 idle connections per host
-            // - timeout: 120 seconds for large historical data requests
-            client: Client::builder()
-                .timeout(std::time::Duration::from_secs(120))
-                .pool_idle_timeout(std::time::Duration::from_secs(120))
-                .pool_max_idle_per_host(20)
-                .build()
-                .expect("Failed to create HTTP client"),
+            http: http::client(),
+            symbols,
         }
     }
 
-    fn get_headers(&self, access_token: Option<&str>) -> reqwest::header::HeaderMap {
-        let mut headers = reqwest::header::HeaderMap::new();
-        headers.insert("Content-Type", "application/json".parse().unwrap());
-
-        if let Some(token) = access_token {
-            // Fyers auth format: api_key:access_token
-            headers.insert("Authorization", token.parse().unwrap());
+    async fn call(
+        &self,
+        method: Method,
+        url: &str,
+        auth: &AuthToken,
+        body: Option<&Value>,
+    ) -> Result<Envelope> {
+        if auth.pair().is_none() {
+            return Err(session_expired());
         }
-
-        headers
+        let mut req = self
+            .http
+            .request(method, url)
+            .header("Authorization", auth.raw())
+            .header("Content-Type", "application/json");
+        if let Some(b) = body {
+            req = req.json(b);
+        }
+        let resp = req.send().await?;
+        let (status, env): (_, Envelope) = http::read_json("fyers", resp).await?;
+        if env.s != "ok" {
+            tracing::warn!(
+                status = status.as_u16(),
+                code = env.code,
+                "Fyers refused the request: {}",
+                env.message
+            );
+            if env.code == -8 || env.code == -15 || env.code == -16 || status.as_u16() == 401 {
+                return Err(session_expired());
+            }
+            return Err(AppError::Broker(if env.message.is_empty() {
+                "Fyers refused the request.".into()
+            } else {
+                env.message
+            }));
+        }
+        Ok(env)
     }
 
-    /// Generate appIdHash for Fyers auth
-    /// Hash is SHA256(api_key:api_secret)
-    fn generate_app_id_hash(api_key: &str, api_secret: &str) -> String {
-        let input = format!("{}:{}", api_key, api_secret);
-        let mut hasher = Sha256::new();
-        hasher.update(input.as_bytes());
-        format!("{:x}", hasher.finalize())
+    fn rows<T: serde::de::DeserializeOwned + Default>(env: &mut Envelope, key: &str) -> Vec<T> {
+        env.rest
+            .remove(key)
+            .and_then(|v| serde_json::from_value::<Option<Vec<T>>>(v).ok().flatten())
+            .unwrap_or_default()
     }
 
-    /// Extract symbol name from Fyers format (e.g., "NSE:RELIANCE-EQ" -> "RELIANCE-EQ")
-    fn extract_symbol_name(fyers_symbol: &str) -> String {
-        if let Some(pos) = fyers_symbol.find(':') {
-            fyers_symbol[pos + 1..].to_string()
-        } else {
-            fyers_symbol.to_string()
-        }
+    fn lookup(&self, key: &QuoteKey) -> Result<SymToken> {
+        self.symbols.by_symbol(&key.exchange, &key.symbol).ok_or_else(|| {
+            AppError::Validation(format!(
+                "Symbol {} was not found on {}. Check the symbol, or download the master contract again from the broker page.",
+                key.symbol, key.exchange
+            ))
+        })
+    }
+
+    /// Fyers `NSE:SBIN-EQ` -> OpenAlgo symbol on the OpenAlgo exchange.
+    fn oa_symbol(&self, fyers_symbol: &str, exchange: &str) -> String {
+        self.symbols
+            .oa_symbol(fyers_symbol, exchange)
+            .unwrap_or_else(|| {
+                tracing::debug!("No OpenAlgo symbol for {}:{}", exchange, fyers_symbol);
+                fyers_symbol
+                    .split_once(':')
+                    .map(|(_, s)| s.to_string())
+                    .unwrap_or_else(|| fyers_symbol.to_string())
+            })
+    }
+
+    async fn depth_raw(&self, auth: &AuthToken, key: &QuoteKey) -> Result<(SymToken, FyersDepth)> {
+        let row = self.lookup(key)?;
+        let url = format!(
+            "{}/depth?symbol={}&ohlcv_flag=1",
+            DATA_URL,
+            urlencoding::encode(row.br_symbol())
+        );
+        let mut env = self.call(Method::GET, &url, auth, None).await?;
+        let d: HashMap<String, FyersDepth> = env
+            .rest
+            .remove("d")
+            .and_then(|v| serde_json::from_value(v).ok())
+            .unwrap_or_default();
+        let depth = d.get(row.br_symbol()).cloned().ok_or_else(|| {
+            AppError::Broker(format!(
+                "Fyers returned no market data for {} {}.",
+                key.exchange, key.symbol
+            ))
+        })?;
+        Ok((row, depth))
     }
 }
 
-impl Default for FyersBroker {
-    fn default() -> Self {
-        Self::new()
+// web mapping: exchange/segment codes, statuses, types, products
+fn exchange_name(exchange: i64, segment: i64) -> &'static str {
+    match (exchange, segment) {
+        (10, 10) => "NSE",
+        (10, 11) => "NFO",
+        (10, 12) => "CDS",
+        (12, 10) => "BSE",
+        (12, 11) => "BFO",
+        (11, 20) => "MCX",
+        _ => "NSE",
     }
+}
+
+fn order_status(code: i64) -> String {
+    match code {
+        1 => "cancelled",
+        2 => "complete",
+        4 => "trigger pending",
+        5 => "rejected",
+        6 => "open",
+        _ => "unknown",
+    }
+    .to_string()
+}
+
+fn side(code: i64) -> String {
+    if code == -1 { "SELL" } else { "BUY" }.to_string()
+}
+
+fn pricetype(code: i64) -> String {
+    match code {
+        1 => "LIMIT",
+        3 => "SL-M",
+        4 => "SL",
+        _ => "MARKET",
+    }
+    .to_string()
+}
+
+fn fyers_type(pt: &str) -> i64 {
+    match pt {
+        "LIMIT" => 1,
+        "SL-M" => 3,
+        "SL" => 4,
+        _ => 2,
+    }
+}
+
+fn oa_product(p: &str) -> String {
+    match p {
+        "INTRADAY" => "MIS".into(),
+        "MARGIN" => "NRML".into(),
+        other => other.to_string(),
+    }
+}
+
+fn fyers_product(p: &str) -> &'static str {
+    match p {
+        "CNC" => "CNC",
+        "NRML" => "MARGIN",
+        _ => "INTRADAY",
+    }
+}
+
+fn clamp(v: i64) -> i32 {
+    v.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct FyersOrder {
+    #[serde(deserialize_with = "string_lenient")]
+    id: String,
+    #[serde(deserialize_with = "string_lenient")]
+    exchOrdId: String,
+    #[serde(deserialize_with = "string_lenient")]
+    symbol: String,
+    #[serde(deserialize_with = "i64_lenient")]
+    exchange: i64,
+    #[serde(deserialize_with = "i64_lenient")]
+    segment: i64,
+    #[serde(deserialize_with = "i64_lenient")]
+    side: i64,
+    #[serde(rename = "type", deserialize_with = "i64_lenient")]
+    kind: i64,
+    #[serde(deserialize_with = "i64_lenient")]
+    status: i64,
+    #[serde(deserialize_with = "i64_lenient")]
+    qty: i64,
+    #[serde(deserialize_with = "i64_lenient")]
+    filledQty: i64,
+    #[serde(deserialize_with = "i64_lenient")]
+    remainingQuantity: i64,
+    #[serde(deserialize_with = "f64_lenient")]
+    limitPrice: f64,
+    #[serde(deserialize_with = "f64_lenient")]
+    stopPrice: f64,
+    #[serde(deserialize_with = "f64_lenient")]
+    tradedPrice: f64,
+    #[serde(deserialize_with = "string_lenient")]
+    productType: String,
+    #[serde(deserialize_with = "string_lenient")]
+    orderValidity: String,
+    #[serde(deserialize_with = "string_lenient")]
+    orderDateTime: String,
+    #[serde(deserialize_with = "string_lenient")]
+    message: String,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct FyersTrade {
+    #[serde(deserialize_with = "string_lenient")]
+    symbol: String,
+    #[serde(deserialize_with = "i64_lenient")]
+    exchange: i64,
+    #[serde(deserialize_with = "i64_lenient")]
+    segment: i64,
+    #[serde(deserialize_with = "i64_lenient")]
+    side: i64,
+    #[serde(deserialize_with = "string_lenient")]
+    productType: String,
+    #[serde(deserialize_with = "i64_lenient")]
+    tradedQty: i64,
+    #[serde(deserialize_with = "f64_lenient")]
+    tradePrice: f64,
+    #[serde(deserialize_with = "f64_lenient")]
+    tradeValue: f64,
+    #[serde(deserialize_with = "string_lenient")]
+    orderNumber: String,
+    #[serde(deserialize_with = "string_lenient")]
+    tradeNumber: String,
+    #[serde(deserialize_with = "string_lenient")]
+    orderDateTime: String,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct FyersPosition {
+    #[serde(deserialize_with = "string_lenient")]
+    symbol: String,
+    #[serde(deserialize_with = "i64_lenient")]
+    exchange: i64,
+    #[serde(deserialize_with = "i64_lenient")]
+    segment: i64,
+    #[serde(deserialize_with = "i64_lenient")]
+    netQty: i64,
+    #[serde(deserialize_with = "f64_lenient")]
+    netAvg: f64,
+    #[serde(deserialize_with = "f64_lenient")]
+    ltp: f64,
+    #[serde(deserialize_with = "f64_lenient")]
+    pl: f64,
+    #[serde(deserialize_with = "f64_lenient")]
+    realized_profit: f64,
+    #[serde(deserialize_with = "f64_lenient")]
+    unrealized_profit: f64,
+    #[serde(deserialize_with = "i64_lenient")]
+    buyQty: i64,
+    #[serde(deserialize_with = "f64_lenient")]
+    buyVal: f64,
+    #[serde(deserialize_with = "i64_lenient")]
+    sellQty: i64,
+    #[serde(deserialize_with = "f64_lenient")]
+    sellVal: f64,
+    #[serde(deserialize_with = "string_lenient")]
+    productType: String,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct FyersHolding {
+    #[serde(deserialize_with = "string_lenient")]
+    symbol: String,
+    #[serde(deserialize_with = "i64_lenient")]
+    exchange: i64,
+    #[serde(deserialize_with = "i64_lenient")]
+    segment: i64,
+    #[serde(deserialize_with = "i64_lenient")]
+    quantity: i64,
+    #[serde(deserialize_with = "f64_lenient")]
+    costPrice: f64,
+    #[serde(deserialize_with = "f64_lenient")]
+    ltp: f64,
+    #[serde(deserialize_with = "f64_lenient")]
+    pl: f64,
+    #[serde(deserialize_with = "string_lenient")]
+    isin: String,
+    #[serde(deserialize_with = "string_lenient")]
+    holdingType: String,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(default)]
+struct FundLimit {
+    #[serde(deserialize_with = "string_lenient")]
+    title: String,
+    #[serde(deserialize_with = "f64_lenient")]
+    equityAmount: f64,
+    #[serde(deserialize_with = "f64_lenient")]
+    commodityAmount: f64,
+}
+
+#[derive(Deserialize, Default, Clone)]
+#[serde(default)]
+struct FyersDepthLevel {
+    #[serde(deserialize_with = "f64_lenient")]
+    price: f64,
+    #[serde(deserialize_with = "i64_lenient")]
+    volume: i64,
+    #[serde(deserialize_with = "i64_lenient")]
+    ord: i64,
+}
+
+#[derive(Deserialize, Default, Clone)]
+#[serde(default)]
+struct FyersDepth {
+    bids: Vec<FyersDepthLevel>,
+    ask: Vec<FyersDepthLevel>,
+    #[serde(deserialize_with = "f64_lenient")]
+    o: f64,
+    #[serde(deserialize_with = "f64_lenient")]
+    h: f64,
+    #[serde(deserialize_with = "f64_lenient")]
+    l: f64,
+    #[serde(deserialize_with = "f64_lenient")]
+    c: f64,
+    #[serde(deserialize_with = "f64_lenient")]
+    ltp: f64,
+    #[serde(deserialize_with = "i64_lenient")]
+    ltq: i64,
+    #[serde(deserialize_with = "i64_lenient")]
+    v: i64,
+    #[serde(deserialize_with = "i64_lenient")]
+    oi: i64,
+    #[serde(deserialize_with = "i64_lenient")]
+    totalbuyqty: i64,
+    #[serde(deserialize_with = "i64_lenient")]
+    totalsellqty: i64,
+}
+
+/// One quote from `/data/depth` (web `get_quotes`, which uses depth for OI).
+fn depth_quote(key: &QuoteKey, d: &FyersDepth) -> Quote {
+    let bid = d.bids.first().cloned().unwrap_or_default();
+    let ask = d.ask.first().cloned().unwrap_or_default();
+    let (change, change_percent) = if d.c > 0.0 {
+        (d.ltp - d.c, (d.ltp - d.c) / d.c * 100.0)
+    } else {
+        (0.0, 0.0)
+    };
+    Quote {
+        symbol: key.symbol.clone(),
+        exchange: key.exchange.clone(),
+        ltp: d.ltp,
+        open: d.o,
+        high: d.h,
+        low: d.l,
+        close: d.c,
+        volume: d.v,
+        bid: bid.price,
+        ask: ask.price,
+        bid_qty: bid.volume,
+        ask_qty: ask.volume,
+        oi: d.oi,
+        change,
+        change_percent,
+        timestamp: String::new(),
+    }
+}
+
+fn depth_book(key: &QuoteKey, d: &FyersDepth) -> MarketDepth {
+    let pad = |side: &[FyersDepthLevel]| -> Vec<DepthLevel> {
+        (0..5)
+            .map(|i| {
+                side.get(i)
+                    .map(|l| DepthLevel {
+                        price: l.price,
+                        quantity: l.volume,
+                        orders: l.ord,
+                    })
+                    .unwrap_or_default()
+            })
+            .collect()
+    };
+    MarketDepth {
+        symbol: key.symbol.clone(),
+        exchange: key.exchange.clone(),
+        bids: pad(&d.bids),
+        asks: pad(&d.ask),
+        ltp: d.ltp,
+        ltq: d.ltq,
+        open: d.o,
+        high: d.h,
+        low: d.l,
+        prev_close: d.c,
+        volume: d.v,
+        oi: d.oi,
+        total_buy_qty: d.totalbuyqty,
+        total_sell_qty: d.totalsellqty,
+    }
+}
+
+fn place_body(o: &ResolvedOrder) -> Value {
+    json!({
+        "symbol": o.brsymbol(),
+        "qty": o.quantity,
+        "type": fyers_type(o.pricetype.as_str()),
+        "side": if o.action.as_str() == "BUY" { 1 } else { -1 },
+        "productType": fyers_product(o.product.as_str()),
+        "limitPrice": o.price,
+        "stopPrice": o.trigger_price,
+        "validity": "DAY",
+        "disclosedQty": o.disclosed_quantity,
+        "offlineOrder": false,
+        "stopLoss": 0,
+        "takeProfit": 0,
+        "orderTag": "openalgo",
+    })
+}
+
+fn modify_body(m: &ResolvedModify) -> Value {
+    json!({
+        "id": m.order_id,
+        "qty": m.quantity,
+        "type": fyers_type(m.pricetype.as_str()),
+        "limitPrice": m.price,
+        "stopPrice": m.trigger_price,
+    })
 }
 
 #[async_trait]
@@ -491,80 +536,78 @@ impl Broker for FyersBroker {
         "/logos/fyers.svg"
     }
 
-    fn requires_totp(&self) -> bool {
-        false // Fyers uses auth_code from OAuth flow
+    fn login_kind(&self) -> LoginKind {
+        LoginKind::Redirect { param: "auth_code" }
+    }
+
+    fn supported_exchanges(&self) -> &'static [Exchange] {
+        SUPPORTED_EXCHANGES
+    }
+
+    fn capabilities(&self) -> Capabilities {
+        Capabilities::default()
+    }
+
+    fn timeframe_map(&self) -> &'static [(&'static str, &'static str)] {
+        TIMEFRAME_MAP
+    }
+
+    fn symbols(&self) -> Option<&SymbolResolver> {
+        Some(&self.symbols)
     }
 
     async fn authenticate(&self, credentials: BrokerCredentials) -> Result<AuthResponse> {
-        let auth_code = credentials
+        let code = credentials
             .auth_code
-            .ok_or_else(|| AppError::Validation("Auth code is required".to_string()))?;
-
-        let api_secret = credentials
+            .or(credentials.request_token)
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| {
+                AppError::Validation(
+                    "Fyers did not return a login code. Start the Fyers login again.".into(),
+                )
+            })?;
+        let secret = credentials
             .api_secret
-            .ok_or_else(|| AppError::Validation("API secret is required".to_string()))?;
-
-        let app_id_hash = Self::generate_app_id_hash(&credentials.api_key, &api_secret);
-
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| {
+                AppError::Validation(
+                    "Your Fyers app secret is missing. Add it on the broker settings page.".into(),
+                )
+            })?;
         #[derive(Serialize)]
-        struct ValidateRequest {
-            grant_type: String,
+        struct Validate<'a> {
+            grant_type: &'a str,
             appIdHash: String,
-            code: String,
+            code: &'a str,
         }
-
-        let request = ValidateRequest {
-            grant_type: "authorization_code".to_string(),
-            appIdHash: app_id_hash,
-            code: auth_code,
-        };
-
-        let response = self
-            .client
-            .post(format!("{}/validate-authcode", BASE_URL))
-            .json(&request)
+        let resp = self
+            .http
+            .post(format!("{}/validate-authcode", API_URL))
+            .header("Accept", "application/json")
+            .json(&Validate {
+                grant_type: "authorization_code",
+                appIdHash: app_id_hash(&credentials.api_key, &secret),
+                code: &code,
+            })
             .send()
             .await?;
-
-        // The body carries the access token: never log it.
-        let response_text = response.text().await?;
-
-        #[derive(Deserialize)]
-        #[allow(dead_code)]
-        struct ValidateResponse {
+        #[derive(Deserialize, Default)]
+        #[serde(default)]
+        struct Validated {
             s: String,
-            code: Option<i32>,
-            message: Option<String>,
-            access_token: Option<String>,
+            message: String,
+            access_token: String,
         }
-
-        let result: ValidateResponse = serde_json::from_str(&response_text).map_err(|e| {
-            tracing::warn!(
-                "Fyers sign-in response could not be read: {:?}",
-                e.classify()
-            );
-            AppError::Auth("Fyers did not accept the sign-in. Try again.".to_string())
-        })?;
-
-        if result.s != "ok" {
-            let error_msg = format!(
-                "Fyers auth failed: status={}, code={:?}, message={:?}",
-                result.s, result.code, result.message
-            );
-            tracing::error!("{}", error_msg);
-            return Err(AppError::Auth(
-                result
-                    .message
-                    .unwrap_or_else(|| "Authentication failed".to_string()),
-            ));
+        let (_, v): (_, Validated) = http::read_json("fyers", resp).await?;
+        if v.s != "ok" || v.access_token.is_empty() {
+            tracing::warn!("Fyers login refused");
+            return Err(AppError::Auth(if v.message.is_empty() {
+                "Fyers did not accept the login. Start the Fyers login again.".into()
+            } else {
+                v.message
+            }));
         }
-
-        let access_token = result
-            .access_token
-            .ok_or_else(|| AppError::Auth("No access token in response".to_string()))?;
-
-        // Extract client_id from api_key (format: APPID-100)
-        let client_id = credentials.client_id.unwrap_or_else(|| {
+        let user_id = credentials.client_id.unwrap_or_else(|| {
             credentials
                 .api_key
                 .split('-')
@@ -572,999 +615,601 @@ impl Broker for FyersBroker {
                 .unwrap_or("")
                 .to_string()
         });
-
-        // Combined auth token format for Fyers: api_key:access_token
-        let combined_token = format!("{}:{}", credentials.api_key, access_token);
-
         Ok(AuthResponse {
-            auth_token: combined_token,
+            auth_token: format!("{}:{}", credentials.api_key, v.access_token),
             feed_token: None,
-            user_id: client_id,
+            user_id,
             user_name: None,
         })
     }
 
-    async fn place_order(&self, auth_token: &str, order: OrderRequest) -> Result<OrderResponse> {
-        #[derive(Serialize)]
-        #[serde(rename_all = "camelCase")]
-        struct FyersOrderRequest {
-            symbol: String,
-            qty: i32,
-            #[serde(rename = "type")]
-            order_type: i32,
-            side: i32,
-            product_type: String,
-            limit_price: f64,
-            stop_price: f64,
-            validity: String,
-            disclosed_qty: i32,
-            offline_order: bool,
-        }
-
-        let side = if order.side == "BUY" { 1 } else { -1 };
-
-        let order_type = match order.order_type.as_str() {
-            "MARKET" => 2,
-            "LIMIT" => 1,
-            "SL" => 4,
-            "SL-M" => 3,
-            _ => 2,
-        };
-
-        let product_type = map_product_to_fyers(&order.product);
-
-        // Use broker_symbol if available (looked up from master contract)
-        // Otherwise fall back to constructing it (may not work for all symbols)
-        let symbol = order.broker_symbol.clone().unwrap_or_else(|| {
-            tracing::warn!(
-                "No broker_symbol provided for {}:{}, constructing manually",
-                order.exchange,
-                order.symbol
-            );
-            format!("{}:{}", order.exchange, order.symbol)
-        });
-
-        tracing::info!("Fyers place_order symbol: {}", symbol);
-
-        let request = FyersOrderRequest {
-            symbol,
-            qty: order.quantity,
-            order_type,
-            side,
-            product_type,
-            limit_price: order.price,
-            stop_price: order.trigger_price.unwrap_or(0.0),
-            validity: order.validity.clone(),
-            disclosed_qty: order.disclosed_quantity.unwrap_or(0),
-            offline_order: order.amo,
-        };
-
-        let response = self
-            .client
-            .post(format!("{}/orders/sync", BASE_URL))
-            .headers(self.get_headers(Some(auth_token)))
-            .json(&request)
-            .send()
+    async fn place_order(&self, auth: &AuthToken, order: &ResolvedOrder) -> Result<OrderResponse> {
+        let env = self
+            .call(
+                Method::POST,
+                &format!("{}/orders/sync", API_URL),
+                auth,
+                Some(&place_body(order)),
+            )
             .await?;
-
-        #[derive(Deserialize)]
-        #[allow(dead_code)]
-        struct OrderResult {
-            s: String,
-            code: Option<i32>,
-            message: Option<String>,
-            id: Option<String>,
+        if env.id.is_empty() {
+            return Err(AppError::Broker("Fyers did not return an order id.".into()));
         }
-
-        let result: OrderResult = response.json().await?;
-
-        if result.s != "ok" {
-            return Err(AppError::Broker(
-                result
-                    .message
-                    .unwrap_or_else(|| "Order placement failed".to_string()),
-            ));
-        }
-
-        let order_id = result
-            .id
-            .ok_or_else(|| AppError::Broker("No order ID in response".to_string()))?;
-
         Ok(OrderResponse {
-            order_id,
-            message: Some("Order placed successfully".to_string()),
+            order_id: env.id,
+            message: None,
         })
     }
 
     async fn modify_order(
         &self,
-        auth_token: &str,
-        order_id: &str,
-        order: ModifyOrderRequest,
+        auth: &AuthToken,
+        order: &ResolvedModify,
     ) -> Result<OrderResponse> {
-        #[derive(Serialize)]
-        struct ModifyRequest {
-            id: String,
-            #[serde(skip_serializing_if = "Option::is_none")]
-            qty: Option<i32>,
-            #[serde(rename = "type", skip_serializing_if = "Option::is_none")]
-            order_type: Option<i32>,
-            #[serde(rename = "limitPrice", skip_serializing_if = "Option::is_none")]
-            limit_price: Option<f64>,
-            #[serde(rename = "stopPrice", skip_serializing_if = "Option::is_none")]
-            stop_price: Option<f64>,
-        }
-
-        let order_type = order.order_type.as_ref().map(|t| match t.as_str() {
-            "MARKET" => 2,
-            "LIMIT" => 1,
-            "SL" => 4,
-            "SL-M" => 3,
-            _ => 2,
-        });
-
-        let request = ModifyRequest {
-            id: order_id.to_string(),
-            qty: order.quantity,
-            order_type,
-            limit_price: order.price,
-            stop_price: order.trigger_price,
-        };
-
-        let response = self
-            .client
-            .patch(format!("{}/orders/sync", BASE_URL))
-            .headers(self.get_headers(Some(auth_token)))
-            .json(&request)
-            .send()
+        let env = self
+            .call(
+                Method::PATCH,
+                &format!("{}/orders/sync", API_URL),
+                auth,
+                Some(&modify_body(order)),
+            )
             .await?;
-
-        #[derive(Deserialize)]
-        struct ModifyResult {
-            s: String,
-            message: Option<String>,
-        }
-
-        let result: ModifyResult = response.json().await?;
-
-        if result.s != "ok" {
-            return Err(AppError::Broker(
-                result
-                    .message
-                    .unwrap_or_else(|| "Order modification failed".to_string()),
-            ));
-        }
-
         Ok(OrderResponse {
-            order_id: order_id.to_string(),
-            message: Some("Order modified successfully".to_string()),
+            order_id: if env.id.is_empty() {
+                order.order_id.clone()
+            } else {
+                env.id
+            },
+            message: None,
         })
     }
 
-    async fn cancel_order(
-        &self,
-        auth_token: &str,
-        order_id: &str,
-        _variety: Option<&str>,
-    ) -> Result<()> {
-        #[derive(Serialize)]
-        struct CancelRequest {
-            id: String,
-        }
-
-        let request = CancelRequest {
-            id: order_id.to_string(),
-        };
-
-        let response = self
-            .client
-            .delete(format!("{}/orders/sync", BASE_URL))
-            .headers(self.get_headers(Some(auth_token)))
-            .json(&request)
-            .send()
+    async fn cancel_order(&self, auth: &AuthToken, order_id: &str) -> Result<OrderResponse> {
+        let env = self
+            .call(
+                Method::DELETE,
+                &format!("{}/orders/sync", API_URL),
+                auth,
+                Some(&json!({"id": order_id})),
+            )
             .await?;
-
-        #[derive(Deserialize)]
-        struct CancelResult {
-            s: String,
-            message: Option<String>,
-        }
-
-        let result: CancelResult = response.json().await?;
-
-        if result.s != "ok" {
-            return Err(AppError::Broker(
-                result
-                    .message
-                    .unwrap_or_else(|| "Order cancellation failed".to_string()),
-            ));
-        }
-
-        Ok(())
+        Ok(OrderResponse {
+            order_id: if env.id.is_empty() {
+                order_id.to_string()
+            } else {
+                env.id
+            },
+            message: None,
+        })
     }
 
-    async fn get_order_book(&self, auth_token: &str) -> Result<Vec<Order>> {
-        let response = self
-            .client
-            .get(format!("{}/orders", BASE_URL))
-            .headers(self.get_headers(Some(auth_token)))
-            .send()
+    async fn get_order_book(&self, auth: &AuthToken) -> Result<Vec<Order>> {
+        let mut env = self
+            .call(Method::GET, &format!("{}/orders", API_URL), auth, None)
             .await?;
-
-        let result: FyersResponse<OrderBookData> = response.json().await?;
-
-        if result.s != "ok" {
-            return Err(AppError::Broker(
-                result
-                    .message
-                    .unwrap_or_else(|| "Failed to fetch order book".to_string()),
-            ));
-        }
-
-        let orders = result.data.and_then(|d| d.orderBook).unwrap_or_default();
-
-        let mapped_orders: Vec<Order> = orders
+        let rows: Vec<FyersOrder> = Self::rows(&mut env, "orderBook");
+        Ok(rows
             .into_iter()
             .map(|o| {
-                let exchange = get_exchange_name(o.exchange.unwrap_or(10), o.segment.unwrap_or(10));
-                let symbol_name = o
-                    .symbol
-                    .as_ref()
-                    .map(|s| Self::extract_symbol_name(s))
-                    .unwrap_or_default();
-
+                let ex = exchange_name(o.exchange, o.segment);
+                let status = order_status(o.status);
                 Order {
-                    order_id: o.id.unwrap_or_default(),
-                    exchange_order_id: None,
-                    symbol: symbol_name,
-                    exchange,
-                    side: map_side(o.side.unwrap_or(1)),
-                    quantity: o.qty.unwrap_or(0) as i32,
-                    filled_quantity: o.filledQty.unwrap_or(0) as i32,
-                    pending_quantity: (o.qty.unwrap_or(0) - o.filledQty.unwrap_or(0)) as i32,
-                    price: o.limitPrice.unwrap_or(0.0),
-                    trigger_price: o.stopPrice.unwrap_or(0.0),
-                    average_price: o.tradedPrice.unwrap_or(0.0),
-                    order_type: map_order_type(o.order_type.unwrap_or(2)),
-                    product: map_product_type(o.productType.as_deref().unwrap_or("INTRADAY")),
-                    status: map_order_status(o.status.unwrap_or(0)),
-                    validity: "DAY".to_string(),
-                    order_timestamp: o.orderDateTime.unwrap_or_default(),
+                    symbol: self.oa_symbol(&o.symbol, ex),
+                    exchange: ex.to_string(),
+                    exchange_order_id: (!o.exchOrdId.is_empty()).then_some(o.exchOrdId),
+                    side: side(o.side),
+                    quantity: clamp(o.qty),
+                    filled_quantity: clamp(o.filledQty),
+                    pending_quantity: clamp(o.remainingQuantity),
+                    price: o.limitPrice,
+                    trigger_price: o.stopPrice,
+                    average_price: o.tradedPrice,
+                    order_type: pricetype(o.kind),
+                    product: oa_product(&o.productType),
+                    rejection_reason: (status == "rejected" && !o.message.is_empty())
+                        .then_some(o.message),
+                    status,
+                    validity: if o.orderValidity.is_empty() {
+                        "DAY".into()
+                    } else {
+                        o.orderValidity
+                    },
+                    order_timestamp: o.orderDateTime,
                     exchange_timestamp: None,
-                    rejection_reason: o.message,
+                    order_id: o.id,
                 }
             })
-            .collect();
-
-        Ok(mapped_orders)
+            .collect())
     }
 
-    async fn get_trade_book(&self, auth_token: &str) -> Result<Vec<Order>> {
-        let response = self
-            .client
-            .get(format!("{}/tradebook", BASE_URL))
-            .headers(self.get_headers(Some(auth_token)))
-            .send()
+    async fn get_trade_book(&self, auth: &AuthToken) -> Result<Vec<Trade>> {
+        let mut env = self
+            .call(Method::GET, &format!("{}/tradebook", API_URL), auth, None)
             .await?;
-
-        let result: FyersResponse<TradeBookData> = response.json().await?;
-
-        if result.s != "ok" {
-            return Err(AppError::Broker(
-                result
-                    .message
-                    .unwrap_or_else(|| "Failed to fetch trade book".to_string()),
-            ));
-        }
-
-        let trades = result.data.and_then(|d| d.tradeBook).unwrap_or_default();
-
-        let mapped_trades: Vec<Order> = trades
+        let rows: Vec<FyersTrade> = Self::rows(&mut env, "tradeBook");
+        Ok(rows
             .into_iter()
             .map(|t| {
-                let exchange = get_exchange_name(t.exchange.unwrap_or(10), t.segment.unwrap_or(10));
-                let symbol_name = t
-                    .symbol
-                    .as_ref()
-                    .map(|s| Self::extract_symbol_name(s))
-                    .unwrap_or_default();
-
-                Order {
-                    order_id: t.orderNumber.clone().unwrap_or_default(),
-                    exchange_order_id: t.orderNumber,
-                    symbol: symbol_name,
-                    exchange,
-                    side: map_side(t.side.unwrap_or(1)),
-                    quantity: t.tradedQty.unwrap_or(0) as i32,
-                    filled_quantity: t.tradedQty.unwrap_or(0) as i32,
-                    pending_quantity: 0,
-                    price: t.tradePrice.unwrap_or(0.0),
-                    trigger_price: 0.0,
-                    average_price: t.tradePrice.unwrap_or(0.0),
-                    order_type: "MARKET".to_string(),
-                    product: map_product_type(t.productType.as_deref().unwrap_or("INTRADAY")),
-                    status: "COMPLETE".to_string(),
-                    validity: "DAY".to_string(),
-                    order_timestamp: t.orderDateTime.unwrap_or_default(),
-                    exchange_timestamp: None,
-                    rejection_reason: None,
+                let ex = exchange_name(t.exchange, t.segment);
+                Trade {
+                    symbol: self.oa_symbol(&t.symbol, ex),
+                    exchange: ex.to_string(),
+                    product: oa_product(&t.productType),
+                    side: side(t.side),
+                    quantity: clamp(t.tradedQty),
+                    average_price: t.tradePrice,
+                    trade_value: t.tradeValue,
+                    order_id: t.orderNumber,
+                    trade_id: t.tradeNumber,
+                    timestamp: t.orderDateTime,
                 }
             })
-            .collect();
-
-        Ok(mapped_trades)
+            .collect())
     }
 
-    async fn get_positions(&self, auth_token: &str) -> Result<Vec<Position>> {
-        let response = self
-            .client
-            .get(format!("{}/positions", BASE_URL))
-            .headers(self.get_headers(Some(auth_token)))
-            .send()
+    async fn get_positions(&self, auth: &AuthToken) -> Result<Vec<Position>> {
+        let mut env = self
+            .call(Method::GET, &format!("{}/positions", API_URL), auth, None)
             .await?;
-
-        let result: FyersResponse<PositionsData> = response.json().await?;
-
-        if result.s != "ok" {
-            return Err(AppError::Broker(
-                result
-                    .message
-                    .unwrap_or_else(|| "Failed to fetch positions".to_string()),
-            ));
-        }
-
-        let positions = result.data.and_then(|d| d.netPositions).unwrap_or_default();
-
-        let mapped_positions: Vec<Position> = positions
+        let rows: Vec<FyersPosition> = Self::rows(&mut env, "netPositions");
+        Ok(rows
             .into_iter()
             .map(|p| {
-                let exchange = get_exchange_name(p.exchange.unwrap_or(10), p.segment.unwrap_or(10));
-                let symbol_name = p
-                    .symbol
-                    .as_ref()
-                    .map(|s| Self::extract_symbol_name(s))
-                    .unwrap_or_default();
-
-                let quantity = p.netQty.unwrap_or(0) as i32;
-                let avg_price = p.netAvg.unwrap_or(0.0);
-                let ltp = p.ltp.unwrap_or(0.0);
-
+                let ex = exchange_name(p.exchange, p.segment);
                 Position {
-                    symbol: symbol_name,
-                    exchange,
-                    product: map_product_type(p.productType.as_deref().unwrap_or("INTRADAY")),
-                    quantity,
+                    symbol: self.oa_symbol(&p.symbol, ex),
+                    exchange: ex.to_string(),
+                    product: oa_product(&p.productType),
+                    quantity: clamp(p.netQty),
                     overnight_quantity: 0,
-                    average_price: avg_price,
-                    ltp,
-                    pnl: p.pl.unwrap_or(0.0),
-                    realized_pnl: p.realized_profit.unwrap_or(0.0),
-                    unrealized_pnl: p.unrealized_profit.unwrap_or(0.0),
-                    buy_quantity: if quantity > 0 { quantity } else { 0 },
-                    buy_value: if quantity > 0 {
-                        quantity as f64 * avg_price
-                    } else {
-                        0.0
-                    },
-                    sell_quantity: if quantity < 0 { quantity.abs() } else { 0 },
-                    sell_value: if quantity < 0 {
-                        quantity.abs() as f64 * avg_price
-                    } else {
-                        0.0
-                    },
+                    average_price: p.netAvg,
+                    ltp: p.ltp,
+                    pnl: p.pl,
+                    realized_pnl: p.realized_profit,
+                    unrealized_pnl: p.unrealized_profit,
+                    buy_quantity: clamp(p.buyQty),
+                    buy_value: p.buyVal,
+                    sell_quantity: clamp(p.sellQty),
+                    sell_value: p.sellVal,
                 }
             })
-            .collect();
-
-        Ok(mapped_positions)
+            .collect())
     }
 
-    async fn get_holdings(&self, auth_token: &str) -> Result<Vec<Holding>> {
-        let response = self
-            .client
-            .get(format!("{}/holdings", BASE_URL))
-            .headers(self.get_headers(Some(auth_token)))
-            .send()
+    async fn get_holdings(&self, auth: &AuthToken) -> Result<Vec<Holding>> {
+        let mut env = self
+            .call(Method::GET, &format!("{}/holdings", API_URL), auth, None)
             .await?;
-
-        let result: FyersResponse<HoldingsData> = response.json().await?;
-
-        if result.s != "ok" {
-            return Err(AppError::Broker(
-                result
-                    .message
-                    .unwrap_or_else(|| "Failed to fetch holdings".to_string()),
-            ));
-        }
-
-        let holdings = result.data.and_then(|d| d.holdings).unwrap_or_default();
-
-        let mapped_holdings: Vec<Holding> = holdings
+        let rows: Vec<FyersHolding> = Self::rows(&mut env, "holdings");
+        Ok(rows
             .into_iter()
             .map(|h| {
-                let exchange = get_exchange_name(h.exchange.unwrap_or(10), h.segment.unwrap_or(10));
-                let symbol_name = h
-                    .symbol
-                    .as_ref()
-                    .map(|s| Self::extract_symbol_name(s))
-                    .unwrap_or_default();
-
-                let quantity = h.quantity.unwrap_or(0) as i32;
-                let avg_price = h.costPrice.unwrap_or(0.0);
-                let ltp = h.ltp.unwrap_or(0.0);
-                let pnl = h.pl.unwrap_or(0.0);
-                let pnl_percentage = if avg_price > 0.0 {
-                    (ltp - avg_price) / avg_price * 100.0
+                let ex = exchange_name(h.exchange, h.segment);
+                let pnl_percentage = if h.costPrice != 0.0 {
+                    (h.ltp - h.costPrice) / h.costPrice * 100.0
                 } else {
                     0.0
                 };
-
                 Holding {
-                    symbol: symbol_name,
-                    exchange,
-                    isin: None,
-                    quantity,
-                    t1_quantity: 0,
-                    average_price: avg_price,
-                    ltp,
-                    close_price: avg_price,
-                    pnl,
+                    symbol: self.oa_symbol(&h.symbol, ex),
+                    exchange: ex.to_string(),
+                    product: "CNC".into(),
+                    isin: (!h.isin.is_empty()).then_some(h.isin),
+                    t1_quantity: if h.holdingType == "T1" {
+                        clamp(h.quantity)
+                    } else {
+                        0
+                    },
+                    quantity: clamp(h.quantity),
+                    average_price: h.costPrice,
+                    ltp: h.ltp,
+                    close_price: 0.0,
+                    pnl: h.pl,
                     pnl_percentage,
-                    current_value: quantity as f64 * ltp,
+                    current_value: h.quantity as f64 * h.ltp,
                 }
             })
-            .collect();
-
-        Ok(mapped_holdings)
+            .collect())
     }
 
-    async fn get_funds(&self, auth_token: &str) -> Result<Funds> {
-        let response = self
-            .client
-            .get(format!("{}/funds", BASE_URL))
-            .headers(self.get_headers(Some(auth_token)))
-            .send()
+    async fn get_funds(&self, auth: &AuthToken) -> Result<Funds> {
+        let mut env = self
+            .call(Method::GET, &format!("{}/funds", API_URL), auth, None)
             .await?;
-
-        let result: FyersResponse<FundsResponseData> = response.json().await?;
-
-        // Fyers funds API returns code: 200 on success
-        let fund_limit = result.data.and_then(|d| d.fund_limit).unwrap_or_default();
-
-        // Process fund limit entries into a map
-        let mut funds_map: std::collections::HashMap<String, (f64, f64)> =
-            std::collections::HashMap::new();
-        for fund in fund_limit {
-            if let Some(title) = fund.title {
-                let key = title.to_lowercase().replace(' ', "_");
-                funds_map.insert(key, (fund.equityAmount, fund.commodityAmount));
-            }
+        if env.code != 200 {
+            return Err(AppError::Broker(
+                "Fyers did not return your funds. Try again.".into(),
+            ));
         }
-
-        // Extract values with defaults
-        let available_balance = funds_map.get("available_balance").unwrap_or(&(0.0, 0.0));
-        let collaterals = funds_map.get("collaterals").unwrap_or(&(0.0, 0.0));
-        let utilized = funds_map.get("utilized_amount").unwrap_or(&(0.0, 0.0));
-        let total_balance = funds_map.get("total_balance").unwrap_or(&(0.0, 0.0));
-
-        let available_cash = available_balance.0 + available_balance.1;
-        let collateral = collaterals.0 + collaterals.1;
-        let used_margin = utilized.0 + utilized.1;
-        let total_margin = total_balance.0 + total_balance.1;
-
-        Ok(Funds {
-            available_cash,
-            used_margin,
-            total_margin,
-            opening_balance: total_margin,
-            payin: 0.0,
+        let limits: Vec<FundLimit> = Self::rows(&mut env, "fund_limit");
+        let get = |k: &str| -> f64 {
+            limits
+                .iter()
+                .find(|f| f.title.to_lowercase().replace(' ', "_") == k)
+                .map(|f| f.equityAmount + f.commodityAmount)
+                .unwrap_or(0.0)
+        };
+        let mut funds = Funds {
+            // web uses Clear Balance: Available Balance already folds in collateral.
+            available_cash: get("clear_balance"),
+            used_margin: get("utilized_amount"),
+            total_margin: get("total_balance"),
+            opening_balance: get("total_balance"),
+            payin: get("receivables"),
             payout: 0.0,
             span: 0.0,
             exposure: 0.0,
-            collateral,
-        })
-    }
-
-    async fn get_quote(
-        &self,
-        auth_token: &str,
-        symbols: Vec<(String, String)>,
-    ) -> Result<Vec<Quote>> {
-        if symbols.is_empty() {
-            return Ok(vec![]);
-        }
-
-        // Build comma-separated symbols list
-        let symbols_str: Vec<String> = symbols
-            .iter()
-            .map(|(ex, sym)| format!("{}:{}", ex, sym))
-            .collect();
-        let symbols_param = symbols_str.join(",");
-        let encoded_symbols = urlencoding::encode(&symbols_param);
-
-        let response = self
-            .client
-            .get(format!(
-                "https://api-t1.fyers.in/data/quotes?symbols={}",
-                encoded_symbols
-            ))
-            .headers(self.get_headers(Some(auth_token)))
-            .send()
-            .await?;
-
-        let result: QuotesResponse = response.json().await?;
-
-        if result.s != "ok" {
-            return Err(AppError::Broker("Failed to fetch quotes".to_string()));
-        }
-
-        let quote_items = result.d.unwrap_or_default();
-        let mut quotes = Vec::new();
-
-        for item in quote_items {
-            if let (Some(name), Some(values)) = (item.n, item.v) {
-                // Extract exchange and symbol from name (format: "NSE:SYMBOL")
-                let (exchange, symbol) = if let Some(pos) = name.find(':') {
-                    (name[..pos].to_string(), name[pos + 1..].to_string())
-                } else {
-                    ("NSE".to_string(), name)
-                };
-
-                quotes.push(Quote {
-                    symbol,
-                    exchange,
-                    ltp: values.lp,
-                    open: values.open_price,
-                    high: values.high_price,
-                    low: values.low_price,
-                    close: values.prev_close_price,
-                    volume: values.volume,
-                    bid: values.bid,
-                    ask: values.ask,
-                    bid_qty: 0,
-                    ask_qty: 0,
-                    oi: 0,
-                    change: values.ch.unwrap_or(0.0),
-                    change_percent: values.chp.unwrap_or(0.0),
-                    timestamp: chrono::Utc::now().format("%Y-%m-%d %H:%M:%S").to_string(),
-                });
+            collateral: get("collaterals"),
+            m2m_unrealized: 0.0,
+            m2m_realized: 0.0,
+            utilised_debits: get("utilized_amount"),
+        };
+        match self.get_positions(auth).await {
+            Ok(ps) => {
+                funds.m2m_realized = ps.iter().map(|p| p.realized_pnl).sum();
+                funds.m2m_unrealized = ps.iter().map(|p| p.unrealized_pnl).sum();
             }
+            Err(e) => tracing::warn!("Fyers position P&L for funds failed: {}", e.code()),
         }
-
-        Ok(quotes)
+        Ok(funds)
     }
 
-    async fn get_market_depth(
-        &self,
-        auth_token: &str,
-        exchange: &str,
-        symbol: &str,
-    ) -> Result<MarketDepth> {
-        let fyers_symbol = format!("{}:{}", exchange, symbol);
-        let encoded_symbol = urlencoding::encode(&fyers_symbol);
-
-        let response = self
-            .client
-            .get(format!(
-                "https://api-t1.fyers.in/data/depth?symbol={}&ohlcv_flag=1",
-                encoded_symbol
-            ))
-            .headers(self.get_headers(Some(auth_token)))
-            .send()
-            .await?;
-
-        let result: DepthResponse = response.json().await?;
-
-        if result.s != "ok" {
-            return Err(AppError::Broker("Failed to fetch market depth".to_string()));
-        }
-
-        let depth_data = result
-            .d
-            .and_then(|d| d.get(&fyers_symbol).cloned())
-            .ok_or_else(|| AppError::Broker("No depth data available".to_string()))?;
-
-        let bids: Vec<DepthLevel> = depth_data
-            .bids
-            .unwrap_or_default()
-            .into_iter()
-            .take(5)
-            .map(|b| DepthLevel {
-                price: b.price,
-                quantity: b.volume as i32,
-                orders: 0,
-            })
-            .collect();
-
-        let asks: Vec<DepthLevel> = depth_data
-            .asks
-            .unwrap_or_default()
-            .into_iter()
-            .take(5)
-            .map(|a| DepthLevel {
-                price: a.price,
-                quantity: a.volume as i32,
-                orders: 0,
-            })
-            .collect();
-
-        // Pad with empty entries if needed
-        let bids = Self::pad_depth_levels(bids, 5);
-        let asks = Self::pad_depth_levels(asks, 5);
-
-        Ok(MarketDepth {
-            symbol: symbol.to_string(),
-            exchange: exchange.to_string(),
-            bids,
-            asks,
-        })
+    async fn get_quote(&self, auth: &AuthToken, key: &QuoteKey) -> Result<Quote> {
+        let (_, d) = self.depth_raw(auth, key).await?;
+        Ok(depth_quote(key, &d))
     }
 
-    async fn download_master_contract(&self, _auth_token: &str) -> Result<Vec<SymbolData>> {
-        // Fyers provides separate CSV files per exchange/segment
-        // Each file has 21 columns and requires different processing
-        let mut all_symbols = Vec::new();
+    async fn get_market_depth(&self, auth: &AuthToken, key: &QuoteKey) -> Result<MarketDepth> {
+        let (_, d) = self.depth_raw(auth, key).await?;
+        Ok(depth_book(key, &d))
+    }
 
-        // Download and process each exchange CSV
-        let csv_urls = [
+    async fn get_history(&self, _auth: &AuthToken, _req: &HistoryRequest) -> Result<Vec<Candle>> {
+        // next wave: /data/history with resolution map and 300/60/25-day chunks.
+        Err(AppError::Unsupported("history"))
+    }
+
+    async fn download_master_contract(&self, _auth: &AuthToken) -> Result<Vec<SymbolData>> {
+        let mut all = Vec::new();
+        for (key, url) in [
             ("NSE_CM", "https://public.fyers.in/sym_details/NSE_CM.csv"),
             ("NSE_FO", "https://public.fyers.in/sym_details/NSE_FO.csv"),
             ("BSE_CM", "https://public.fyers.in/sym_details/BSE_CM.csv"),
             ("BSE_FO", "https://public.fyers.in/sym_details/BSE_FO.csv"),
-            ("NSE_CD", "https://public.fyers.in/sym_details/NSE_CD.csv"),
-            ("MCX_COM", "https://public.fyers.in/sym_details/MCX_COM.csv"),
-        ];
-
-        for (exchange_key, url) in csv_urls {
-            match self.client.get(url).send().await {
-                Ok(response) => {
-                    if let Ok(csv_text) = response.text().await {
-                        let symbols = Self::process_fyers_csv(&csv_text, exchange_key);
-                        tracing::info!("Processed {} symbols from {}", symbols.len(), exchange_key);
-                        all_symbols.extend(symbols);
-                    }
-                }
-                Err(e) => {
-                    tracing::warn!(
-                        "Failed to download Fyers master for {}: {}",
-                        exchange_key,
-                        e
-                    );
-                }
-            }
+        ] {
+            let text = self
+                .http
+                .get(url)
+                .timeout(http::DOWNLOAD_TIMEOUT)
+                .send()
+                .await?
+                .text()
+                .await?;
+            all.extend(master::process_csv(&text, key));
         }
-
-        tracing::info!("Downloaded {} total symbols from Fyers", all_symbols.len());
-        Ok(all_symbols)
+        // CDS and MCX come from the JSON masters: their `qtyMultiplier` is the
+        // real lot (the CSV's "Minimum lot size" is 1 on every row).
+        for (exchange, url) in [
+            (
+                "CDS",
+                "https://public.fyers.in/sym_details/NSE_CD_sym_master.json",
+            ),
+            (
+                "MCX",
+                "https://public.fyers.in/sym_details/MCX_COM_sym_master.json",
+            ),
+        ] {
+            let resp = self
+                .http
+                .get(url)
+                .timeout(http::DOWNLOAD_TIMEOUT)
+                .send()
+                .await?;
+            let (_, map): (_, HashMap<String, master::JsonRow>) =
+                http::read_json("fyers", resp).await?;
+            all.extend(master::process_json(map.into_values(), exchange));
+        }
+        tracing::info!("Fyers master contract parsed: {} instruments", all.len());
+        Ok(all)
     }
 }
 
-impl FyersBroker {
-    /// Process Fyers CSV with proper 21-column parsing matching Flask implementation
-    /// CSV columns: Fytoken, Symbol Details, Exchange Instrument type, Minimum lot size,
-    /// Tick size, ISIN, Trading Session, Last update date, Expiry date, Symbol ticker,
-    /// Exchange, Segment, Scrip code, Underlying symbol, Underlying scrip code, Strike price,
-    /// Option type, Underlying FyToken, Reserved column1, Reserved column2, Reserved column3
-    fn process_fyers_csv(csv_text: &str, exchange_key: &str) -> Vec<SymbolData> {
-        let mut symbols = Vec::new();
+/// Master-contract parsing (web `database/master_contract_db.py`).
+pub mod master {
+    use super::*;
 
-        for line in csv_text.lines() {
-            let fields: Vec<&str> = line.split(',').collect();
-
-            // Fyers CSV has 21 columns
-            if fields.len() < 17 {
-                continue;
-            }
-
-            // Parse the 21 columns
-            let fytoken = fields.first().unwrap_or(&"").trim();
-            let symbol_details = fields.get(1).unwrap_or(&"").trim();
-            let exchange_instrument_type: i32 =
-                fields.get(2).unwrap_or(&"0").trim().parse().unwrap_or(0);
-            let lot_size: i32 = fields.get(3).unwrap_or(&"1").trim().parse().unwrap_or(1);
-            let tick_size: f64 = fields
-                .get(4)
-                .unwrap_or(&"0.05")
-                .trim()
-                .parse()
-                .unwrap_or(0.05);
-            let expiry_timestamp: i64 = fields.get(8).unwrap_or(&"0").trim().parse().unwrap_or(0);
-            let symbol_ticker = fields.get(9).unwrap_or(&"").trim();
-            let underlying_symbol = fields.get(13).unwrap_or(&"").trim();
-            let strike_price: f64 = fields
-                .get(15)
-                .unwrap_or(&"0.0")
-                .trim()
-                .parse()
-                .unwrap_or(0.0);
-            let option_type = fields.get(16).unwrap_or(&"").trim();
-
-            // Skip invalid rows
-            if fytoken.is_empty() || symbol_ticker.is_empty() {
-                continue;
-            }
-
-            // Process based on exchange key
-            let processed = match exchange_key {
-                "NSE_CM" => Self::process_nse_cm_row(
-                    fytoken,
-                    symbol_details,
-                    exchange_instrument_type,
-                    lot_size,
-                    tick_size,
-                    symbol_ticker,
-                    underlying_symbol,
-                ),
-                "BSE_CM" => Self::process_bse_cm_row(
-                    fytoken,
-                    symbol_details,
-                    exchange_instrument_type,
-                    lot_size,
-                    tick_size,
-                    symbol_ticker,
-                    underlying_symbol,
-                ),
-                "NSE_FO" => Self::process_fo_row(
-                    fytoken,
-                    symbol_details,
-                    lot_size,
-                    tick_size,
-                    expiry_timestamp,
-                    symbol_ticker,
-                    strike_price,
-                    option_type,
-                    "NFO",
-                ),
-                "BSE_FO" => Self::process_fo_row(
-                    fytoken,
-                    symbol_details,
-                    lot_size,
-                    tick_size,
-                    expiry_timestamp,
-                    symbol_ticker,
-                    strike_price,
-                    option_type,
-                    "BFO",
-                ),
-                "NSE_CD" => Self::process_fo_row(
-                    fytoken,
-                    symbol_details,
-                    lot_size,
-                    tick_size,
-                    expiry_timestamp,
-                    symbol_ticker,
-                    strike_price,
-                    option_type,
-                    "CDS",
-                ),
-                "MCX_COM" => Self::process_fo_row(
-                    fytoken,
-                    symbol_details,
-                    lot_size,
-                    tick_size,
-                    expiry_timestamp,
-                    symbol_ticker,
-                    strike_price,
-                    option_type,
-                    "MCX",
-                ),
-                _ => None,
-            };
-
-            if let Some(symbol_data) = processed {
-                symbols.push(symbol_data);
-            }
-        }
-
-        symbols
-    }
-
-    /// Process NSE_CM (cash market) row
-    fn process_nse_cm_row(
-        fytoken: &str,
-        symbol_details: &str,
-        exchange_instrument_type: i32,
-        lot_size: i32,
-        tick_size: f64,
-        symbol_ticker: &str,
-        underlying_symbol: &str,
-    ) -> Option<SymbolData> {
-        // Exchange instrument type mapping for NSE_CM:
-        // 0, 9 -> EQ (equities)
-        // 10 -> INDEX
-        // 2 with -GB suffix -> GB (government bonds)
-        let (exchange, instrument_type) = match exchange_instrument_type {
-            0 | 9 => ("NSE", "EQ"),
-            10 => ("NSE_INDEX", "INDEX"),
-            2 if symbol_ticker.ends_with("-GB") => ("NSE", "GB"),
-            _ => return None, // Skip other instrument types
-        };
-
-        Some(SymbolData {
-            exchange: exchange.to_string(),
-            symbol: underlying_symbol.to_string(),
-            token: fytoken.to_string(),
-            name: symbol_details.to_string(),
-            lot_size,
-            tick_size,
-            instrument_type: instrument_type.to_string(),
-            expiry: None,
-            strike: None,
-            option_type: None,
-            brsymbol: Some(symbol_ticker.to_string()),
-            brexchange: Some("NSE".to_string()),
-        })
-    }
-
-    /// Process BSE_CM (cash market) row
-    fn process_bse_cm_row(
-        fytoken: &str,
-        symbol_details: &str,
-        exchange_instrument_type: i32,
-        lot_size: i32,
-        tick_size: f64,
-        symbol_ticker: &str,
-        underlying_symbol: &str,
-    ) -> Option<SymbolData> {
-        // Exchange instrument type mapping for BSE_CM:
-        // 0, 4, 50 -> EQ (equities)
-        // 10 -> INDEX
-        let (exchange, instrument_type) = match exchange_instrument_type {
-            0 | 4 | 50 => ("BSE", "EQ"),
-            10 => ("BSE_INDEX", "INDEX"),
-            _ => return None,
-        };
-
-        Some(SymbolData {
-            exchange: exchange.to_string(),
-            symbol: underlying_symbol.to_string(),
-            token: fytoken.to_string(),
-            name: symbol_details.to_string(),
-            lot_size,
-            tick_size,
-            instrument_type: instrument_type.to_string(),
-            expiry: None,
-            strike: None,
-            option_type: None,
-            brsymbol: Some(symbol_ticker.to_string()),
-            brexchange: Some("BSE".to_string()),
-        })
-    }
-
-    /// Process F&O row (NSE_FO, BSE_FO, NSE_CD, MCX_COM)
-    #[allow(clippy::too_many_arguments)]
-    fn process_fo_row(
-        fytoken: &str,
-        symbol_details: &str,
-        lot_size: i32,
-        tick_size: f64,
-        expiry_timestamp: i64,
-        symbol_ticker: &str,
-        strike_price: f64,
-        option_type: &str,
-        exchange: &str,
-    ) -> Option<SymbolData> {
-        // Convert expiry from Unix timestamp to DD-MMM-YY format
-        let expiry = if expiry_timestamp > 0 {
-            Self::convert_unix_to_expiry(expiry_timestamp)
-        } else {
-            None
-        };
-
-        // Determine instrument type from option_type field
-        // XX -> FUT (futures)
-        // CE -> CE (call option)
-        // PE -> PE (put option)
-        let instrument_type = match option_type {
-            "XX" => "FUT",
-            "CE" => "CE",
-            "PE" => "PE",
-            "" => "FUT", // Default to FUT if empty
-            _ => option_type,
-        };
-
-        // Reformat symbol details to standard format
-        // "NIFTY 24 Apr 25 FUT" -> "NIFTY25APR24FUT"
-        let symbol = Self::reformat_symbol_detail(symbol_details, option_type);
-
-        Some(SymbolData {
-            exchange: exchange.to_string(),
-            symbol,
-            token: fytoken.to_string(),
-            name: symbol_details.to_string(),
-            lot_size,
-            tick_size,
-            instrument_type: instrument_type.to_string(),
-            expiry,
-            strike: if strike_price > 0.0 {
-                Some(strike_price)
-            } else {
-                None
-            },
-            option_type: match option_type {
-                "CE" => Some("CE".to_string()),
-                "PE" => Some("PE".to_string()),
-                _ => None,
-            },
-            brsymbol: Some(symbol_ticker.to_string()),
-            brexchange: Some(exchange.to_string()),
-        })
-    }
-
-    /// Convert Unix timestamp to DD-MMM-YY format (e.g., "24-APR-25")
-    fn convert_unix_to_expiry(timestamp: i64) -> Option<String> {
-        use chrono::{TimeZone, Utc};
-
-        if timestamp <= 0 {
+    /// `"BANKNIFTY 27 Oct 26 FUT"` -> `BANKNIFTY27OCT26FUT` (DDMMMYY, the
+    /// order every other broker uses); options keep the strike and take the
+    /// option type appended by the caller.
+    pub fn reformat_symbol_detail(details: &str) -> Option<String> {
+        let p: Vec<&str> = details.split_whitespace().collect();
+        if p.len() < 5 {
             return None;
         }
-
-        match Utc.timestamp_opt(timestamp, 0) {
-            chrono::LocalResult::Single(dt) => {
-                Some(dt.format("%d-%b-%y").to_string().to_uppercase())
-            }
-            _ => None,
-        }
+        Some(format!(
+            "{}{}{}{}{}",
+            p[0],
+            p[1],
+            p[2].to_uppercase(),
+            p[3],
+            p[4]
+        ))
     }
 
-    /// Reformat symbol details from Fyers format to standard format
-    /// Input: "NIFTY 24 Apr 25 FUT" or "NIFTY 24 Apr 25 25000"
-    /// Output: "NIFTY25APR24FUT" or "NIFTY25APR2425000CE"
-    fn reformat_symbol_detail(symbol_details: &str, option_type: &str) -> String {
-        let parts: Vec<&str> = symbol_details.split_whitespace().collect();
-
-        // Expected format: "NAME DD Mon YY SUFFIX"
-        // e.g., "NIFTY 24 Apr 25 FUT" or "NIFTY 24 Apr 25 25000"
-        if parts.len() >= 5 {
-            let name = parts[0];
-            let day = parts[1];
-            let month = parts[2].to_uppercase();
-            let year = parts[3];
-            let suffix = parts[4];
-
-            // Build the reformatted symbol: NAME + YY + MON + DD + SUFFIX
-            let base = format!("{}{}{}{}{}", name, year, month, day, suffix);
-
-            // Add option type suffix if it's an option
-            match option_type {
-                "CE" => format!("{}CE", base),
-                "PE" => format!("{}PE", base),
-                _ => base, // FUT or XX - no additional suffix
-            }
-        } else if parts.len() >= 4 {
-            // Handle shorter format without explicit suffix
-            let name = parts[0];
-            let day = parts[1];
-            let month = parts[2].to_uppercase();
-            let year = parts[3];
-
-            let base = format!("{}{}{}{}", name, year, month, day);
-
-            match option_type {
-                "CE" => format!("{}CE", base),
-                "PE" => format!("{}PE", base),
-                "XX" => format!("{}FUT", base),
-                _ => base,
-            }
-        } else {
-            // Fallback: return as-is with option suffix
-            match option_type {
-                "CE" => format!("{}CE", symbol_details.replace(' ', "")),
-                "PE" => format!("{}PE", symbol_details.replace(' ', "")),
-                _ => symbol_details.replace(' ', ""),
-            }
+    fn expiry_from_epoch(secs: i64) -> String {
+        if secs <= 0 {
+            return String::new();
         }
+        chrono::DateTime::from_timestamp(secs, 0)
+            .map(|d| format_expiry(d.date_naive()))
+            .unwrap_or_default()
     }
 
-    /// Pad depth levels to ensure we have the required count
-    fn pad_depth_levels(mut entries: Vec<DepthLevel>, count: usize) -> Vec<DepthLevel> {
-        while entries.len() < count {
-            entries.push(DepthLevel {
-                price: 0.0,
-                quantity: 0,
-                orders: 0,
-            });
+    /// One derivative row (CSV or JSON master).
+    #[allow(clippy::too_many_arguments)]
+    fn derivative(
+        token: &str,
+        details: &str,
+        ticker: &str,
+        option_type: &str,
+        expiry_epoch: i64,
+        strike: f64,
+        lot: i64,
+        tick: f64,
+        exchange: &str,
+    ) -> Option<SymToken> {
+        let instrument_type = match option_type {
+            "CE" | "PE" => option_type.to_string(),
+            _ => "FUT".to_string(),
+        };
+        let base = reformat_symbol_detail(details)?;
+        let symbol = match option_type {
+            "CE" | "PE" => format!("{}{}", base, option_type),
+            _ => base,
+        };
+        Some(SymToken {
+            symbol,
+            brsymbol: ticker.to_string(),
+            name: details.to_string(),
+            exchange: exchange.to_string(),
+            brexchange: exchange.to_string(),
+            token: token.to_string(),
+            expiry: expiry_from_epoch(expiry_epoch),
+            strike,
+            lot_size: i32::try_from(lot).unwrap_or(1),
+            instrument_type,
+            tick_size: tick,
+        })
+    }
+
+    /// The 21-column Fyers CSV (no header, no quoted fields).
+    pub fn process_csv(text: &str, key: &str) -> Vec<SymToken> {
+        let mut out = Vec::new();
+        for line in text.lines() {
+            let f: Vec<&str> = line.split(',').map(str::trim).collect();
+            if f.len() < 17 || f[0].is_empty() || f[9].is_empty() {
+                continue;
+            }
+            let itype: i64 = f[2].parse().unwrap_or(-1);
+            let lot: i64 = f[3].parse::<f64>().map(|v| v as i64).unwrap_or(1);
+            let tick: f64 = f[4].parse().unwrap_or(0.05);
+            let expiry: i64 = f[8].parse::<f64>().map(|v| v as i64).unwrap_or(0);
+            let strike: f64 = f[15].parse().unwrap_or(0.0);
+            let row = match key {
+                "NSE_CM" | "BSE_CM" => {
+                    let (eq_types, ex, idx_ex): (&[i64], &str, &str) = if key == "NSE_CM" {
+                        (&[0, 9], "NSE", "NSE_INDEX")
+                    } else {
+                        (&[0, 4, 50], "BSE", "BSE_INDEX")
+                    };
+                    let exchange = if eq_types.contains(&itype)
+                        || (key == "NSE_CM" && itype == 2 && f[9].ends_with("-GB"))
+                    {
+                        ex
+                    } else if itype == 10 {
+                        idx_ex
+                    } else {
+                        continue;
+                    };
+                    let mut symbol = f[13].to_string();
+                    if exchange == "NSE_INDEX" {
+                        symbol = symbol.replace([' ', '-'], "");
+                        if symbol == "NIFTYMID50" {
+                            symbol = "NIFTYMIDCAP50".into();
+                        }
+                    }
+                    // next wave: BSE index rename table (100 -> BSE100, ...).
+                    Some(SymToken {
+                        symbol,
+                        brsymbol: f[9].to_string(),
+                        name: f[1].to_string(),
+                        exchange: exchange.to_string(),
+                        brexchange: ex.to_string(),
+                        token: f[0].to_string(),
+                        expiry: String::new(),
+                        strike,
+                        lot_size: i32::try_from(lot).unwrap_or(1),
+                        instrument_type: "EQ".into(),
+                        tick_size: tick,
+                    })
+                }
+                "NSE_FO" => derivative(f[0], f[1], f[9], f[16], expiry, strike, lot, tick, "NFO"),
+                "BSE_FO" => derivative(f[0], f[1], f[9], f[16], expiry, strike, lot, tick, "BFO"),
+                _ => None,
+            };
+            if let Some(r) = row {
+                out.push(r);
+            }
         }
-        entries
+        out
+    }
+
+    /// A row of `NSE_CD_sym_master.json` / `MCX_COM_sym_master.json`.
+    #[derive(Debug, Deserialize, Default)]
+    #[serde(default)]
+    pub struct JsonRow {
+        #[serde(deserialize_with = "string_lenient")]
+        pub fyToken: String,
+        #[serde(deserialize_with = "string_lenient")]
+        pub symDetails: String,
+        #[serde(deserialize_with = "string_lenient")]
+        pub symTicker: String,
+        #[serde(deserialize_with = "string_lenient")]
+        pub optType: String,
+        #[serde(deserialize_with = "i64_lenient")]
+        pub expiryDate: i64,
+        #[serde(deserialize_with = "f64_lenient")]
+        pub strikePrice: f64,
+        #[serde(deserialize_with = "i64_lenient")]
+        pub qtyMultiplier: i64,
+        #[serde(deserialize_with = "f64_lenient")]
+        pub tickSize: f64,
+    }
+
+    pub fn process_json(rows: impl IntoIterator<Item = JsonRow>, exchange: &str) -> Vec<SymToken> {
+        rows.into_iter()
+            .filter_map(|r| {
+                derivative(
+                    &r.fyToken,
+                    &r.symDetails,
+                    &r.symTicker,
+                    &r.optType,
+                    r.expiryDate,
+                    r.strikePrice,
+                    r.qtyMultiplier.max(1),
+                    r.tickSize,
+                    exchange,
+                )
+            })
+            .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::master::*;
+    use super::*;
+
+    #[test]
+    fn derivative_symbols_are_ddmmmyy() {
+        assert_eq!(
+            reformat_symbol_detail("BANKNIFTY 27 Oct 26 FUT").as_deref(),
+            Some("BANKNIFTY27OCT26FUT")
+        );
+        let csv = "101125102771850,BANKNIFTY 27 Oct 26 71900 CE,14,30,0.05,,0915-1530|1815-1915:,2026-10-03,1793098800,NSE:BANKNIFTY26OCT71900CE,10,11,71850,BANKNIFTY,26009,71900.0,CE,101000000026009,None,None,None\n\
+101125102712345,BANKNIFTY 27 Oct 26 FUT,11,30,0.2,,0915-1530|1815-1915:,2026-10-03,1793098800,NSE:BANKNIFTY26OCTFUT,10,11,62345,BANKNIFTY,26009,-1.0,XX,101000000026009,None,None,None";
+        let rows = process_csv(csv, "NSE_FO");
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].symbol, "BANKNIFTY27OCT2671900CE");
+        assert_eq!(rows[0].instrument_type, "CE");
+        assert_eq!(rows[0].expiry, "27-OCT-26");
+        assert_eq!(rows[0].brsymbol, "NSE:BANKNIFTY26OCT71900CE");
+        assert_eq!(rows[0].lot_size, 30);
+        assert_eq!(rows[1].symbol, "BANKNIFTY27OCT26FUT");
+        assert_eq!(rows[1].instrument_type, "FUT");
+    }
+
+    #[test]
+    fn cds_and_mcx_lots_come_from_qty_multiplier() {
+        let json = r#"{
+          "MCX:CRUDEOIL26OCTFUT": {"fyToken": "1120261019123", "symDetails": "CRUDEOIL 19 Oct 26 FUT", "symTicker": "MCX:CRUDEOIL26OCTFUT", "optType": "XX", "expiryDate": "1792432800", "strikePrice": -1.0, "qtyMultiplier": 100, "tickSize": 1.0},
+          "NSE:USDINR26OCT83.25CE": {"fyToken": "1012261029123", "symDetails": "USDINR 29 Oct 26 83.25 CE", "symTicker": "NSE:USDINR26OCT83.25CE", "optType": "CE", "expiryDate": 1793269800, "strikePrice": 83.25, "qtyMultiplier": 1000.0, "tickSize": 0.0025}
+        }"#;
+        let map: HashMap<String, JsonRow> = serde_json::from_str(json).unwrap();
+        let mut mcx = process_json(
+            map.into_iter()
+                .filter(|(k, _)| k.starts_with("MCX"))
+                .map(|(_, v)| v),
+            "MCX",
+        );
+        let crude = mcx.remove(0);
+        assert_eq!(crude.symbol, "CRUDEOIL19OCT26FUT");
+        assert_eq!(crude.lot_size, 100);
+        let map: HashMap<String, JsonRow> = serde_json::from_str(json).unwrap();
+        let cds = process_json(
+            map.into_iter()
+                .filter(|(k, _)| k.contains("USDINR"))
+                .map(|(_, v)| v),
+            "CDS",
+        );
+        assert_eq!(cds[0].symbol, "USDINR29OCT2683.25CE");
+        assert_eq!(cds[0].lot_size, 1000);
+    }
+
+    #[test]
+    fn nse_index_symbols_are_normalised() {
+        let csv = "101000000026000,NIFTY 50,10,1,0.05,,0915-1530|1815-1915:,2026-10-03,,NSE:NIFTY50-INDEX,10,10,26000,NIFTY 50,26000,-1.0,XX,101000000026000,None,None,None\n\
+101000000026013,NIFTYMID50,10,1,0.05,,0915-1530|1815-1915:,2026-10-03,,NSE:NIFTYMIDCAP50-INDEX,10,10,26013,NIFTYMID50,26013,-1.0,XX,101000000026013,None,None,None\n\
+10100000003045,STATE BANK OF INDIA,0,1,0.05,INE062A01020,0915-1530|1815-1915:,2026-10-03,,NSE:SBIN-EQ,10,10,3045,SBIN,3045,-1.0,XX,10100000003045,None,None,None";
+        let rows = process_csv(csv, "NSE_CM");
+        assert_eq!(rows[0].symbol, "NIFTY50");
+        assert_eq!(rows[0].exchange, "NSE_INDEX");
+        assert_eq!(rows[0].instrument_type, "EQ");
+        assert_eq!(rows[1].symbol, "NIFTYMIDCAP50");
+        assert_eq!(rows[2].symbol, "SBIN");
+        assert_eq!(rows[2].brsymbol, "NSE:SBIN-EQ");
+    }
+
+    #[test]
+    fn books_map_back_to_openalgo_symbols() {
+        let r = SymbolResolver::new();
+        r.load(vec![SymToken {
+            symbol: "SBIN".into(),
+            brsymbol: "NSE:SBIN-EQ".into(),
+            name: "SBIN".into(),
+            exchange: "NSE".into(),
+            brexchange: "NSE".into(),
+            token: "10100000003045".into(),
+            expiry: String::new(),
+            strike: -1.0,
+            lot_size: 1,
+            instrument_type: "EQ".into(),
+            tick_size: 0.05,
+        }]);
+        let b = FyersBroker::new(r.clone());
+        assert_eq!(b.oa_symbol("NSE:SBIN-EQ", "NSE"), "SBIN");
+        assert_eq!(b.oa_symbol("NSE:XYZ-EQ", "NSE"), "XYZ-EQ");
+        assert_eq!(order_status(4), "trigger pending");
+        assert_eq!(exchange_name(11, 20), "MCX");
+        let req = OrderRequest {
+            symbol: "SBIN".into(),
+            exchange: "NSE".into(),
+            side: "SELL".into(),
+            quantity: 2,
+            price: 0.0,
+            order_type: "SL-M".into(),
+            product: "NRML".into(),
+            validity: "IOC".into(),
+            trigger_price: Some(900.0),
+            disclosed_quantity: None,
+            amo: true,
+        };
+        let body = place_body(&ResolvedOrder::resolve(&req, &r).unwrap());
+        assert_eq!(body["symbol"], "NSE:SBIN-EQ");
+        assert_eq!(body["type"], 3);
+        assert_eq!(body["side"], -1);
+        assert_eq!(body["productType"], "MARGIN");
+        assert_eq!(body["validity"], "DAY");
+        assert_eq!(body["offlineOrder"], false);
+        assert_eq!(body["orderTag"], "openalgo");
+    }
+
+    #[test]
+    fn quotes_come_from_depth() {
+        let d: FyersDepth = serde_json::from_str(
+            r#"{"totalbuyqty": 1000, "totalsellqty": 900, "bids": [{"price": 954.0, "volume": 10, "ord": 2}], "ask": [{"price": 954.1, "volume": 5, "ord": 1}], "o": 951, "h": 957.4, "l": 948.2, "c": 950.65, "ltp": 954.1, "ltq": 3, "v": 4823170, "oi": 0}"#,
+        )
+        .unwrap();
+        let k = QuoteKey::new("NSE", "SBIN");
+        let q = depth_quote(&k, &d);
+        assert_eq!((q.bid, q.ask, q.bid_qty, q.ask_qty), (954.0, 954.1, 10, 5));
+        let book = depth_book(&k, &d);
+        assert_eq!(book.bids.len(), 5);
+        assert_eq!(book.bids[0].orders, 2);
+        assert_eq!(book.total_buy_qty, 1000);
+        assert_eq!(
+            app_id_hash("a", "b"),
+            "6783a31eabf68ccc0660f935c0826282bdd2241f3a80a9f2d10d59aea9ebb5d8"
+        );
     }
 }
