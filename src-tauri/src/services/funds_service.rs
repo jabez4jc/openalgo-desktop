@@ -42,7 +42,9 @@ impl FundsService {
             .get(&broker_id)
             .ok_or_else(|| AppError::Broker(format!("Broker '{}' not found", broker_id)))?;
 
-        let funds = broker.get_funds(auth_token.expose()).await?;
+        let funds = broker
+            .get_funds(&crate::brokers::types::AuthToken::new(auth_token.expose()))
+            .await?;
 
         Ok(FundsResult {
             success: true,
@@ -89,6 +91,7 @@ impl FundsService {
             span: 0.0,
             exposure: 0.0,
             collateral: 0.0,
+            ..Default::default()
         };
 
         Ok(FundsResult {

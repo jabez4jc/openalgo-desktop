@@ -309,8 +309,6 @@ pub async fn place_order(
         },
         validity: "DAY".to_string(),
         amo: false,
-        broker_symbol: None, // Set by OrderService from symbol cache
-        symbol_token: None,  // Set by OrderService from symbol cache
     };
 
     // Execute order via service
@@ -433,27 +431,15 @@ pub async fn modify_order(
 
     // Build broker modify order request
     let modify_req = BrokerModifyOrder {
-        quantity: if req.quantity > 0 {
-            Some(req.quantity)
-        } else {
-            None
-        },
-        price: if req.price > 0.0 {
-            Some(req.price)
-        } else {
-            None
-        },
-        order_type: if !req.pricetype.is_empty() {
-            Some(req.pricetype.clone())
-        } else {
-            None
-        },
-        trigger_price: if req.trigger_price > 0.0 {
-            Some(req.trigger_price)
-        } else {
-            None
-        },
-        validity: None,
+        symbol: req.symbol.clone(),
+        exchange: req.exchange.clone(),
+        action: req.action.clone(),
+        product: req.product.clone(),
+        pricetype: req.pricetype.clone(),
+        quantity: req.quantity,
+        price: req.price,
+        trigger_price: req.trigger_price,
+        disclosed_quantity: req.disclosed_quantity,
     };
 
     match OrderService::modify_order(&app_state, &req.orderid, modify_req, Some(&req.apikey)).await
@@ -939,8 +925,6 @@ pub async fn place_basket_order(
             disclosed_quantity: None,
             validity: "DAY".to_string(),
             amo: false,
-            broker_symbol: None, // Set by OrderService from symbol cache
-            symbol_token: None,  // Set by OrderService from symbol cache
         })
         .collect();
 
@@ -1209,8 +1193,8 @@ pub async fn get_depth(
                 .into_iter()
                 .map(|d| DepthLevel {
                     price: d.price,
-                    quantity: d.quantity,
-                    orders: d.orders,
+                    quantity: d.quantity as i32,
+                    orders: d.orders as i32,
                 })
                 .collect();
             let sell: Vec<DepthLevel> = depth_data
@@ -1218,8 +1202,8 @@ pub async fn get_depth(
                 .into_iter()
                 .map(|d| DepthLevel {
                     price: d.price,
-                    quantity: d.quantity,
-                    orders: d.orders,
+                    quantity: d.quantity as i32,
+                    orders: d.orders as i32,
                 })
                 .collect();
             let totalbuyqty = buy.iter().map(|d| d.quantity as i64).sum();

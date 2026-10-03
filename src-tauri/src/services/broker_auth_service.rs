@@ -252,7 +252,9 @@ impl BrokerAuthService {
         // Like the web: a cheap funds call proves the token still works.
         match tokio::time::timeout(
             RESUME_CHECK_TIMEOUT,
-            broker.get_funds(stored.auth_token.expose()),
+            broker.get_funds(&crate::brokers::types::AuthToken::new(
+                stored.auth_token.expose(),
+            )),
         )
         .await
         {

@@ -50,7 +50,9 @@ impl PositionService {
             .get(&broker_id)
             .ok_or_else(|| AppError::Broker(format!("Broker '{}' not found", broker_id)))?;
 
-        let positions = broker.get_positions(auth_token.expose()).await?;
+        let positions = broker
+            .get_positions(&crate::brokers::types::AuthToken::new(auth_token.expose()))
+            .await?;
 
         Ok(PositionResult {
             success: true,
@@ -150,8 +152,6 @@ impl PositionService {
             disclosed_quantity: None,
             validity: "DAY".to_string(),
             amo: false,
-            broker_symbol: None, // Set by OrderService from symbol cache
-            symbol_token: None,  // Set by OrderService from symbol cache
         };
 
         let result =

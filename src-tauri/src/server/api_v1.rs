@@ -119,7 +119,11 @@ pub async fn funds_payload(ctx: &AppState) -> crate::error::Result<(Value, Optio
     let broker = ctx.brokers.get(&session.broker_id).ok_or_else(|| {
         crate::error::AppError::NotFound("Broker-specific module not found".into())
     })?;
-    let f = broker.get_funds(session.auth_token.expose()).await?;
+    let f = broker
+        .get_funds(&crate::brokers::types::AuthToken::new(
+            session.auth_token.expose(),
+        ))
+        .await?;
     Ok((
         json!({
             "availablecash": format!("{:.2}", f.available_cash),
