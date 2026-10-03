@@ -130,6 +130,30 @@ pub fn login_fields(broker: &str) -> &'static [LoginField] {
                 required: false,
             },
         ],
+        // Kotak Neo (web BrokerTOTP.tsx): the stored API key is the UCC and
+        // the secret the Neo access token; the form carries the mobile
+        // number and TOTP (step one) and the MPIN (step two), posted
+        // together as on the web.
+        "kotak" => &[
+            LoginField {
+                name: "mobile",
+                label: "Mobile number",
+                secret: false,
+                required: true,
+            },
+            LoginField {
+                name: "totp",
+                label: "TOTP from the Kotak NEO app",
+                secret: true,
+                required: true,
+            },
+            LoginField {
+                name: "mpin",
+                label: "MPIN",
+                secret: true,
+                required: true,
+            },
+        ],
         _ => &[],
     }
 }
@@ -229,6 +253,18 @@ mod tests {
         assert_eq!(extract_code("dhan", &q(&[("code", "x")])), None);
         assert_eq!(auth_type("kotak"), AuthType::Form);
         assert_eq!(auth_type("dhan_sandbox"), AuthType::Form);
+        // The sandbox signs in with the stored token alone.
+        assert!(login_fields("dhan_sandbox").is_empty());
+        assert!(login_fields("dhan").is_empty());
+    }
+
+    #[test]
+    fn kotak_login_fields_are_mobile_totp_mpin() {
+        let f = login_fields("kotak");
+        let names: Vec<&str> = f.iter().map(|x| x.name).collect();
+        assert_eq!(names, ["mobile", "totp", "mpin"]);
+        assert!(f.iter().all(|x| x.required));
+        assert!(!f[0].secret && f[1].secret && f[2].secret);
     }
 
     #[test]
