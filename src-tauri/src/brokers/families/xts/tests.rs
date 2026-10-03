@@ -817,6 +817,7 @@ fn feed(cfg: &'static XtsConfig) -> XtsFeed {
         cfg,
         reqwest::Client::new(),
         "https://example.invalid".into(),
+        None,
         FeedSource::stored("t", "U"),
     );
     f.insert(sub("SBIN", "NSE", "3045", FeedMode::Ltp));
@@ -927,6 +928,7 @@ fn subscribe_frames_group_by_message_code_and_unsubscribe_forgets() {
         &crate::brokers::fivepaisaxts::CONFIG,
         reqwest::Client::new(),
         "https://example.invalid".into(),
+        None,
         FeedSource::default(),
     );
     let subs = [

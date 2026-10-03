@@ -106,6 +106,8 @@ pub struct XtsUpstream {
     cfg: &'static XtsConfig,
     http: reqwest::Client,
     base_url: String,
+    /// Socket host when it is not the REST host (tests).
+    socket_base: Option<String>,
     source: FeedSource,
     /// Token of the connection just opened, taken by `session()`.
     minted: parking_lot::Mutex<Option<Secret>>,
@@ -178,7 +180,8 @@ impl Upstream for XtsUpstream {
             Ok(s) => s,
             Err(o) => return o,
         };
-        let url = socket_url(self.cfg, &self.base_url, &session.token, &session.user_id);
+        let base = self.socket_base.as_deref().unwrap_or(&self.base_url);
+        let url = socket_url(self.cfg, base, &session.token, &session.user_id);
         let Ok(req) = url.as_str().into_client_request() else {
             tracing::error!(
                 broker = self.cfg.id,
@@ -489,6 +492,7 @@ impl XtsFeed {
         cfg: &'static XtsConfig,
         http: reqwest::Client,
         base_url: String,
+        socket_base: Option<String>,
         source: FeedSource,
     ) -> Self {
         Self {
@@ -497,6 +501,7 @@ impl XtsFeed {
                 cfg,
                 http,
                 base_url,
+                socket_base,
                 source,
                 minted: parking_lot::Mutex::new(None),
             }),

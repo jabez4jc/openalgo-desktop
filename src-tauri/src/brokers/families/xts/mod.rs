@@ -180,6 +180,7 @@ pub struct XtsBroker {
     /// A feed token issued by an "Invalid Token" refresh in this process.
     feed_override: parking_lot::RwLock<Option<Secret>>,
     order_pacer: Pacer,
+    socket_base: Option<String>,
 }
 
 impl XtsBroker {
@@ -201,7 +202,14 @@ impl XtsBroker {
             market_keys: parking_lot::Mutex::new(None),
             feed_override: parking_lot::RwLock::new(None),
             order_pacer: Pacer::per_second(10.0),
+            socket_base: None,
         }
+    }
+
+    /// Open the market-data socket on another host (tests).
+    pub fn with_socket_base(mut self, socket_base: impl Into<String>) -> Self {
+        self.socket_base = Some(socket_base.into().trim_end_matches('/').to_string());
+        self
     }
 
     pub fn config(&self) -> &'static XtsConfig {
@@ -513,6 +521,7 @@ impl Broker for XtsBroker {
             self.cfg,
             self.http.clone(),
             self.base_url.clone(),
+            self.socket_base.clone(),
             self.feed_source(auth),
         )))
     }
