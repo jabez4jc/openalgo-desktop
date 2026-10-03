@@ -10,7 +10,9 @@ rust-version = "1.92"
 
 [lib]
 name = "openalgo_desktop_lib"
-crate-type = ["lib", "cdylib", "staticlib"]
+# Desktop only: the cdylib and staticlib types Tauri adds for mobile targets
+# cost a 600 MB static archive per build and are never used here.
+crate-type = ["lib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
