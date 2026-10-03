@@ -17,6 +17,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { showToast } from '@/utils/toast'
+import BrokerProxyCard from './BrokerProxyCard'
 
 const LOOPBACK = '127.0.0.1'
 const ALL_INTERFACES = '0.0.0.0'
@@ -273,6 +274,7 @@ export default function ServerSettings() {
           )}
         </CardContent>
       </Card>
+      <BrokerProxyCard />
     </div>
   )
 }

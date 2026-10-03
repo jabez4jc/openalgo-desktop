@@ -28,6 +28,7 @@ pub mod apikey_service;
 pub mod auth_service;
 pub mod batch_order_service;
 pub mod broker_auth_service;
+pub mod broker_proxy;
 pub mod chart_test_service;
 pub mod core;
 pub mod error_log;

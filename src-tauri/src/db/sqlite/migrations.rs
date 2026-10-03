@@ -41,6 +41,7 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
     )?;
     run_rust_migration(conn, "061_watchlists", super::watchlist::migrate)?;
     run_rust_migration(conn, "062_alert_log", super::alert_log::migrate)?;
+    run_rust_migration(conn, "063_broker_proxy", m063_broker_proxy)?;
 
     tracing::info!("Database migrations completed");
     Ok(())
@@ -310,6 +311,14 @@ fn m042_broker_credentials_market(conn: &Connection) -> Result<()> {
         "api_secret_market_nonce",
         "TEXT",
     )?;
+    Ok(())
+}
+
+fn m063_broker_proxy(conn: &Connection) -> Result<()> {
+    add_column(conn, "settings", "broker_proxy_url", "TEXT")?;
+    add_column(conn, "settings", "broker_proxy_user", "TEXT")?;
+    add_column(conn, "settings", "broker_proxy_pass_encrypted", "TEXT")?;
+    add_column(conn, "settings", "broker_proxy_pass_nonce", "TEXT")?;
     Ok(())
 }
 

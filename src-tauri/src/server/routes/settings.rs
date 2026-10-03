@@ -187,6 +187,62 @@ pub async fn save_server(State(ctx): Ctx, body: JsonBody) -> Response {
     }
 }
 
+fn proxy_data(v: crate::services::broker_proxy::ProxyView) -> Value {
+    json!({
+        "url": v.url.unwrap_or_default(),
+        "username": v.username.unwrap_or_default(),
+        "has_password": v.has_password,
+    })
+}
+
+/// GET /settings/api/broker-proxy. The password is never returned.
+pub async fn get_broker_proxy(State(ctx): Ctx) -> Response {
+    match ctx
+        .sqlite
+        .conn()
+        .and_then(|c| crate::services::broker_proxy::get(&c))
+    {
+        Ok(v) => ok(json!({"status": "success", "data": proxy_data(v)})),
+        Err(e) => failed(
+            "Reading the broker proxy",
+            e,
+            "The proxy settings could not be loaded. Try again.",
+        ),
+    }
+}
+
+/// POST /settings/api/broker-proxy (json: url, username, password). An empty
+/// url turns the proxy off; a missing password keeps the stored one.
+pub async fn save_broker_proxy(State(ctx): Ctx, body: JsonBody) -> Response {
+    use crate::services::broker_proxy::{get, save, ProxyUpdate};
+    let update = ProxyUpdate {
+        url: body.str("url").unwrap_or_default(),
+        username: body.str("username").unwrap_or_default(),
+        password: body.str("password"),
+    };
+    let res = ctx.sqlite.conn().and_then(|c| {
+        save(&c, &ctx.security, &update)?;
+        get(&c)
+    });
+    match res {
+        Ok(v) => {
+            tracing::info!("Broker proxy settings saved");
+            ok(json!({
+                "status": "success",
+                "message": "Saved. Broker calls will use this proxy after OpenAlgo restarts.",
+                "restart_required": true,
+                "data": proxy_data(v),
+            }))
+        }
+        Err(crate::error::AppError::Validation(m)) => error(StatusCode::BAD_REQUEST, m),
+        Err(e) => failed(
+            "Saving the broker proxy",
+            e,
+            "The proxy settings were not saved. Try again.",
+        ),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

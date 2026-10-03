@@ -24,6 +24,18 @@ pub const POOL_IDLE_TIMEOUT: Duration = Duration::from_secs(90);
 pub const POOL_MAX_IDLE_PER_HOST: usize = 8;
 
 static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+/// Proxy every broker call goes through, set once before the first broker
+/// request. The client is built before the settings are read, so the proxy is
+/// looked up per request rather than at build time. It is never changed once
+/// set: a pooled connection opened direct could otherwise be reused after the
+/// route changed, and an order would leave from the wrong address.
+static PROXY: OnceLock<reqwest::Url> = OnceLock::new();
+
+/// Route broker calls through `url` (credentials in the URL). Takes effect
+/// once; a later call is ignored until the app restarts.
+pub fn set_proxy(url: reqwest::Url) {
+    let _ = PROXY.set(url);
+}
 
 fn build() -> reqwest::Client {
     reqwest::Client::builder()
@@ -33,6 +45,7 @@ fn build() -> reqwest::Client {
         .pool_idle_timeout(POOL_IDLE_TIMEOUT)
         .pool_max_idle_per_host(POOL_MAX_IDLE_PER_HOST)
         .tcp_keepalive(Duration::from_secs(60))
+        .proxy(reqwest::Proxy::custom(|_| PROXY.get().cloned()))
         .user_agent(concat!("openalgo-desktop/", env!("CARGO_PKG_VERSION")))
         .build()
         // Only fails when the TLS backend cannot initialise; fall back to the

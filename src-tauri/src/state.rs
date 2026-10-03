@@ -106,6 +106,9 @@ impl AppState {
         let duckdb = Arc::new(DuckDb::new(&duck_path)?);
         crate::security::fsperm::restrict_db_files(&duck_path)?;
         crate::db::sqlite::data_migrations::run(&sqlite, &security)?;
+        if let Ok(conn) = sqlite.conn() {
+            crate::services::broker_proxy::load(&conn, &security);
+        }
         let config = {
             let conn = sqlite.conn()?;
             ServerConfig::load(&conn)?

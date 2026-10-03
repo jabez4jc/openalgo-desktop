@@ -146,6 +146,18 @@ pub fn table() -> Vec<RouteSpec> {
         // Desktop server settings (the older path is an alias).
         r!(GET, "/settings/api/server", User, settings::get_server),
         r!(POST, "/settings/api/server", User, settings::save_server),
+        r!(
+            GET,
+            "/settings/api/broker-proxy",
+            User,
+            settings::get_broker_proxy
+        ),
+        r!(
+            POST,
+            "/settings/api/broker-proxy",
+            User,
+            settings::save_broker_proxy
+        ),
         r!(GET, "/api/desktop/settings", User, settings::get_server),
         r!(POST, "/api/desktop/settings", User, settings::save_server),
         r!(GET, "/settings/analyze-mode", User, settings::analyze_mode),

@@ -122,6 +122,9 @@ impl AuthService {
         }
         // Now unlocked in password mode: finish any pending re-encryption.
         crate::db::sqlite::data_migrations::run(&state.sqlite, &state.security)?;
+        if let Ok(conn) = state.sqlite.conn() {
+            crate::services::broker_proxy::load(&conn, &state.security);
+        }
         Self::ensure_totp_secret(state, &row)?;
         if row.is_totp_required_for("login") {
             Ok(LoginOutcome::TotpRequired(row.username))
