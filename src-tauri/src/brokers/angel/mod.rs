@@ -2,15 +2,16 @@
 
 #![allow(non_snake_case)]
 
-use crate::brokers::{AuthResponse, Broker, BrokerCredentials};
 use crate::brokers::types::*;
+use crate::brokers::{AuthResponse, Broker, BrokerCredentials};
 use crate::error::{AppError, Result};
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
 const BASE_URL: &str = "https://apiconnect.angelone.in";
-const MASTER_CONTRACT_URL: &str = "https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json";
+const MASTER_CONTRACT_URL: &str =
+    "https://margincalculator.angelbroking.com/OpenAPI_File/files/OpenAPIScripMaster.json";
 
 /// Angel One broker implementation
 pub struct AngelBroker {
@@ -438,7 +439,8 @@ impl Broker for AngelBroker {
         let symbol_token = order.symbol_token.clone().unwrap_or_else(|| {
             tracing::warn!(
                 "No symbol_token provided for {}:{}, using 0",
-                order.exchange, order.symbol
+                order.exchange,
+                order.symbol
             );
             "0".to_string()
         });
@@ -447,17 +449,28 @@ impl Broker for AngelBroker {
         let trading_symbol = order.broker_symbol.clone().unwrap_or_else(|| {
             tracing::warn!(
                 "No broker_symbol provided for {}:{}, using original symbol",
-                order.exchange, order.symbol
+                order.exchange,
+                order.symbol
             );
             order.symbol.clone()
         });
 
-        tracing::info!("Angel place_order: tradingsymbol={}, symboltoken={}", trading_symbol, symbol_token);
+        tracing::info!(
+            "Angel place_order: tradingsymbol={}, symboltoken={}",
+            trading_symbol,
+            symbol_token
+        );
 
         // Map variety based on order type
         let variety = match order.order_type.as_str() {
             "SL" | "SL-M" => "STOPLOSS",
-            _ => if order.amo { "AMO" } else { "NORMAL" },
+            _ => {
+                if order.amo {
+                    "AMO"
+                } else {
+                    "NORMAL"
+                }
+            }
         };
 
         // Map order type to Angel format
@@ -594,7 +607,9 @@ impl Broker for AngelBroker {
         }
 
         let data = result.data;
-        let final_order_id = data.map(|d| d.orderid).unwrap_or_else(|| order_id.to_string());
+        let final_order_id = data
+            .map(|d| d.orderid)
+            .unwrap_or_else(|| order_id.to_string());
 
         Ok(OrderResponse {
             order_id: final_order_id,
@@ -957,7 +972,11 @@ impl Broker for AngelBroker {
                 let ltp = q.ltp.to_f64();
                 let close = q.close.to_f64();
                 let change = ltp - close;
-                let change_percent = if close > 0.0 { (change / close) * 100.0 } else { 0.0 };
+                let change_percent = if close > 0.0 {
+                    (change / close) * 100.0
+                } else {
+                    0.0
+                };
 
                 Quote {
                     symbol: q.tradingSymbol,
@@ -988,7 +1007,9 @@ impl Broker for AngelBroker {
         symbol: &str,
     ) -> Result<MarketDepth> {
         // Use the same quote endpoint with FULL mode for depth
-        let quotes = self.get_quote(auth_token, vec![(symbol.to_string(), exchange.to_string())]).await?;
+        let quotes = self
+            .get_quote(auth_token, vec![(symbol.to_string(), exchange.to_string())])
+            .await?;
 
         if quotes.is_empty() {
             return Ok(MarketDepth {
@@ -1092,17 +1113,13 @@ impl Broker for AngelBroker {
     }
 
     async fn download_master_contract(&self, _auth_token: &str) -> Result<Vec<SymbolData>> {
-        let response = self
-            .client
-            .get(MASTER_CONTRACT_URL)
-            .send()
-            .await?;
+        let response = self.client.get(MASTER_CONTRACT_URL).send().await?;
 
         let symbols: Vec<AngelSymbolData> = response.json().await?;
 
         Ok(symbols
             .into_iter()
-            .map(|s| Self::process_angel_symbol(s))
+            .map(Self::process_angel_symbol)
             .collect())
     }
 }
@@ -1134,7 +1151,10 @@ impl AngelBroker {
 
         // Convert expiry date format: 19MAR2024 -> 19-MAR-24
         let expiry = s.expiry.as_ref().map(|exp| Self::convert_expiry_date(exp));
-        let expiry_nodash = expiry.as_ref().map(|e| e.replace("-", "")).unwrap_or_default();
+        let expiry_nodash = expiry
+            .as_ref()
+            .map(|e| e.replace("-", ""))
+            .unwrap_or_default();
 
         // Exchange mapping for indices (AMXIDX instrument type)
         if instrument_type == "AMXIDX" {
@@ -1156,42 +1176,24 @@ impl AngelBroker {
         // Build proper symbol for derivatives based on exchange and instrument type
         let name = &s.name;
 
-        // CDS Futures
-        if (instrument_type == "FUTCUR" || instrument_type == "FUTIRC") && exchange == "CDS" {
+        // Derivatives whose Angel symbol does not follow the OpenAlgo format
+        // are rebuilt (same rules as the web's master_contract_db.py):
+        // CDS currency and IRC futures, MCX commodity futures, BFO index and
+        // stock futures -> NAME + DDMMMYY + FUT; the matching options ->
+        // NAME + DDMMMYY + STRIKE + CE/PE. NFO symbols already match.
+        let it = instrument_type.as_str();
+        let ex = exchange.as_str();
+        let rebuilt_future = matches!(
+            (it, ex),
+            ("FUTCUR" | "FUTIRC", "CDS") | ("FUTCOM", "MCX") | ("FUTIDX" | "FUTSTK", "BFO")
+        );
+        let rebuilt_option = matches!(
+            (it, ex),
+            ("OPTCUR" | "OPTIRC", "CDS") | ("OPTFUT", "MCX") | ("OPTIDX" | "OPTSTK", "BFO")
+        );
+        if rebuilt_future {
             symbol = format!("{}{}FUT", name, expiry_nodash);
-        }
-        // MCX Futures
-        else if instrument_type == "FUTCOM" && exchange == "MCX" {
-            symbol = format!("{}{}FUT", name, expiry_nodash);
-        }
-        // BFO Index Futures
-        else if instrument_type == "FUTIDX" && exchange == "BFO" {
-            symbol = format!("{}{}FUT", name, expiry_nodash);
-        }
-        // BFO Stock Futures
-        else if instrument_type == "FUTSTK" && exchange == "BFO" {
-            symbol = format!("{}{}FUT", name, expiry_nodash);
-        }
-        // CDS Options
-        else if (instrument_type == "OPTCUR" || instrument_type == "OPTIRC") && exchange == "CDS" {
-            let strike_str = Self::format_strike(strike);
-            let opt_type = if brsymbol.ends_with("CE") { "CE" } else { "PE" };
-            symbol = format!("{}{}{}{}", name, expiry_nodash, strike_str, opt_type);
-        }
-        // MCX Options
-        else if instrument_type == "OPTFUT" && exchange == "MCX" {
-            let strike_str = Self::format_strike(strike);
-            let opt_type = if brsymbol.ends_with("CE") { "CE" } else { "PE" };
-            symbol = format!("{}{}{}{}", name, expiry_nodash, strike_str, opt_type);
-        }
-        // BFO Index Options
-        else if instrument_type == "OPTIDX" && exchange == "BFO" {
-            let strike_str = Self::format_strike(strike);
-            let opt_type = if brsymbol.ends_with("CE") { "CE" } else { "PE" };
-            symbol = format!("{}{}{}{}", name, expiry_nodash, strike_str, opt_type);
-        }
-        // BFO Stock Options
-        else if instrument_type == "OPTSTK" && exchange == "BFO" {
+        } else if rebuilt_option {
             let strike_str = Self::format_strike(strike);
             let opt_type = if brsymbol.ends_with("CE") { "CE" } else { "PE" };
             symbol = format!("{}{}{}{}", name, expiry_nodash, strike_str, opt_type);
@@ -1215,9 +1217,13 @@ impl AngelBroker {
         // FUTIDX, FUTSTK, FUTCOM, FUTCUR, FUTIRC, FUTIRT -> FUT
         instrument_type = match instrument_type.as_str() {
             "OPTIDX" | "OPTSTK" | "OPTFUT" | "OPTCUR" | "OPTIRC" => {
-                if brsymbol.ends_with("CE") { "CE".to_string() }
-                else if brsymbol.ends_with("PE") { "PE".to_string() }
-                else { instrument_type }
+                if brsymbol.ends_with("CE") {
+                    "CE".to_string()
+                } else if brsymbol.ends_with("PE") {
+                    "PE".to_string()
+                } else {
+                    instrument_type
+                }
             }
             "FUTIDX" | "FUTSTK" | "FUTCOM" | "FUTCUR" | "FUTIRC" | "FUTIRT" => "FUT".to_string(),
             _ => instrument_type,
@@ -1246,7 +1252,11 @@ impl AngelBroker {
             // Format: DDMMMYYYY (e.g., 19MAR2024)
             let day = &date_str[0..2];
             let month = &date_str[2..5];
-            let year = if date_str.len() >= 9 { &date_str[7..9] } else { "00" };
+            let year = if date_str.len() >= 9 {
+                &date_str[7..9]
+            } else {
+                "00"
+            };
             format!("{}-{}-{}", day, month.to_uppercase(), year)
         } else {
             date_str.to_uppercase()
@@ -1290,5 +1300,32 @@ impl Default for AngelFundsData {
             exposure: StringOrFloat::None,
             collateral: StringOrFloat::None,
         }
+    }
+}
+
+#[cfg(test)]
+mod symbol_tests {
+    use super::*;
+
+    fn sym(json: &str) -> SymbolData {
+        AngelBroker::process_angel_symbol(serde_json::from_str(json).unwrap())
+    }
+
+    #[test]
+    fn bfo_and_mcx_derivatives_are_rebuilt_nfo_kept() {
+        let f = sym(
+            r#"{"token":"1","symbol":"SENSEX25OCTFUT","name":"SENSEX","exch_seg":"BFO","instrumenttype":"FUTIDX","lotsize":"20","tick_size":"5","expiry":"30OCT2025","strike":"-1"}"#,
+        );
+        assert_eq!(f.symbol, "SENSEX30OCT25FUT");
+        assert_eq!(f.instrument_type, "FUT");
+        let o = sym(
+            r#"{"token":"2","symbol":"CRUDEOIL25NOV5000CE","name":"CRUDEOIL","exch_seg":"MCX","instrumenttype":"OPTFUT","lotsize":"100","tick_size":"10","expiry":"17NOV2025","strike":"500000"}"#,
+        );
+        assert_eq!(o.symbol, "CRUDEOIL17NOV255000CE");
+        assert_eq!(o.instrument_type, "CE");
+        let n = sym(
+            r#"{"token":"3","symbol":"NIFTY30OCT2525000CE","name":"NIFTY","exch_seg":"NFO","instrumenttype":"OPTIDX","lotsize":"75","tick_size":"5","expiry":"30OCT2025","strike":"2500000"}"#,
+        );
+        assert_eq!(n.symbol, "NIFTY30OCT2525000CE");
     }
 }

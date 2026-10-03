@@ -7,25 +7,23 @@
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:5173",
     "beforeBuildCommand": "npm run build",
-    "frontendDist": "../dist"
+    "frontendDist": "bootstrap"
   },
   "app": {
-    "withGlobalTauri": true,
-    "windows": [
-      {
-        "title": "OpenAlgo Desktop",
-        "width": 1400,
-        "height": 900,
-        "minWidth": 1024,
-        "minHeight": 768,
-        "resizable": true,
-        "fullscreen": false,
-        "center": true
-      }
-    ],
+    "withGlobalTauri": false,
+    "windows": [],
     "security": {
-      "csp": null,
-      "capabilities": ["default"]
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self'",
+        "style-src": "'self'",
+        "img-src": "'self' data:",
+        "connect-src": "ipc: http://ipc.localhost",
+        "frame-ancestors": "'none'",
+        "object-src": "'none'",
+        "base-uri": "'self'"
+      },
+      "capabilities": ["default", "remote-app"]
     }
   },
   "bundle": {
@@ -42,7 +40,7 @@
     "category": "Finance",
     "shortDescription": "Open Source Algorithmic Trading Platform",
     "longDescription": "OpenAlgo Desktop is an open-source algorithmic trading platform that allows you to connect with multiple Indian brokers and execute trades via TradingView webhooks and APIs.",
-    "copyright": "Copyright © 2024 OpenAlgo",
+    "copyright": "Copyright 2024 OpenAlgo",
     "macOS": {
       "entitlements": null,
       "exceptionDomain": "",
@@ -74,7 +72,7 @@
   },
   "plugins": {
     "shell": {
-      "open": true
+      "open": "^https?://"
     }
   }
 }

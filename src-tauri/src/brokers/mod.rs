@@ -1,9 +1,12 @@
 //! Broker adapters module
 
-pub mod types;
 pub mod angel;
-pub mod zerodha;
+pub mod catalog;
 pub mod fyers;
+#[cfg(test)]
+pub mod mock;
+pub mod types;
+pub mod zerodha;
 
 use crate::error::Result;
 use async_trait::async_trait;
@@ -82,8 +85,8 @@ pub trait Broker: Send + Sync {
     async fn download_master_contract(&self, auth_token: &str) -> Result<Vec<SymbolData>>;
 }
 
-/// Broker credentials for authentication
-#[derive(Debug, Clone, serde::Deserialize)]
+/// Broker credentials for authentication. `Debug` is redacted.
+#[derive(Clone, Default, serde::Deserialize)]
 pub struct BrokerCredentials {
     pub api_key: String,
     pub api_secret: Option<String>,
@@ -94,13 +97,30 @@ pub struct BrokerCredentials {
     pub auth_code: Option<String>,
 }
 
+impl std::fmt::Debug for BrokerCredentials {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("BrokerCredentials")
+            .field("api_key", &"[REDACTED]")
+            .field("client_id", &self.client_id.as_ref().map(|_| "[set]"))
+            .finish_non_exhaustive()
+    }
+}
+
 /// Authentication response from broker
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct AuthResponse {
     pub auth_token: String,
     pub feed_token: Option<String>,
     pub user_id: String,
     pub user_name: Option<String>,
+}
+
+impl std::fmt::Debug for AuthResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AuthResponse")
+            .field("user_id", &self.user_id)
+            .finish_non_exhaustive()
+    }
 }
 
 /// Broker registry for managing multiple brokers
@@ -115,10 +135,30 @@ impl BrokerRegistry {
 
         // Register brokers
         brokers.insert("angel".to_string(), Arc::new(angel::AngelBroker::new()));
-        brokers.insert("zerodha".to_string(), Arc::new(zerodha::ZerodhaBroker::new()));
+        brokers.insert(
+            "zerodha".to_string(),
+            Arc::new(zerodha::ZerodhaBroker::new()),
+        );
         brokers.insert("fyers".to_string(), Arc::new(fyers::FyersBroker::new()));
 
         Self { brokers }
+    }
+
+    /// Registry with exactly these adapters (tests use a mock broker).
+    pub fn with(brokers: Vec<Arc<dyn Broker>>) -> Self {
+        Self {
+            brokers: brokers
+                .into_iter()
+                .map(|b| (b.id().to_string(), b))
+                .collect(),
+        }
+    }
+
+    /// IDs of the adapters compiled into this build.
+    pub fn ids(&self) -> Vec<String> {
+        let mut v: Vec<String> = self.brokers.keys().cloned().collect();
+        v.sort();
+        v
     }
 
     /// Get broker by ID

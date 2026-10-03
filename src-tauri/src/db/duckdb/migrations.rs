@@ -7,12 +7,14 @@ use duckdb::Connection;
 pub fn run_migrations(conn: &Connection) -> Result<()> {
     // Check if migrations table exists with old schema (has 'id' column)
     // If so, drop and recreate with new schema
-    let has_old_schema: bool = conn.query_row(
-        "SELECT COUNT(*) > 0 FROM information_schema.columns
+    let has_old_schema: bool = conn
+        .query_row(
+            "SELECT COUNT(*) > 0 FROM information_schema.columns
          WHERE table_name = 'migrations' AND column_name = 'id'",
-        [],
-        |row| row.get(0),
-    ).unwrap_or(false);
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(false);
 
     if has_old_schema {
         tracing::info!("Migrating DuckDB migrations table to new schema");

@@ -13,24 +13,21 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::Cursor;
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter};
-use tokio::sync::mpsc;
+use tokio::sync::{broadcast, mpsc};
+use tokio::task::JoinHandle;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{debug, error, info, warn};
 
 /// Subscription mode for market data
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, Default,
+)]
 pub enum SubscriptionMode {
-    Ltp = 1,      // Last traded price only
-    Quote = 2,    // LTP + OHLC + volume
+    Ltp = 1, // Last traded price only
+    #[default]
+    Quote = 2, // LTP + OHLC + volume
     SnapQuote = 3, // Quote + best 5 bid/ask (Angel)
-    Full = 4,     // Full market depth
-}
-
-impl Default for SubscriptionMode {
-    fn default() -> Self {
-        Self::Quote
-    }
+    Full = 4, // Full market depth
 }
 
 /// Market tick data emitted to frontend
@@ -120,12 +117,19 @@ pub struct SubscriptionRequest {
     pub mode: SubscriptionMode,
 }
 
+/// Capacity of the tick fan-out channel.
+pub const TICK_CHANNEL_CAP: usize = 4096;
+
 /// Token to symbol mapping for reverse lookup
 type TokenMap = Arc<RwLock<HashMap<String, (String, String)>>>; // token -> (symbol, exchange)
 
 /// WebSocket manager for handling market data streams
 pub struct WebSocketManager {
-    app_handle: AppHandle,
+    /// Bounded tick fan-out for the (next wave) feed server. Slow receivers
+    /// see `Lagged` and skip ahead; nothing grows.
+    ticks: broadcast::Sender<MarketTick>,
+    /// The one reader task; aborted on disconnect and before reconnecting.
+    task: parking_lot::Mutex<Option<JoinHandle<()>>>,
     state: RwLock<ConnectionState>,
     subscriptions: RwLock<HashMap<String, SubscriptionMode>>,
     sender: RwLock<Option<mpsc::Sender<WebSocketCommand>>>,
@@ -133,11 +137,19 @@ pub struct WebSocketManager {
     broker_id: RwLock<Option<String>>,
 }
 
+impl Default for WebSocketManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl WebSocketManager {
     /// Create new WebSocket manager
-    pub fn new(app_handle: AppHandle) -> Self {
+    pub fn new() -> Self {
+        let (ticks, _) = broadcast::channel(TICK_CHANNEL_CAP);
         Self {
-            app_handle,
+            ticks,
+            task: parking_lot::Mutex::new(None),
             state: RwLock::new(ConnectionState::Disconnected),
             subscriptions: RwLock::new(HashMap::new()),
             sender: RwLock::new(None),
@@ -218,15 +230,16 @@ impl WebSocketManager {
         *self.sender.write() = Some(tx);
         *self.state.write() = ConnectionState::Connected;
 
-        let app_handle = self.app_handle.clone();
+        let tick_tx = self.ticks.clone();
         let broker = broker_id.to_string();
         let token_map = self.token_map.clone();
 
         info!("{} WebSocket connected", broker_id);
 
         // Spawn WebSocket handler task
-        tokio::spawn(async move {
-            let mut heartbeat_interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
+        let handle = tokio::spawn(async move {
+            let mut heartbeat_interval =
+                tokio::time::interval(tokio::time::Duration::from_secs(30));
 
             loop {
                 tokio::select! {
@@ -237,9 +250,8 @@ impl WebSocketManager {
                                 // Parse binary data based on broker protocol
                                 let ticks = parse_broker_ticks(&broker, &data, &token_map);
                                 for tick in ticks {
-                                    if let Err(e) = app_handle.emit("market_tick", &tick) {
-                                        warn!("Failed to emit tick: {}", e);
-                                    }
+                                    // No receiver yet is normal; ignore.
+                                    let _ = tick_tx.send(tick);
                                 }
                             }
                             Some(Ok(Message::Text(text))) => {
@@ -255,12 +267,10 @@ impl WebSocketManager {
                             }
                             Some(Ok(Message::Close(_))) => {
                                 info!("WebSocket closed by server");
-                                let _ = app_handle.emit("websocket_disconnected", &broker);
                                 break;
                             }
                             Some(Err(e)) => {
                                 error!("WebSocket error: {}", e);
-                                let _ = app_handle.emit("websocket_error", e.to_string());
                                 break;
                             }
                             None => {
@@ -316,8 +326,16 @@ impl WebSocketManager {
 
             info!("{} WebSocket task ended", broker);
         });
+        if let Some(old) = self.task.lock().replace(handle) {
+            old.abort();
+        }
 
         Ok(())
+    }
+
+    /// Receive ticks (bounded; a slow receiver gets `Lagged`).
+    pub fn subscribe_ticks(&self) -> broadcast::Receiver<MarketTick> {
+        self.ticks.subscribe()
     }
 
     /// Subscribe to symbols
@@ -389,12 +407,21 @@ impl WebSocketManager {
         };
 
         if let Some(tx) = tx {
-            let _ = tx.send(WebSocketCommand::Disconnect).await;
+            // Bounded wait: a stuck reader must not stall logout.
+            let _ = tokio::time::timeout(
+                std::time::Duration::from_secs(2),
+                tx.send(WebSocketCommand::Disconnect),
+            )
+            .await;
+        }
+        if let Some(task) = self.task.lock().take() {
+            task.abort();
         }
         *self.state.write() = ConnectionState::Disconnected;
         *self.sender.write() = None;
         *self.broker_id.write() = None;
         self.subscriptions.write().clear();
+        self.token_map.write().clear();
         Ok(())
     }
 
@@ -411,7 +438,10 @@ impl WebSocketManager {
     /// Register token to symbol mapping
     pub fn register_symbol(&self, token: &str, symbol: &str, exchange: &str) {
         let mut map = self.token_map.write();
-        map.insert(token.to_string(), (symbol.to_string(), exchange.to_string()));
+        map.insert(
+            token.to_string(),
+            (symbol.to_string(), exchange.to_string()),
+        );
     }
 }
 
@@ -787,11 +817,16 @@ fn parse_fyers_snapshot(data: &[u8], _token_map: &TokenMap) -> Option<(MarketTic
     // prev_close_price, type, symbol
 
     let mut fields = vec![0i32; field_count];
-    for i in 0..field_count {
+    for field in fields.iter_mut() {
         if offset + 4 > data.len() {
             break;
         }
-        fields[i] = i32::from_be_bytes([data[offset], data[offset + 1], data[offset + 2], data[offset + 3]]);
+        *field = i32::from_be_bytes([
+            data[offset],
+            data[offset + 1],
+            data[offset + 2],
+            data[offset + 3],
+        ]);
         offset += 4;
     }
 
@@ -806,11 +841,7 @@ fn parse_fyers_snapshot(data: &[u8], _token_map: &TokenMap) -> Option<(MarketTic
     };
     offset += 2;
 
-    let _precision = if offset < data.len() {
-        data[offset]
-    } else {
-        2
-    };
+    let _precision = if offset < data.len() { data[offset] } else { 2 };
     offset += 1;
 
     // Parse string fields: exchange, exchange_token, symbol
@@ -827,14 +858,14 @@ fn parse_fyers_snapshot(data: &[u8], _token_map: &TokenMap) -> Option<(MarketTic
         }
     }
 
-    let exchange = strings.get(0).cloned().unwrap_or_default();
+    let exchange = strings.first().cloned().unwrap_or_default();
     let token = strings.get(1).cloned().unwrap_or_default();
     let symbol = strings.get(2).cloned().unwrap_or(topic_name);
 
     // Divisor for price conversion
     let divisor = if multiplier > 0.0 { multiplier } else { 100.0 };
 
-    let ltp = fields.get(0).copied().unwrap_or(0) as f64 / divisor;
+    let ltp = fields.first().copied().unwrap_or(0) as f64 / divisor;
     let close = fields.get(20).copied().unwrap_or(0) as f64 / divisor;
 
     let tick = MarketTick {
@@ -854,7 +885,11 @@ fn parse_fyers_snapshot(data: &[u8], _token_map: &TokenMap) -> Option<(MarketTic
         oi: fields.get(12).copied().unwrap_or(0) as i64,
         timestamp: fields.get(3).copied().unwrap_or(0) as i64 * 1000,
         change: if close > 0.0 { ltp - close } else { 0.0 },
-        change_percent: if close > 0.0 { ((ltp - close) / close) * 100.0 } else { 0.0 },
+        change_percent: if close > 0.0 {
+            ((ltp - close) / close) * 100.0
+        } else {
+            0.0
+        },
     };
 
     Some((tick, offset))
@@ -900,7 +935,10 @@ fn create_angel_subscribe(requests: &[SubscriptionRequest]) -> Message {
             "CDS" => 13,
             _ => 1,
         };
-        token_lists.entry(exchange_type).or_default().push(req.token.clone());
+        token_lists
+            .entry(exchange_type)
+            .or_default()
+            .push(req.token.clone());
     }
 
     let token_list: Vec<serde_json::Value> = token_lists
@@ -914,11 +952,7 @@ fn create_angel_subscribe(requests: &[SubscriptionRequest]) -> Message {
         .collect();
 
     // Use the highest mode requested
-    let mode = requests
-        .iter()
-        .map(|r| r.mode as u8)
-        .max()
-        .unwrap_or(2);
+    let mode = requests.iter().map(|r| r.mode as u8).max().unwrap_or(2);
 
     let msg = serde_json::json!({
         "correlationID": format!("sub_{}", chrono::Utc::now().timestamp_millis()),
@@ -947,7 +981,10 @@ fn create_angel_unsubscribe(symbols: &[(String, String)]) -> Message {
             "CDS" => 13,
             _ => 1,
         };
-        token_lists.entry(exchange_type).or_default().push(token.clone());
+        token_lists
+            .entry(exchange_type)
+            .or_default()
+            .push(token.clone());
     }
 
     let token_list: Vec<serde_json::Value> = token_lists
@@ -986,7 +1023,12 @@ fn create_zerodha_subscribe(requests: &[SubscriptionRequest]) -> Message {
     });
 
     // Then set mode
-    let mode = match requests.iter().map(|r| r.mode).max().unwrap_or(SubscriptionMode::Quote) {
+    let mode = match requests
+        .iter()
+        .map(|r| r.mode)
+        .max()
+        .unwrap_or(SubscriptionMode::Quote)
+    {
         SubscriptionMode::Ltp => "ltp",
         SubscriptionMode::Quote => "quote",
         SubscriptionMode::Full | SubscriptionMode::SnapQuote => "full",

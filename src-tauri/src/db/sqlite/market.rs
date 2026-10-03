@@ -93,7 +93,11 @@ pub fn get_holidays_by_year(conn: &Connection, year: i32) -> Result<Vec<MarketHo
 }
 
 /// Get all holidays for an exchange
-pub fn get_holidays_by_exchange(conn: &Connection, exchange: &str, year: Option<i32>) -> Result<Vec<MarketHoliday>> {
+pub fn get_holidays_by_exchange(
+    conn: &Connection,
+    exchange: &str,
+    year: Option<i32>,
+) -> Result<Vec<MarketHoliday>> {
     let sql = if year.is_some() {
         r#"
         SELECT h.id, h.date, h.description, h.year
@@ -159,9 +163,8 @@ pub fn is_holiday(conn: &Connection, exchange: &str, date: &str) -> Result<bool>
 }
 
 fn get_holiday_exchanges(conn: &Connection, holiday_id: i64) -> Result<Vec<String>> {
-    let mut stmt = conn.prepare(
-        "SELECT exchange FROM market_holiday_exchanges WHERE holiday_id = ?1",
-    )?;
+    let mut stmt =
+        conn.prepare("SELECT exchange FROM market_holiday_exchanges WHERE holiday_id = ?1")?;
 
     let exchanges: Vec<String> = stmt
         .query_map(params![holiday_id], |row| row.get(0))?
@@ -258,7 +261,11 @@ pub fn get_timing_by_exchange(conn: &Connection, exchange: &str) -> Result<Optio
 }
 
 /// Update market timing for an exchange
-pub fn update_timing(conn: &Connection, exchange: &str, req: &UpdateTimingRequest) -> Result<MarketTiming> {
+pub fn update_timing(
+    conn: &Connection,
+    exchange: &str,
+    req: &UpdateTimingRequest,
+) -> Result<MarketTiming> {
     // Build dynamic update query
     let mut updates = Vec::new();
     let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
@@ -290,7 +297,8 @@ pub fn update_timing(conn: &Connection, exchange: &str, req: &UpdateTimingReques
             "UPDATE market_timings SET {} WHERE exchange = ?",
             updates.join(", ")
         );
-        let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+        let params_refs: Vec<&dyn rusqlite::ToSql> =
+            params_vec.iter().map(|p| p.as_ref()).collect();
         conn.execute(&sql, params_refs.as_slice())?;
     }
 

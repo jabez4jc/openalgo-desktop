@@ -76,5 +76,8 @@ pub fn on_authenticated(broker_id: &str) {
 
 /// Handle authentication failure
 pub fn on_auth_failed(broker_id: &str, reason: &str) {
-    error!("WebSocket authentication failed for {}: {}", broker_id, reason);
+    error!(
+        "WebSocket authentication failed for {}: {}",
+        broker_id, reason
+    );
 }

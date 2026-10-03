@@ -1,188 +1,114 @@
-//! OpenAlgo Desktop - Algorithmic Trading Platform
+//! OpenAlgo Desktop: a single-user desktop port of OpenAlgo web.
 //!
-//! A desktop application for algorithmic trading with support for
-//! multiple Indian brokers (Angel One, Zerodha, Fyers).
+//! The Rust process owns everything: one HTTP server (UI, session routes,
+//! broker callbacks, `/api/v1`, Socket.IO), the services, the event bus and
+//! the databases. The Tauri window is a browser pointed at that server.
 
-pub mod commands;
-pub mod db;
 pub mod brokers;
-pub mod security;
-pub mod websocket;
-pub mod webhook;
-pub mod scheduler;
+pub mod clock;
+pub mod commands;
+pub mod config;
+pub mod db;
 pub mod error;
-pub mod state;
+pub mod events;
+pub mod sandbox;
+pub mod security;
+pub mod server;
 pub mod services;
+pub mod session;
+pub mod state;
+pub mod webhook;
+pub mod websocket;
 
-use scheduler::AutoLogoutScheduler;
+use commands::ShellState;
 use state::AppState;
-use webhook::WebhookServer;
-use tauri::Manager;
+use std::sync::Arc;
+use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+fn init_logging() {
+    // Fixed filter (no environment read): info in release, debug in development.
+    let filter = if cfg!(debug_assertions) {
+        "openalgo_desktop_lib=debug,openalgo_desktop=debug,tauri=info,warn"
+    } else {
+        "openalgo_desktop_lib=info,openalgo_desktop=info,tauri=warn,warn"
+    };
+    let _ = tracing_subscriber::registry()
+        .with(tracing_subscriber::EnvFilter::new(filter))
+        .with(tracing_subscriber::fmt::layer())
+        .try_init();
+}
 
 /// Initialize and run the Tauri application
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // Initialize tracing/logging
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "openalgo_desktop=debug,tauri=info".into()),
-        )
-        .with(tracing_subscriber::fmt::layer())
-        .init();
+    init_logging();
+    tracing::info!("Starting OpenAlgo Desktop {}", env!("CARGO_PKG_VERSION"));
 
-    tracing::info!("Starting OpenAlgo Desktop...");
-
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
-            // Initialize application state
-            let app_state = AppState::new(app.handle())?;
+            let data_dir = app.path().app_data_dir()?;
+            let (ctx, server) = tauri::async_runtime::block_on(async {
+                let ctx = AppState::open_default(&data_dir)?;
+                session::spawn_expiry_task(ctx.clone());
+                let server = server::start(ctx.clone()).await.ok();
+                Ok::<_, error::AppError>((ctx, server))
+            })?;
 
-            // Get webhook config before managing state
-            let webhook_config = app_state.sqlite.get_webhook_config().ok();
-
-            app.manage(app_state);
-
-            // Start auto-logout scheduler (configurable, default 3:00 AM IST)
-            let scheduler = AutoLogoutScheduler::new(app.handle().clone());
-            scheduler.start();
-
-            // Start webhook server if enabled
-            if let Some(config) = webhook_config {
-                if config.enabled {
-                    let app_handle = app.handle().clone();
-                    tauri::async_runtime::spawn(async move {
-                        let mut server = WebhookServer::new(app_handle.clone());
-                        if let Err(e) = server.start(config).await {
-                            tracing::error!("Failed to start webhook server: {}", e);
-                        }
-                        // Keep server running
-                        loop {
-                            tauri::async_runtime::spawn(async {
-                                tokio::time::sleep(tokio::time::Duration::from_secs(3600)).await;
-                            }).await.ok();
-                        }
-                    });
-                    tracing::info!("Webhook server starting...");
+            let url = if server.is_none() {
+                // Start-up page explaining why the server is not running.
+                WebviewUrl::App("index.html".into())
+            } else if cfg!(debug_assertions) {
+                // Development: Vite (devUrl) proxies to the Rust server.
+                WebviewUrl::App("index.html".into())
+            } else {
+                match commands::window_url(&ctx) {
+                    Some(u) => WebviewUrl::External(u),
+                    None => WebviewUrl::App("index.html".into()),
                 }
-            }
+            };
+            WebviewWindowBuilder::new(app, "main", url)
+                .title("OpenAlgo Desktop")
+                .inner_size(1400.0, 900.0)
+                .min_inner_size(1024.0, 768.0)
+                .center()
+                .build()?;
 
-            tracing::info!("Application state initialized");
-            tracing::info!("Auto-logout scheduler started");
+            app.manage(ShellState {
+                ctx,
+                server: tokio::sync::Mutex::new(server),
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            // Auth commands
-            commands::auth::check_setup,
-            commands::auth::setup,
-            commands::auth::login,
-            commands::auth::logout,
-            commands::auth::check_session,
-            commands::auth::get_current_user,
-            commands::auth::reset_user_data,
-            // Broker commands
-            commands::broker::broker_login,
-            commands::broker::broker_logout,
-            commands::broker::get_broker_status,
-            commands::broker::set_active_broker,
-            commands::broker::get_available_brokers,
-            // Order commands
-            commands::orders::place_order,
-            commands::orders::modify_order,
-            commands::orders::cancel_order,
-            commands::orders::get_order_book,
-            commands::orders::get_trade_book,
-            // Position commands
-            commands::positions::get_positions,
-            commands::positions::close_position,
-            commands::positions::close_all_positions,
-            // Holdings commands
-            commands::holdings::get_holdings,
-            // Funds commands
-            commands::funds::get_funds,
-            // Quote commands
-            commands::quotes::get_quote,
-            commands::quotes::get_market_depth,
-            // Symbol commands
-            commands::symbols::search_symbols,
-            commands::symbols::get_symbol_info,
-            commands::symbols::get_symbol_by_token,
-            commands::symbols::get_symbol_count,
-            commands::symbols::refresh_symbol_master,
-            // Strategy commands
-            commands::strategy::get_strategies,
-            commands::strategy::create_strategy,
-            commands::strategy::update_strategy,
-            commands::strategy::delete_strategy,
-            commands::strategy::toggle_strategy,
-            // Settings commands
-            commands::settings::get_settings,
-            commands::settings::update_settings,
-            commands::settings::save_broker_credentials,
-            commands::settings::delete_broker_credentials,
-            commands::settings::get_auto_logout_config,
-            commands::settings::update_auto_logout_config,
-            commands::settings::get_webhook_config,
-            commands::settings::update_webhook_config,
-            commands::settings::get_rate_limit_config,
-            commands::settings::update_rate_limit_config,
-            commands::settings::get_broker_config,
-            commands::settings::get_broker_credentials,
-            commands::settings::get_raw_broker_credentials,
-            commands::settings::has_broker_credentials,
-            commands::settings::get_broker_credentials_for_edit,
-            commands::settings::get_analyze_mode,
-            commands::settings::set_analyze_mode,
-            // API key commands
-            commands::api_keys::create_api_key,
-            commands::api_keys::list_api_keys,
-            commands::api_keys::delete_api_key,
-            commands::api_keys::delete_api_key_by_id,
-            commands::api_keys::get_user_api_key,
-            commands::api_keys::regenerate_api_key,
-            // Sandbox commands
-            commands::sandbox::get_sandbox_positions,
-            commands::sandbox::get_sandbox_orders,
-            commands::sandbox::place_sandbox_order,
-            commands::sandbox::reset_sandbox,
-            commands::sandbox::get_sandbox_holdings,
-            commands::sandbox::get_sandbox_funds,
-            commands::sandbox::update_sandbox_ltp,
-            commands::sandbox::cancel_sandbox_order,
-            commands::sandbox::get_sandbox_config,
-            commands::sandbox::update_sandbox_config,
-            commands::sandbox::get_sandbox_trades,
-            commands::sandbox::get_sandbox_daily_pnl,
-            commands::sandbox::get_sandbox_pnl,
-            // Order logs commands
-            commands::order_logs::get_order_logs,
-            commands::order_logs::get_order_logs_by_order_id,
-            commands::order_logs::get_recent_order_logs,
-            commands::order_logs::get_order_log_stats,
-            commands::order_logs::clear_old_order_logs,
-            // Market commands
-            commands::market::create_market_holiday,
-            commands::market::get_market_holidays_by_year,
-            commands::market::get_market_holidays_by_exchange,
-            commands::market::is_market_holiday,
-            commands::market::delete_market_holiday,
-            commands::market::get_all_market_timings,
-            commands::market::get_market_timing,
-            commands::market::update_market_timing,
-            commands::market::is_market_open,
-            // Historify commands
-            commands::historify::get_market_data,
-            commands::historify::download_historical_data,
-            // WebSocket commands
-            commands::websocket::websocket_connect,
-            commands::websocket::websocket_disconnect,
-            commands::websocket::websocket_status,
-            commands::websocket::websocket_subscribe,
-            commands::websocket::websocket_unsubscribe,
-            commands::websocket::websocket_register_symbol,
+            commands::startup_status,
+            commands::retry_server,
+            commands::restart_server,
+            commands::open_external,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!());
+
+    let app = match app {
+        Ok(a) => a,
+        Err(e) => {
+            tracing::error!("OpenAlgo Desktop could not start: {}", e);
+            return;
+        }
+    };
+
+    app.run(|handle, event| {
+        if let RunEvent::Exit = event {
+            if let Some(shell) = handle.try_state::<ShellState>() {
+                let ctx: Arc<AppState> = shell.ctx.clone();
+                tauri::async_runtime::block_on(async {
+                    if let Some(h) = shell.server.lock().await.take() {
+                        h.stop().await;
+                    }
+                    ctx.shutdown().await;
+                });
+                tracing::info!("OpenAlgo Desktop stopped");
+            }
+        }
+    });
 }

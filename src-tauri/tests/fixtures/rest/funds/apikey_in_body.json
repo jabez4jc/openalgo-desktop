@@ -1,0 +1,38 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/funds",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "286",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": {
+        "availablecash": 10000000.0,
+        "collateral": 0.0,
+        "grossexposure": 0.0,
+        "last_reset": "2026-10-03 09:30:17",
+        "m2mrealized": 0.0,
+        "m2munrealized": 0.0,
+        "reset_count": 0,
+        "today_realized_pnl": 0.0,
+        "total_realized_pnl": 0.0,
+        "totalpnl": 0.0,
+        "utiliseddebits": 0.0
+      },
+      "mode": "analyze",
+      "status": "success"
+    }
+  }
+}

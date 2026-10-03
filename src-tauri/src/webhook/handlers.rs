@@ -4,11 +4,14 @@
 //! - Dynamic strategy-based webhooks (/webhook/{webhook_id})
 //! - OpenAlgo SDK compatible REST API (/api/v1/*)
 
-use crate::brokers::types::{ModifyOrderRequest as BrokerModifyOrder, OrderRequest as BrokerOrderRequest};
+use crate::brokers::types::{
+    ModifyOrderRequest as BrokerModifyOrder, OrderRequest as BrokerOrderRequest,
+};
+use crate::server::envelope::ApiJson;
+use crate::services::apikey_service::ApiKeyService;
 use crate::services::{
-    AnalyzerService, FundsService, HoldingsService, HistoryService, OptionsService,
-    OrderService, OrderbookService, PositionService, QuotesService, SmartOrderService,
-    SymbolService,
+    AnalyzerService, FundsService, HistoryService, HoldingsService, OptionsService, OrderService,
+    OrderbookService, PositionService, QuotesService, SmartOrderService, SymbolService,
 };
 use crate::state::AppState;
 use crate::webhook::types::*;
@@ -18,59 +21,35 @@ use axum::{
     response::IntoResponse,
 };
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter, Manager};
 use tracing::{error, info, warn};
 
-/// Shared state for webhook/API handlers
-pub struct WebhookState {
-    pub app_handle: AppHandle,
+/// Legacy handlers take the application context directly.
+pub type WebhookState = AppState;
+
+/// Helpers the legacy handlers were written against.
+pub(crate) trait LegacyState {
+    /// Web rule (`get_auth_token_broker`): the key must be the stored
+    /// OpenAlgo key AND a broker session must be live; otherwise the client
+    /// gets 403 "Invalid openalgo apikey".
+    fn validate_api_key(&self, apikey: &str) -> Result<String, String>;
+    fn get_app_state(&self) -> Option<Arc<AppState>>;
 }
 
-impl WebhookState {
-    pub fn new(app_handle: AppHandle) -> Self {
-        Self { app_handle }
-    }
-
-    /// Get AppState from Tauri
-    fn get_app_state(&self) -> Option<tauri::State<'_, AppState>> {
-        self.app_handle.try_state::<AppState>()
-    }
-
-    /// Validate API key and return the key name if valid
+impl LegacyState for Arc<AppState> {
     fn validate_api_key(&self, apikey: &str) -> Result<String, String> {
-        match self.get_app_state() {
-            Some(state) => {
-                state.sqlite.validate_api_key(apikey, &state.security)
-                    .map(|key| key.name)
-                    .map_err(|e| format!("Invalid openalgo apikey: {}", e))
-            }
-            None => Err("Internal error: AppState not available".to_string())
+        if ApiKeyService::is_valid(self, apikey) && self.is_broker_connected() {
+            Ok("apikey".to_string())
+        } else {
+            Err(INVALID_API_KEY.to_string())
         }
     }
 
-    /// Emit event to frontend
-    fn emit<T: serde::Serialize + Clone>(&self, event: &str, payload: &T) {
-        if let Err(e) = self.app_handle.emit(event, payload) {
-            warn!("Failed to emit {}: {}", event, e);
-        }
-    }
-
-    /// Check if broker is connected
-    fn is_broker_connected(&self) -> bool {
-        self.get_app_state()
-            .map(|s| s.is_broker_connected())
-            .unwrap_or(false)
+    fn get_app_state(&self) -> Option<Arc<AppState>> {
+        Some(self.clone())
     }
 }
 
-// ============================================================================
-// Health Check
-// ============================================================================
-
-/// Health check endpoint - GET /health or GET /
-pub async fn health_check() -> impl IntoResponse {
-    Json(ApiResponse::<Empty>::success_with_message("OpenAlgo Desktop API is running"))
-}
+pub const INVALID_API_KEY: &str = "Invalid openalgo apikey";
 
 // ============================================================================
 // Dynamic Webhook Handler
@@ -83,7 +62,7 @@ pub async fn health_check() -> impl IntoResponse {
 pub async fn webhook_handler(
     AxumState(state): AxumState<Arc<WebhookState>>,
     Path(webhook_id): Path<String>,
-    Json(payload): Json<WebhookPayload>,
+    ApiJson(payload): ApiJson<WebhookPayload>,
 ) -> impl IntoResponse {
     info!("Received webhook for strategy: {}", webhook_id);
 
@@ -97,7 +76,7 @@ pub async fn webhook_handler(
                 data: None,
                 orderid: None,
                 mode: None,
-            })
+            }),
         )
     }
 
@@ -114,7 +93,7 @@ pub async fn webhook_handler(
                     data: None,
                     orderid: None,
                     mode: None,
-                })
+                }),
             );
         }
     };
@@ -132,7 +111,7 @@ pub async fn webhook_handler(
                     data: None,
                     orderid: None,
                     mode: None,
-                })
+                }),
             );
         }
         Err(e) => {
@@ -145,7 +124,7 @@ pub async fn webhook_handler(
                     data: None,
                     orderid: None,
                     mode: None,
-                })
+                }),
             );
         }
     };
@@ -204,7 +183,7 @@ pub async fn webhook_handler(
         };
 
         // Build processed alert
-        let processed_alert = ProcessedAlert {
+        let _processed_alert = ProcessedAlert {
             strategy_id: strategy.id,
             strategy_name: strategy.name.clone(),
             webhook_id: webhook_id.clone(),
@@ -222,7 +201,6 @@ pub async fn webhook_handler(
         };
 
         // Emit alert to frontend
-        state.emit("webhook_alert", &processed_alert);
         alerts_processed += 1;
 
         // Check broker connection before placing order
@@ -235,7 +213,6 @@ pub async fn webhook_handler(
         // TODO: Execute order via broker adapter
         // For now, just queue the order for later implementation
         orders_queued += 1;
-        info!("Order queued: {:?}", processed_alert);
     }
 
     // Return result
@@ -250,11 +227,14 @@ pub async fn webhook_handler(
             StatusCode::OK,
             Json(ApiResponse {
                 status: "success".to_string(),
-                message: Some(format!("{} alerts processed, {} orders queued", alerts_processed, orders_queued)),
+                message: Some(format!(
+                    "{} alerts processed, {} orders queued",
+                    alerts_processed, orders_queued
+                )),
                 data: Some(result),
                 orderid: None,
                 mode: None,
-            })
+            }),
         )
     } else if alerts_processed > 0 {
         (
@@ -265,7 +245,7 @@ pub async fn webhook_handler(
                 data: Some(result),
                 orderid: None,
                 mode: None,
-            })
+            }),
         )
     } else {
         (
@@ -276,7 +256,7 @@ pub async fn webhook_handler(
                 data: Some(result),
                 orderid: None,
                 mode: None,
-            })
+            }),
         )
     }
 }
@@ -288,10 +268,8 @@ pub async fn webhook_handler(
 /// Place order - POST /api/v1/placeorder
 pub async fn place_order(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<PlaceOrderRequest>,
+    ApiJson(req): ApiJson<PlaceOrderRequest>,
 ) -> impl IntoResponse {
-    info!("Place order request: {:?}", req);
-
     // Validate API key
     if let Err(e) = state.validate_api_key(&req.apikey) {
         return (StatusCode::FORBIDDEN, Json(ApiResponse::<Empty>::error(&e)));
@@ -303,7 +281,9 @@ pub async fn place_order(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<Empty>::error("Internal error: AppState not available"))
+                Json(ApiResponse::<Empty>::error(
+                    "Internal error: AppState not available",
+                )),
             );
         }
     };
@@ -317,18 +297,25 @@ pub async fn place_order(
         price: req.price,
         order_type: req.pricetype.clone(),
         product: req.product.clone(),
-        trigger_price: if req.trigger_price > 0.0 { Some(req.trigger_price) } else { None },
-        disclosed_quantity: if req.disclosed_quantity > 0 { Some(req.disclosed_quantity) } else { None },
+        trigger_price: if req.trigger_price > 0.0 {
+            Some(req.trigger_price)
+        } else {
+            None
+        },
+        disclosed_quantity: if req.disclosed_quantity > 0 {
+            Some(req.disclosed_quantity)
+        } else {
+            None
+        },
         validity: "DAY".to_string(),
         amo: false,
-        broker_symbol: None,  // Set by OrderService from symbol cache
-        symbol_token: None,   // Set by OrderService from symbol cache
+        broker_symbol: None, // Set by OrderService from symbol cache
+        symbol_token: None,  // Set by OrderService from symbol cache
     };
 
     // Execute order via service
     match OrderService::place_order(&app_state, order, Some(&req.apikey)).await {
         Ok(result) => {
-            state.emit("api_order", &req);
             if result.success {
                 (
                     StatusCode::OK,
@@ -338,12 +325,12 @@ pub async fn place_order(
                         data: None,
                         orderid: result.order_id,
                         mode: Some(result.mode),
-                    })
+                    }),
                 )
             } else {
                 (
                     StatusCode::BAD_REQUEST,
-                    Json(ApiResponse::<Empty>::error(&result.message))
+                    Json(ApiResponse::<Empty>::error(&result.message)),
                 )
             }
         }
@@ -351,7 +338,7 @@ pub async fn place_order(
             error!("Place order failed: {}", e);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<Empty>::error(&e.to_string()))
+                Json(ApiResponse::<Empty>::error(&e.client_message())),
             )
         }
     }
@@ -360,10 +347,8 @@ pub async fn place_order(
 /// Place smart order - POST /api/v1/placesmartorder
 pub async fn place_smart_order(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<PlaceSmartOrderRequest>,
+    ApiJson(req): ApiJson<PlaceSmartOrderRequest>,
 ) -> impl IntoResponse {
-    info!("Place smart order request: {:?}", req);
-
     // Validate API key
     if let Err(e) = state.validate_api_key(&req.apikey) {
         return (StatusCode::FORBIDDEN, Json(ApiResponse::<Empty>::error(&e)));
@@ -374,7 +359,9 @@ pub async fn place_smart_order(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<Empty>::error("Internal error: AppState not available"))
+                Json(ApiResponse::<Empty>::error(
+                    "Internal error: AppState not available",
+                )),
             );
         }
     };
@@ -387,12 +374,16 @@ pub async fn place_smart_order(
         position_size: req.position_size,
         product: req.product.clone(),
         pricetype: Some(req.pricetype.clone()),
-        price: if req.price > 0.0 { Some(req.price) } else { None },
+        price: if req.price > 0.0 {
+            Some(req.price)
+        } else {
+            None
+        },
     };
 
-    match SmartOrderService::place_smart_order(&app_state, smart_order_req, Some(&req.apikey)).await {
+    match SmartOrderService::place_smart_order(&app_state, smart_order_req, Some(&req.apikey)).await
+    {
         Ok(result) => {
-            state.emit("api_smart_order", &req);
             if result.success {
                 (
                     StatusCode::OK,
@@ -402,12 +393,12 @@ pub async fn place_smart_order(
                         data: None,
                         orderid: result.order_id,
                         mode: None,
-                    })
+                    }),
                 )
             } else {
                 (
                     StatusCode::BAD_REQUEST,
-                    Json(ApiResponse::<Empty>::error(&result.message))
+                    Json(ApiResponse::<Empty>::error(&result.message)),
                 )
             }
         }
@@ -415,7 +406,7 @@ pub async fn place_smart_order(
             error!("Place smart order failed: {}", e);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<Empty>::error(&e.to_string()))
+                Json(ApiResponse::<Empty>::error(&e.client_message())),
             )
         }
     }
@@ -424,10 +415,8 @@ pub async fn place_smart_order(
 /// Modify order - POST /api/v1/modifyorder
 pub async fn modify_order(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<ModifyOrderRequest>,
+    ApiJson(req): ApiJson<ModifyOrderRequest>,
 ) -> impl IntoResponse {
-    info!("Modify order request: {:?}", req);
-
     if let Err(e) = state.validate_api_key(&req.apikey) {
         return (StatusCode::FORBIDDEN, Json(ApiResponse::<Empty>::error(&e)));
     }
@@ -437,32 +426,48 @@ pub async fn modify_order(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<Empty>::error("Internal error"))
+                Json(ApiResponse::<Empty>::error("Internal error")),
             );
         }
     };
 
     // Build broker modify order request
     let modify_req = BrokerModifyOrder {
-        quantity: if req.quantity > 0 { Some(req.quantity) } else { None },
-        price: if req.price > 0.0 { Some(req.price) } else { None },
-        order_type: if !req.pricetype.is_empty() { Some(req.pricetype.clone()) } else { None },
-        trigger_price: if req.trigger_price > 0.0 { Some(req.trigger_price) } else { None },
+        quantity: if req.quantity > 0 {
+            Some(req.quantity)
+        } else {
+            None
+        },
+        price: if req.price > 0.0 {
+            Some(req.price)
+        } else {
+            None
+        },
+        order_type: if !req.pricetype.is_empty() {
+            Some(req.pricetype.clone())
+        } else {
+            None
+        },
+        trigger_price: if req.trigger_price > 0.0 {
+            Some(req.trigger_price)
+        } else {
+            None
+        },
         validity: None,
     };
 
-    match OrderService::modify_order(&app_state, &req.orderid, modify_req, Some(&req.apikey)).await {
+    match OrderService::modify_order(&app_state, &req.orderid, modify_req, Some(&req.apikey)).await
+    {
         Ok(result) => {
-            state.emit("api_modify_order", &req);
             if result.success {
                 (
                     StatusCode::OK,
-                    Json(ApiResponse::<Empty>::success_with_orderid(&result.order_id))
+                    Json(ApiResponse::<Empty>::success_with_orderid(&result.order_id)),
                 )
             } else {
                 (
                     StatusCode::BAD_REQUEST,
-                    Json(ApiResponse::<Empty>::error(&result.message))
+                    Json(ApiResponse::<Empty>::error(&result.message)),
                 )
             }
         }
@@ -470,7 +475,7 @@ pub async fn modify_order(
             error!("Modify order failed: {}", e);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<Empty>::error(&e.to_string()))
+                Json(ApiResponse::<Empty>::error(&e.client_message())),
             )
         }
     }
@@ -479,10 +484,8 @@ pub async fn modify_order(
 /// Cancel order - POST /api/v1/cancelorder
 pub async fn cancel_order(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<CancelOrderRequest>,
+    ApiJson(req): ApiJson<CancelOrderRequest>,
 ) -> impl IntoResponse {
-    info!("Cancel order request: {:?}", req);
-
     if let Err(e) = state.validate_api_key(&req.apikey) {
         return (StatusCode::FORBIDDEN, Json(ApiResponse::<Empty>::error(&e)));
     }
@@ -492,23 +495,22 @@ pub async fn cancel_order(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<Empty>::error("Internal error"))
+                Json(ApiResponse::<Empty>::error("Internal error")),
             );
         }
     };
 
     match OrderService::cancel_order(&app_state, &req.orderid, None, Some(&req.apikey)).await {
         Ok(result) => {
-            state.emit("api_cancel_order", &req);
             if result.success {
                 (
                     StatusCode::OK,
-                    Json(ApiResponse::<Empty>::success_with_orderid(&result.order_id))
+                    Json(ApiResponse::<Empty>::success_with_orderid(&result.order_id)),
                 )
             } else {
                 (
                     StatusCode::BAD_REQUEST,
-                    Json(ApiResponse::<Empty>::error(&result.message))
+                    Json(ApiResponse::<Empty>::error(&result.message)),
                 )
             }
         }
@@ -516,7 +518,7 @@ pub async fn cancel_order(
             error!("Cancel order failed: {}", e);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<Empty>::error(&e.to_string()))
+                Json(ApiResponse::<Empty>::error(&e.client_message())),
             )
         }
     }
@@ -525,10 +527,8 @@ pub async fn cancel_order(
 /// Cancel all orders - POST /api/v1/cancelallorder
 pub async fn cancel_all_orders(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<CancelAllOrdersRequest>,
+    ApiJson(req): ApiJson<CancelAllOrdersRequest>,
 ) -> impl IntoResponse {
-    info!("Cancel all orders request: {:?}", req);
-
     if let Err(e) = state.validate_api_key(&req.apikey) {
         return (StatusCode::FORBIDDEN, Json(ApiResponse::<Empty>::error(&e)));
     }
@@ -538,14 +538,13 @@ pub async fn cancel_all_orders(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<Empty>::error("Internal error"))
+                Json(ApiResponse::<Empty>::error("Internal error")),
             );
         }
     };
 
     match OrderService::cancel_all_orders(&app_state, Some(&req.apikey)).await {
         Ok(results) => {
-            state.emit("api_cancel_all_orders", &req);
             let cancelled_count = results.iter().filter(|r| r.success).count();
             let failed_count = results.len() - cancelled_count;
             let message = if failed_count == 0 {
@@ -555,14 +554,14 @@ pub async fn cancel_all_orders(
             };
             (
                 StatusCode::OK,
-                Json(ApiResponse::<Empty>::success_with_message(&message))
+                Json(ApiResponse::<Empty>::success_with_message(&message)),
             )
         }
         Err(e) => {
             error!("Cancel all orders failed: {}", e);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<Empty>::error(&e.to_string()))
+                Json(ApiResponse::<Empty>::error(&e.client_message())),
             )
         }
     }
@@ -572,10 +571,8 @@ pub async fn cancel_all_orders(
 /// Note: This endpoint closes ALL positions (ClosePositionRequest only has apikey and strategy)
 pub async fn close_position(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<ClosePositionRequest>,
+    ApiJson(req): ApiJson<ClosePositionRequest>,
 ) -> impl IntoResponse {
-    info!("Close position request: {:?}", req);
-
     if let Err(e) = state.validate_api_key(&req.apikey) {
         return (StatusCode::FORBIDDEN, Json(ApiResponse::<Empty>::error(&e)));
     }
@@ -585,7 +582,7 @@ pub async fn close_position(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<Empty>::error("Internal error"))
+                Json(ApiResponse::<Empty>::error("Internal error")),
             );
         }
     };
@@ -593,18 +590,20 @@ pub async fn close_position(
     // Close all positions (ClosePositionRequest only has apikey and strategy)
     match PositionService::close_all_positions(&app_state, Some(&req.apikey)).await {
         Ok(results) => {
-            state.emit("api_close_position", &req);
             let closed_count = results.iter().filter(|r| r.success).count();
             (
                 StatusCode::OK,
-                Json(ApiResponse::<Empty>::success_with_message(&format!("{} positions closed", closed_count)))
+                Json(ApiResponse::<Empty>::success_with_message(&format!(
+                    "{} positions closed",
+                    closed_count
+                ))),
             )
         }
         Err(e) => {
             error!("Close all positions failed: {}", e);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<Empty>::error(&e.to_string()))
+                Json(ApiResponse::<Empty>::error(&e.client_message())),
             )
         }
     }
@@ -613,10 +612,13 @@ pub async fn close_position(
 /// Get order book - POST /api/v1/orderbook
 pub async fn get_orderbook(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<ApiKeyRequest>,
+    ApiJson(req): ApiJson<ApiKeyRequest>,
 ) -> impl IntoResponse {
     if let Err(e) = state.validate_api_key(&req.apikey) {
-        return (StatusCode::FORBIDDEN, Json(ApiResponse::<Vec<OrderData>>::error(&e)));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse::<Vec<OrderData>>::error(&e)),
+        );
     }
 
     let app_state = match state.get_app_state() {
@@ -624,47 +626,49 @@ pub async fn get_orderbook(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<Vec<OrderData>>::error("Internal error"))
+                Json(ApiResponse::<Vec<OrderData>>::error("Internal error")),
             );
         }
     };
 
     match OrderbookService::get_orderbook(&app_state, Some(&req.apikey)).await {
         Ok(result) => {
-            let orders: Vec<OrderData> = result.orders.into_iter().map(|o| OrderData {
-                orderid: o.order_id,
-                symbol: o.symbol,
-                exchange: o.exchange,
-                action: o.side,
-                quantity: o.quantity,
-                price: o.price,
-                trigger_price: o.trigger_price,
-                pricetype: o.order_type,
-                product: o.product,
-                order_status: o.status,
-                timestamp: o.order_timestamp,
-            }).collect();
-            (
-                StatusCode::OK,
-                Json(ApiResponse::success_with_data(orders))
-            )
+            let orders: Vec<OrderData> = result
+                .orders
+                .into_iter()
+                .map(|o| OrderData {
+                    orderid: o.order_id,
+                    symbol: o.symbol,
+                    exchange: o.exchange,
+                    action: o.side,
+                    quantity: o.quantity,
+                    price: o.price,
+                    trigger_price: o.trigger_price,
+                    pricetype: o.order_type,
+                    product: o.product,
+                    order_status: o.status,
+                    timestamp: o.order_timestamp,
+                })
+                .collect();
+            (StatusCode::OK, Json(ApiResponse::success_with_data(orders)))
         }
-        Err(e) => {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<Vec<OrderData>>::error(&e.to_string()))
-            )
-        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<Vec<OrderData>>::error(&e.client_message())),
+        ),
     }
 }
 
 /// Get trade book - POST /api/v1/tradebook
 pub async fn get_tradebook(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<ApiKeyRequest>,
+    ApiJson(req): ApiJson<ApiKeyRequest>,
 ) -> impl IntoResponse {
     if let Err(e) = state.validate_api_key(&req.apikey) {
-        return (StatusCode::FORBIDDEN, Json(ApiResponse::<Vec<TradeData>>::error(&e)));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse::<Vec<TradeData>>::error(&e)),
+        );
     }
 
     let app_state = match state.get_app_state() {
@@ -672,48 +676,50 @@ pub async fn get_tradebook(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<Vec<TradeData>>::error("Internal error"))
+                Json(ApiResponse::<Vec<TradeData>>::error("Internal error")),
             );
         }
     };
 
     match OrderbookService::get_tradebook(&app_state, Some(&req.apikey)).await {
         Ok(result) => {
-            let trades: Vec<TradeData> = result.trades.into_iter().map(|t| {
-                let trade_value = t.filled_quantity as f64 * t.average_price;
-                TradeData {
-                    orderid: t.order_id,
-                    symbol: t.symbol,
-                    exchange: t.exchange,
-                    product: t.product,
-                    action: t.side,
-                    quantity: t.filled_quantity,
-                    average_price: t.average_price,
-                    trade_value,
-                    timestamp: t.order_timestamp,
-                }
-            }).collect();
-            (
-                StatusCode::OK,
-                Json(ApiResponse::success_with_data(trades))
-            )
+            let trades: Vec<TradeData> = result
+                .trades
+                .into_iter()
+                .map(|t| {
+                    let trade_value = t.filled_quantity as f64 * t.average_price;
+                    TradeData {
+                        orderid: t.order_id,
+                        symbol: t.symbol,
+                        exchange: t.exchange,
+                        product: t.product,
+                        action: t.side,
+                        quantity: t.filled_quantity,
+                        average_price: t.average_price,
+                        trade_value,
+                        timestamp: t.order_timestamp,
+                    }
+                })
+                .collect();
+            (StatusCode::OK, Json(ApiResponse::success_with_data(trades)))
         }
-        Err(e) => {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<Vec<TradeData>>::error(&e.to_string()))
-            )
-        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<Vec<TradeData>>::error(&e.client_message())),
+        ),
     }
 }
 
 /// Get position book - POST /api/v1/positionbook
 pub async fn get_positionbook(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<ApiKeyRequest>,
+    ApiJson(req): ApiJson<ApiKeyRequest>,
 ) -> impl IntoResponse {
     if let Err(e) = state.validate_api_key(&req.apikey) {
-        return (StatusCode::FORBIDDEN, Json(ApiResponse::<Vec<PositionData>>::error(&e)));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse::<Vec<PositionData>>::error(&e)),
+        );
     }
 
     let app_state = match state.get_app_state() {
@@ -721,43 +727,48 @@ pub async fn get_positionbook(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<Vec<PositionData>>::error("Internal error"))
+                Json(ApiResponse::<Vec<PositionData>>::error("Internal error")),
             );
         }
     };
 
     match PositionService::get_positions(&app_state, Some(&req.apikey)).await {
         Ok(result) => {
-            let positions: Vec<PositionData> = result.positions.into_iter().map(|p| PositionData {
-                symbol: p.symbol,
-                exchange: p.exchange,
-                product: p.product,
-                quantity: p.quantity,
-                average_price: p.average_price,
-                ltp: p.ltp,
-                pnl: p.pnl,
-            }).collect();
+            let positions: Vec<PositionData> = result
+                .positions
+                .into_iter()
+                .map(|p| PositionData {
+                    symbol: p.symbol,
+                    exchange: p.exchange,
+                    product: p.product,
+                    quantity: p.quantity,
+                    average_price: p.average_price,
+                    ltp: p.ltp,
+                    pnl: p.pnl,
+                })
+                .collect();
             (
                 StatusCode::OK,
-                Json(ApiResponse::success_with_data(positions))
+                Json(ApiResponse::success_with_data(positions)),
             )
         }
-        Err(e) => {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<Vec<PositionData>>::error(&e.to_string()))
-            )
-        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<Vec<PositionData>>::error(&e.client_message())),
+        ),
     }
 }
 
 /// Get holdings - POST /api/v1/holdings
 pub async fn get_holdings(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<ApiKeyRequest>,
+    ApiJson(req): ApiJson<ApiKeyRequest>,
 ) -> impl IntoResponse {
     if let Err(e) = state.validate_api_key(&req.apikey) {
-        return (StatusCode::FORBIDDEN, Json(ApiResponse::<Vec<HoldingData>>::error(&e)));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse::<Vec<HoldingData>>::error(&e)),
+        );
     }
 
     let app_state = match state.get_app_state() {
@@ -765,42 +776,47 @@ pub async fn get_holdings(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<Vec<HoldingData>>::error("Internal error"))
+                Json(ApiResponse::<Vec<HoldingData>>::error("Internal error")),
             );
         }
     };
 
     match HoldingsService::get_holdings(&app_state, Some(&req.apikey)).await {
         Ok(result) => {
-            let holdings: Vec<HoldingData> = result.holdings.into_iter().map(|h| HoldingData {
-                symbol: h.symbol,
-                exchange: h.exchange,
-                quantity: h.quantity,
-                product: "CNC".to_string(), // Holdings are typically CNC
-                pnl: h.pnl,
-                pnlpercent: h.pnl_percentage,
-            }).collect();
+            let holdings: Vec<HoldingData> = result
+                .holdings
+                .into_iter()
+                .map(|h| HoldingData {
+                    symbol: h.symbol,
+                    exchange: h.exchange,
+                    quantity: h.quantity,
+                    product: "CNC".to_string(), // Holdings are typically CNC
+                    pnl: h.pnl,
+                    pnlpercent: h.pnl_percentage,
+                })
+                .collect();
             (
                 StatusCode::OK,
-                Json(ApiResponse::success_with_data(holdings))
+                Json(ApiResponse::success_with_data(holdings)),
             )
         }
-        Err(e) => {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<Vec<HoldingData>>::error(&e.to_string()))
-            )
-        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<Vec<HoldingData>>::error(&e.client_message())),
+        ),
     }
 }
 
 /// Get funds - POST /api/v1/funds
 pub async fn get_funds(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<ApiKeyRequest>,
+    ApiJson(req): ApiJson<ApiKeyRequest>,
 ) -> impl IntoResponse {
     if let Err(e) = state.validate_api_key(&req.apikey) {
-        return (StatusCode::FORBIDDEN, Json(ApiResponse::<FundsData>::error(&e)));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse::<FundsData>::error(&e)),
+        );
     }
 
     let app_state = match state.get_app_state() {
@@ -808,7 +824,7 @@ pub async fn get_funds(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<FundsData>::error("Internal error"))
+                Json(ApiResponse::<FundsData>::error("Internal error")),
             );
         }
     };
@@ -822,27 +838,25 @@ pub async fn get_funds(
                 m2mrealized: 0.0,   // Not directly available in Funds struct
                 utiliseddebits: result.funds.used_margin,
             };
-            (
-                StatusCode::OK,
-                Json(ApiResponse::success_with_data(funds))
-            )
+            (StatusCode::OK, Json(ApiResponse::success_with_data(funds)))
         }
-        Err(e) => {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<FundsData>::error(&e.to_string()))
-            )
-        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<FundsData>::error(&e.client_message())),
+        ),
     }
 }
 
 /// Get quotes - POST /api/v1/quotes
 pub async fn get_quotes(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<QuoteRequest>,
+    ApiJson(req): ApiJson<QuoteRequest>,
 ) -> impl IntoResponse {
     if let Err(e) = state.validate_api_key(&req.apikey) {
-        return (StatusCode::FORBIDDEN, Json(ApiResponse::<QuoteData>::error(&e)));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse::<QuoteData>::error(&e)),
+        );
     }
 
     let app_state = match state.get_app_state() {
@@ -850,12 +864,13 @@ pub async fn get_quotes(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<QuoteData>::error("Internal error"))
+                Json(ApiResponse::<QuoteData>::error("Internal error")),
             );
         }
     };
 
-    match QuotesService::get_quote(&app_state, &req.exchange, &req.symbol, Some(&req.apikey)).await {
+    match QuotesService::get_quote(&app_state, &req.exchange, &req.symbol, Some(&req.apikey)).await
+    {
         Ok(q) => {
             let quote = QuoteData {
                 bid: q.bid,
@@ -868,17 +883,12 @@ pub async fn get_quotes(
                 volume: q.volume,
                 oi: q.oi,
             };
-            (
-                StatusCode::OK,
-                Json(ApiResponse::success_with_data(quote))
-            )
+            (StatusCode::OK, Json(ApiResponse::success_with_data(quote)))
         }
-        Err(e) => {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<QuoteData>::error(&e.to_string()))
-            )
-        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<QuoteData>::error(&e.client_message())),
+        ),
     }
 }
 
@@ -886,12 +896,15 @@ pub async fn get_quotes(
 /// Places multiple orders in a single request
 pub async fn place_basket_order(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<BasketOrderRequest>,
+    ApiJson(req): ApiJson<BasketOrderRequest>,
 ) -> impl IntoResponse {
     info!("Basket order request: {} orders", req.orders.len());
 
     if let Err(e) = state.validate_api_key(&req.apikey) {
-        return (StatusCode::FORBIDDEN, Json(ApiResponse::<Vec<BasketOrderResult>>::error(&e)));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse::<Vec<BasketOrderResult>>::error(&e)),
+        );
     }
 
     let app_state = match state.get_app_state() {
@@ -899,52 +912,74 @@ pub async fn place_basket_order(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<Vec<BasketOrderResult>>::error("Internal error"))
+                Json(ApiResponse::<Vec<BasketOrderResult>>::error(
+                    "Internal error",
+                )),
             );
         }
     };
 
     // Convert to broker order requests
-    let orders: Vec<BrokerOrderRequest> = req.orders.iter().map(|o| BrokerOrderRequest {
-        symbol: o.symbol.clone(),
-        exchange: o.exchange.clone(),
-        side: o.action.clone(),
-        quantity: o.quantity,
-        price: o.price,
-        order_type: o.pricetype.clone(),
-        product: o.product.clone(),
-        trigger_price: if o.trigger_price > 0.0 { Some(o.trigger_price) } else { None },
-        disclosed_quantity: None,
-        validity: "DAY".to_string(),
-        amo: false,
-        broker_symbol: None,  // Set by OrderService from symbol cache
-        symbol_token: None,   // Set by OrderService from symbol cache
-    }).collect();
+    let orders: Vec<BrokerOrderRequest> = req
+        .orders
+        .iter()
+        .map(|o| BrokerOrderRequest {
+            symbol: o.symbol.clone(),
+            exchange: o.exchange.clone(),
+            side: o.action.clone(),
+            quantity: o.quantity,
+            price: o.price,
+            order_type: o.pricetype.clone(),
+            product: o.product.clone(),
+            trigger_price: if o.trigger_price > 0.0 {
+                Some(o.trigger_price)
+            } else {
+                None
+            },
+            disclosed_quantity: None,
+            validity: "DAY".to_string(),
+            amo: false,
+            broker_symbol: None, // Set by OrderService from symbol cache
+            symbol_token: None,  // Set by OrderService from symbol cache
+        })
+        .collect();
 
     match SmartOrderService::place_basket_order(&app_state, orders, Some(&req.apikey)).await {
         Ok(order_results) => {
-            let results: Vec<BasketOrderResult> = order_results.into_iter()
+            let results: Vec<BasketOrderResult> = order_results
+                .into_iter()
                 .enumerate()
                 .map(|(i, r)| BasketOrderResult {
-                    symbol: req.orders.get(i).map(|o| o.symbol.clone()).unwrap_or_default(),
-                    exchange: req.orders.get(i).map(|o| o.exchange.clone()).unwrap_or_default(),
+                    symbol: req
+                        .orders
+                        .get(i)
+                        .map(|o| o.symbol.clone())
+                        .unwrap_or_default(),
+                    exchange: req
+                        .orders
+                        .get(i)
+                        .map(|o| o.exchange.clone())
+                        .unwrap_or_default(),
                     orderid: r.order_id,
-                    status: if r.success { "success".to_string() } else { "error".to_string() },
+                    status: if r.success {
+                        "success".to_string()
+                    } else {
+                        "error".to_string()
+                    },
                     message: if r.success { None } else { Some(r.message) },
                 })
                 .collect();
-            state.emit("api_basket_order", &req);
             (
                 StatusCode::OK,
-                Json(ApiResponse::success_with_data(results))
+                Json(ApiResponse::success_with_data(results)),
             )
         }
-        Err(e) => {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<Vec<BasketOrderResult>>::error(&e.to_string()))
-            )
-        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<Vec<BasketOrderResult>>::error(
+                &e.client_message(),
+            )),
+        ),
     }
 }
 
@@ -952,12 +987,18 @@ pub async fn place_basket_order(
 /// Splits a large order into smaller chunks
 pub async fn place_split_order(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<SplitOrderRequest>,
+    ApiJson(req): ApiJson<SplitOrderRequest>,
 ) -> impl IntoResponse {
-    info!("Split order request: {} qty, {} split size", req.quantity, req.splitsize);
+    info!(
+        "Split order request: {} qty, {} split size",
+        req.quantity, req.splitsize
+    );
 
     if let Err(e) = state.validate_api_key(&req.apikey) {
-        return (StatusCode::FORBIDDEN, Json(ApiResponse::<SplitOrderResult>::error(&e)));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse::<SplitOrderResult>::error(&e)),
+        );
     }
 
     let app_state = match state.get_app_state() {
@@ -965,7 +1006,7 @@ pub async fn place_split_order(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<SplitOrderResult>::error("Internal error"))
+                Json(ApiResponse::<SplitOrderResult>::error("Internal error")),
             );
         }
     };
@@ -978,12 +1019,15 @@ pub async fn place_split_order(
         split_size: req.splitsize,
         product: req.product.clone(),
         pricetype: Some(req.pricetype.clone()),
-        price: if req.price > 0.0 { Some(req.price) } else { None },
+        price: if req.price > 0.0 {
+            Some(req.price)
+        } else {
+            None
+        },
     };
 
     match SmartOrderService::place_split_order(&app_state, split_req, Some(&req.apikey)).await {
         Ok(result) => {
-            state.emit("api_split_order", &req);
             let api_result = SplitOrderResult {
                 total_quantity: result.total_quantity,
                 split_size: result.split_size,
@@ -992,27 +1036,28 @@ pub async fn place_split_order(
             };
             (
                 StatusCode::OK,
-                Json(ApiResponse::success_with_data(api_result))
+                Json(ApiResponse::success_with_data(api_result)),
             )
         }
-        Err(e) => {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<SplitOrderResult>::error(&e.to_string()))
-            )
-        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<SplitOrderResult>::error(&e.client_message())),
+        ),
     }
 }
 
 /// Get order status - POST /api/v1/orderstatus
 pub async fn get_order_status(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<OrderStatusRequest>,
+    ApiJson(req): ApiJson<OrderStatusRequest>,
 ) -> impl IntoResponse {
     info!("Order status request: {}", req.orderid);
 
     if let Err(e) = state.validate_api_key(&req.apikey) {
-        return (StatusCode::FORBIDDEN, Json(ApiResponse::<OrderStatusData>::error(&e)));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse::<OrderStatusData>::error(&e)),
+        );
     }
 
     let app_state = match state.get_app_state() {
@@ -1020,50 +1065,41 @@ pub async fn get_order_status(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<OrderStatusData>::error("Internal error"))
+                Json(ApiResponse::<OrderStatusData>::error("Internal error")),
             );
         }
     };
 
     match OrderbookService::get_order_status(&app_state, &req.orderid, Some(&req.apikey)).await {
-        Ok(result) => {
-            match result.order {
-                Some(o) => {
-                    let status = OrderStatusData {
-                        orderid: o.order_id,
-                        symbol: o.symbol,
-                        exchange: o.exchange,
-                        action: o.side,
-                        quantity: o.quantity,
-                        price: o.price,
-                        trigger_price: o.trigger_price,
-                        pricetype: o.order_type,
-                        product: o.product,
-                        order_status: o.status,
-                        filled_quantity: o.filled_quantity,
-                        pending_quantity: o.pending_quantity,
-                        average_price: o.average_price,
-                        timestamp: o.order_timestamp,
-                    };
-                    (
-                        StatusCode::OK,
-                        Json(ApiResponse::success_with_data(status))
-                    )
-                }
-                None => {
-                    (
-                        StatusCode::NOT_FOUND,
-                        Json(ApiResponse::<OrderStatusData>::error("Order not found"))
-                    )
-                }
+        Ok(result) => match result.order {
+            Some(o) => {
+                let status = OrderStatusData {
+                    orderid: o.order_id,
+                    symbol: o.symbol,
+                    exchange: o.exchange,
+                    action: o.side,
+                    quantity: o.quantity,
+                    price: o.price,
+                    trigger_price: o.trigger_price,
+                    pricetype: o.order_type,
+                    product: o.product,
+                    order_status: o.status,
+                    filled_quantity: o.filled_quantity,
+                    pending_quantity: o.pending_quantity,
+                    average_price: o.average_price,
+                    timestamp: o.order_timestamp,
+                };
+                (StatusCode::OK, Json(ApiResponse::success_with_data(status)))
             }
-        }
-        Err(e) => {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<OrderStatusData>::error(&e.to_string()))
-            )
-        }
+            None => (
+                StatusCode::NOT_FOUND,
+                Json(ApiResponse::<OrderStatusData>::error("Order not found")),
+            ),
+        },
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<OrderStatusData>::error(&e.client_message())),
+        ),
     }
 }
 
@@ -1071,12 +1107,15 @@ pub async fn get_order_status(
 /// Get position for a specific symbol
 pub async fn get_open_position(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<OpenPositionRequest>,
+    ApiJson(req): ApiJson<OpenPositionRequest>,
 ) -> impl IntoResponse {
     info!("Open position request: {} {}", req.exchange, req.symbol);
 
     if let Err(e) = state.validate_api_key(&req.apikey) {
-        return (StatusCode::FORBIDDEN, Json(ApiResponse::<OpenPositionData>::error(&e)));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse::<OpenPositionData>::error(&e)),
+        );
     }
 
     let app_state = match state.get_app_state() {
@@ -1084,12 +1123,20 @@ pub async fn get_open_position(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<OpenPositionData>::error("Internal error"))
+                Json(ApiResponse::<OpenPositionData>::error("Internal error")),
             );
         }
     };
 
-    match PositionService::get_open_position(&app_state, &req.exchange, &req.symbol, &req.product, Some(&req.apikey)).await {
+    match PositionService::get_open_position(
+        &app_state,
+        &req.exchange,
+        &req.symbol,
+        &req.product,
+        Some(&req.apikey),
+    )
+    .await
+    {
         Ok(Some(p)) => {
             let position = OpenPositionData {
                 symbol: p.symbol,
@@ -1102,7 +1149,7 @@ pub async fn get_open_position(
             };
             (
                 StatusCode::OK,
-                Json(ApiResponse::success_with_data(position))
+                Json(ApiResponse::success_with_data(position)),
             )
         }
         Ok(None) => {
@@ -1118,27 +1165,28 @@ pub async fn get_open_position(
             };
             (
                 StatusCode::OK,
-                Json(ApiResponse::success_with_data(position))
+                Json(ApiResponse::success_with_data(position)),
             )
         }
-        Err(e) => {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<OpenPositionData>::error(&e.to_string()))
-            )
-        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<OpenPositionData>::error(&e.client_message())),
+        ),
     }
 }
 
 /// Get market depth - POST /api/v1/depth
 pub async fn get_depth(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<DepthRequest>,
+    ApiJson(req): ApiJson<DepthRequest>,
 ) -> impl IntoResponse {
     info!("Depth request: {} {}", req.exchange, req.symbol);
 
     if let Err(e) = state.validate_api_key(&req.apikey) {
-        return (StatusCode::FORBIDDEN, Json(ApiResponse::<DepthData>::error(&e)));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse::<DepthData>::error(&e)),
+        );
     }
 
     let app_state = match state.get_app_state() {
@@ -1146,24 +1194,34 @@ pub async fn get_depth(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<DepthData>::error("Internal error"))
+                Json(ApiResponse::<DepthData>::error("Internal error")),
             );
         }
     };
 
-    match QuotesService::get_market_depth(&app_state, &req.exchange, &req.symbol, Some(&req.apikey)).await {
+    match QuotesService::get_market_depth(&app_state, &req.exchange, &req.symbol, Some(&req.apikey))
+        .await
+    {
         Ok(result) => {
             let depth_data = result.depth;
-            let buy: Vec<DepthLevel> = depth_data.bids.into_iter().map(|d| DepthLevel {
-                price: d.price,
-                quantity: d.quantity,
-                orders: d.orders,
-            }).collect();
-            let sell: Vec<DepthLevel> = depth_data.asks.into_iter().map(|d| DepthLevel {
-                price: d.price,
-                quantity: d.quantity,
-                orders: d.orders,
-            }).collect();
+            let buy: Vec<DepthLevel> = depth_data
+                .bids
+                .into_iter()
+                .map(|d| DepthLevel {
+                    price: d.price,
+                    quantity: d.quantity,
+                    orders: d.orders,
+                })
+                .collect();
+            let sell: Vec<DepthLevel> = depth_data
+                .asks
+                .into_iter()
+                .map(|d| DepthLevel {
+                    price: d.price,
+                    quantity: d.quantity,
+                    orders: d.orders,
+                })
+                .collect();
             let totalbuyqty = buy.iter().map(|d| d.quantity as i64).sum();
             let totalsellqty = sell.iter().map(|d| d.quantity as i64).sum();
 
@@ -1179,29 +1237,27 @@ pub async fn get_depth(
                 totalbuyqty,
                 totalsellqty,
             };
-            (
-                StatusCode::OK,
-                Json(ApiResponse::success_with_data(depth))
-            )
+            (StatusCode::OK, Json(ApiResponse::success_with_data(depth)))
         }
-        Err(e) => {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<DepthData>::error(&e.to_string()))
-            )
-        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<DepthData>::error(&e.client_message())),
+        ),
     }
 }
 
 /// Get symbol info - POST /api/v1/symbol
 pub async fn get_symbol(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<SymbolRequest>,
+    ApiJson(req): ApiJson<SymbolRequest>,
 ) -> impl IntoResponse {
     info!("Symbol request: {} {}", req.exchange, req.symbol);
 
     if let Err(e) = state.validate_api_key(&req.apikey) {
-        return (StatusCode::FORBIDDEN, Json(ApiResponse::<SymbolData>::error(&e)));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse::<SymbolData>::error(&e)),
+        );
     }
 
     // Get from symbol cache (doesn't require broker connection)
@@ -1210,7 +1266,7 @@ pub async fn get_symbol(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<SymbolData>::error("Internal error"))
+                Json(ApiResponse::<SymbolData>::error("Internal error")),
             );
         }
     };
@@ -1229,29 +1285,30 @@ pub async fn get_symbol(
                 tick_size: symbol_info.tick_size,
                 instrument_type: symbol_info.instrument_type,
             };
-            (
-                StatusCode::OK,
-                Json(ApiResponse::success_with_data(data))
-            )
+            (StatusCode::OK, Json(ApiResponse::success_with_data(data)))
         }
-        None => {
-            (
-                StatusCode::NOT_FOUND,
-                Json(ApiResponse::<SymbolData>::error("Symbol not found"))
-            )
-        }
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(ApiResponse::<SymbolData>::error("Symbol not found")),
+        ),
     }
 }
 
 /// Get historical data - POST /api/v1/history
 pub async fn get_history(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<HistoryRequest>,
+    ApiJson(req): ApiJson<HistoryRequest>,
 ) -> impl IntoResponse {
-    info!("History request: {} {} {}", req.exchange, req.symbol, req.interval);
+    info!(
+        "History request: {} {} {}",
+        req.exchange, req.symbol, req.interval
+    );
 
     if let Err(e) = state.validate_api_key(&req.apikey) {
-        return (StatusCode::FORBIDDEN, Json(ApiResponse::<HistoryData>::error(&e)));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse::<HistoryData>::error(&e)),
+        );
     }
 
     let app_state = match state.get_app_state() {
@@ -1259,7 +1316,7 @@ pub async fn get_history(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<HistoryData>::error("Internal error"))
+                Json(ApiResponse::<HistoryData>::error("Internal error")),
             );
         }
     };
@@ -1275,17 +1332,23 @@ pub async fn get_history(
         start_date,
         end_date,
         Some(&req.apikey),
-    ).await {
+    )
+    .await
+    {
         Ok(result) => {
-            let candles: Vec<Candle> = result.candles.into_iter().map(|c| Candle {
-                timestamp: c.timestamp,
-                open: c.open,
-                high: c.high,
-                low: c.low,
-                close: c.close,
-                volume: c.volume,
-                oi: None,
-            }).collect();
+            let candles: Vec<Candle> = result
+                .candles
+                .into_iter()
+                .map(|c| Candle {
+                    timestamp: c.timestamp,
+                    open: c.open,
+                    high: c.high,
+                    low: c.low,
+                    close: c.close,
+                    volume: c.volume,
+                    oi: None,
+                })
+                .collect();
             let history = HistoryData {
                 symbol: result.symbol,
                 exchange: result.exchange,
@@ -1294,25 +1357,26 @@ pub async fn get_history(
             };
             (
                 StatusCode::OK,
-                Json(ApiResponse::success_with_data(history))
+                Json(ApiResponse::success_with_data(history)),
             )
         }
-        Err(e) => {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<HistoryData>::error(&e.to_string()))
-            )
-        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<HistoryData>::error(&e.client_message())),
+        ),
     }
 }
 
 /// Get supported intervals - POST /api/v1/intervals
 pub async fn get_intervals(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<IntervalsRequest>,
+    ApiJson(req): ApiJson<IntervalsRequest>,
 ) -> impl IntoResponse {
     if let Err(e) = state.validate_api_key(&req.apikey) {
-        return (StatusCode::FORBIDDEN, Json(ApiResponse::<IntervalsData>::error(&e)));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse::<IntervalsData>::error(&e)),
+        );
     }
 
     let result = HistoryService::get_intervals();
@@ -1322,17 +1386,20 @@ pub async fn get_intervals(
 
     (
         StatusCode::OK,
-        Json(ApiResponse::success_with_data(intervals))
+        Json(ApiResponse::success_with_data(intervals)),
     )
 }
 
 /// Get analyzer status - POST /api/v1/analyzer
 pub async fn get_analyzer_status(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<AnalyzerRequest>,
+    ApiJson(req): ApiJson<AnalyzerRequest>,
 ) -> impl IntoResponse {
     if let Err(e) = state.validate_api_key(&req.apikey) {
-        return (StatusCode::FORBIDDEN, Json(ApiResponse::<AnalyzerData>::error(&e)));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse::<AnalyzerData>::error(&e)),
+        );
     }
 
     let app_state = match state.get_app_state() {
@@ -1340,7 +1407,7 @@ pub async fn get_analyzer_status(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<AnalyzerData>::error("Internal error"))
+                Json(ApiResponse::<AnalyzerData>::error("Internal error")),
             );
         }
     };
@@ -1352,27 +1419,25 @@ pub async fn get_analyzer_status(
                 mode: status.mode,
                 total_logs: status.total_logs,
             };
-            (
-                StatusCode::OK,
-                Json(ApiResponse::success_with_data(data))
-            )
+            (StatusCode::OK, Json(ApiResponse::success_with_data(data)))
         }
-        Err(e) => {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<AnalyzerData>::error(&e.to_string()))
-            )
-        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<AnalyzerData>::error(&e.client_message())),
+        ),
     }
 }
 
 /// Toggle analyzer mode - POST /api/v1/analyzer/toggle
 pub async fn toggle_analyzer(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<AnalyzerToggleRequest>,
+    ApiJson(req): ApiJson<AnalyzerToggleRequest>,
 ) -> impl IntoResponse {
     if let Err(e) = state.validate_api_key(&req.apikey) {
-        return (StatusCode::FORBIDDEN, Json(ApiResponse::<AnalyzerData>::error(&e)));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse::<AnalyzerData>::error(&e)),
+        );
     }
 
     let app_state = match state.get_app_state() {
@@ -1380,7 +1445,7 @@ pub async fn toggle_analyzer(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<AnalyzerData>::error("Internal error"))
+                Json(ApiResponse::<AnalyzerData>::error("Internal error")),
             );
         }
     };
@@ -1392,49 +1457,51 @@ pub async fn toggle_analyzer(
                 mode: status.mode,
                 total_logs: status.total_logs,
             };
-            (
-                StatusCode::OK,
-                Json(ApiResponse::success_with_data(data))
-            )
+            (StatusCode::OK, Json(ApiResponse::success_with_data(data)))
         }
-        Err(e) => {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<AnalyzerData>::error(&e.to_string()))
-            )
-        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<AnalyzerData>::error(&e.client_message())),
+        ),
     }
 }
 
 /// Calculate margin - POST /api/v1/margin
 pub async fn get_margin(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<MarginRequest>,
+    ApiJson(req): ApiJson<MarginRequest>,
 ) -> impl IntoResponse {
     info!("Margin request: {} positions", req.positions.len());
 
     if let Err(e) = state.validate_api_key(&req.apikey) {
-        return (StatusCode::FORBIDDEN, Json(ApiResponse::<MarginData>::error(&e)));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse::<MarginData>::error(&e)),
+        );
     }
 
     if req.positions.is_empty() {
         return (
             StatusCode::BAD_REQUEST,
-            Json(ApiResponse::<MarginData>::error("Positions array cannot be empty"))
+            Json(ApiResponse::<MarginData>::error(
+                "Positions array cannot be empty",
+            )),
         );
     }
 
     if req.positions.len() > 50 {
         return (
             StatusCode::BAD_REQUEST,
-            Json(ApiResponse::<MarginData>::error("Maximum 50 positions allowed"))
+            Json(ApiResponse::<MarginData>::error(
+                "Maximum 50 positions allowed",
+            )),
         );
     }
 
     if !state.is_broker_connected() {
         return (
             StatusCode::SERVICE_UNAVAILABLE,
-            Json(ApiResponse::<MarginData>::error("Broker not connected"))
+            Json(ApiResponse::<MarginData>::error("Broker not connected")),
         );
     }
 
@@ -1445,21 +1512,21 @@ pub async fn get_margin(
         exposure_margin: Some(0.0),
     };
 
-    (
-        StatusCode::OK,
-        Json(ApiResponse::success_with_data(data))
-    )
+    (StatusCode::OK, Json(ApiResponse::success_with_data(data)))
 }
 
 /// Get multi-quotes - POST /api/v1/multiquotes
 pub async fn get_multiquotes(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<MultiQuotesRequest>,
+    ApiJson(req): ApiJson<MultiQuotesRequest>,
 ) -> impl IntoResponse {
     info!("Multi-quotes request: {} symbols", req.symbols.len());
 
     if let Err(e) = state.validate_api_key(&req.apikey) {
-        return (StatusCode::FORBIDDEN, Json(ApiResponse::<MultiQuotesData>::error(&e)));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse::<MultiQuotesData>::error(&e)),
+        );
     }
 
     let app_state = match state.get_app_state() {
@@ -1467,53 +1534,57 @@ pub async fn get_multiquotes(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<MultiQuotesData>::error("Internal error"))
+                Json(ApiResponse::<MultiQuotesData>::error("Internal error")),
             );
         }
     };
 
     // Convert symbols to (exchange, symbol) pairs
-    let symbols: Vec<(String, String)> = req.symbols.iter()
+    let symbols: Vec<(String, String)> = req
+        .symbols
+        .iter()
         .map(|s| (s.exchange.clone(), s.symbol.clone()))
         .collect();
 
     match QuotesService::get_multi_quotes(&app_state, symbols, Some(&req.apikey)).await {
         Ok(result) => {
             // MultiQuotesData is Vec<QuoteData>
-            let quotes: MultiQuotesData = result.quotes.into_iter().map(|q| QuoteData {
-                bid: q.bid,
-                ask: q.ask,
-                open: q.open,
-                high: q.high,
-                low: q.low,
-                ltp: q.ltp,
-                prev_close: q.close,
-                volume: q.volume,
-                oi: q.oi,
-            }).collect();
-            (
-                StatusCode::OK,
-                Json(ApiResponse::success_with_data(quotes))
-            )
+            let quotes: MultiQuotesData = result
+                .quotes
+                .into_iter()
+                .map(|q| QuoteData {
+                    bid: q.bid,
+                    ask: q.ask,
+                    open: q.open,
+                    high: q.high,
+                    low: q.low,
+                    ltp: q.ltp,
+                    prev_close: q.close,
+                    volume: q.volume,
+                    oi: q.oi,
+                })
+                .collect();
+            (StatusCode::OK, Json(ApiResponse::success_with_data(quotes)))
         }
-        Err(e) => {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<MultiQuotesData>::error(&e.to_string()))
-            )
-        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<MultiQuotesData>::error(&e.client_message())),
+        ),
     }
 }
 
 /// Search symbols - POST /api/v1/search
 pub async fn search_symbols(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<SearchRequest>,
+    ApiJson(req): ApiJson<SearchRequest>,
 ) -> impl IntoResponse {
     info!("Search request: {}", req.query);
 
     if let Err(e) = state.validate_api_key(&req.apikey) {
-        return (StatusCode::FORBIDDEN, Json(ApiResponse::<Vec<SearchResultItem>>::error(&e)));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse::<Vec<SearchResultItem>>::error(&e)),
+        );
     }
 
     let app_state = match state.get_app_state() {
@@ -1521,46 +1592,57 @@ pub async fn search_symbols(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<Vec<SearchResultItem>>::error("Internal error"))
+                Json(ApiResponse::<Vec<SearchResultItem>>::error(
+                    "Internal error",
+                )),
             );
         }
     };
 
     match SymbolService::search_symbols(&app_state, &req.query, req.exchange.as_deref(), Some(50)) {
         Ok(symbols) => {
-            let results: Vec<SearchResultItem> = symbols.into_iter().map(|s| SearchResultItem {
-                symbol: s.symbol,
-                name: s.name,
-                exchange: s.exchange,
-                token: s.token,
-                instrumenttype: s.instrument_type,
-                lotsize: s.lot_size,
-                strike: s.strike,
-                expiry: s.expiry,
-            }).collect();
+            let results: Vec<SearchResultItem> = symbols
+                .into_iter()
+                .map(|s| SearchResultItem {
+                    symbol: s.symbol,
+                    name: s.name,
+                    exchange: s.exchange,
+                    token: s.token,
+                    instrumenttype: s.instrument_type,
+                    lotsize: s.lot_size,
+                    strike: s.strike,
+                    expiry: s.expiry,
+                })
+                .collect();
             (
                 StatusCode::OK,
-                Json(ApiResponse::success_with_data(results))
+                Json(ApiResponse::success_with_data(results)),
             )
         }
-        Err(e) => {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<Vec<SearchResultItem>>::error(&e.to_string()))
-            )
-        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<Vec<SearchResultItem>>::error(
+                &e.client_message(),
+            )),
+        ),
     }
 }
 
 /// Get expiry dates - POST /api/v1/expiry
 pub async fn get_expiry(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<ExpiryRequest>,
+    ApiJson(req): ApiJson<ExpiryRequest>,
 ) -> impl IntoResponse {
-    info!("Expiry request: {} {} {}", req.symbol, req.exchange, req.instrumenttype);
+    info!(
+        "Expiry request: {} {} {}",
+        req.symbol, req.exchange, req.instrumenttype
+    );
 
     if let Err(e) = state.validate_api_key(&req.apikey) {
-        return (StatusCode::FORBIDDEN, Json(ApiResponse::<ExpiryData>::error(&e)));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse::<ExpiryData>::error(&e)),
+        );
     }
 
     let app_state = match state.get_app_state() {
@@ -1568,27 +1650,27 @@ pub async fn get_expiry(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<ExpiryData>::error("Internal error"))
+                Json(ApiResponse::<ExpiryData>::error("Internal error")),
             );
         }
     };
 
-    match SymbolService::get_expiry_dates(&app_state, &req.symbol, &req.exchange, &req.instrumenttype) {
+    match SymbolService::get_expiry_dates(
+        &app_state,
+        &req.symbol,
+        &req.exchange,
+        &req.instrumenttype,
+    ) {
         Ok(result) => {
             let data = ExpiryData {
                 expiry_dates: result.expiry_dates,
             };
-            (
-                StatusCode::OK,
-                Json(ApiResponse::success_with_data(data))
-            )
+            (StatusCode::OK, Json(ApiResponse::success_with_data(data)))
         }
-        Err(e) => {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<ExpiryData>::error(&e.to_string()))
-            )
-        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<ExpiryData>::error(&e.client_message())),
+        ),
     }
 }
 
@@ -1600,7 +1682,10 @@ pub async fn get_instruments(
     info!("Instruments request: {:?}", req.exchange);
 
     if let Err(e) = state.validate_api_key(&req.apikey) {
-        return (StatusCode::FORBIDDEN, Json(ApiResponse::<InstrumentsData>::error(&e)));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse::<InstrumentsData>::error(&e)),
+        );
     }
 
     let app_state = match state.get_app_state() {
@@ -1608,40 +1693,46 @@ pub async fn get_instruments(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<InstrumentsData>::error("Internal error"))
+                Json(ApiResponse::<InstrumentsData>::error("Internal error")),
             );
         }
     };
 
     let symbols = SymbolService::get_instruments(&app_state, req.exchange.as_deref());
-    let data: InstrumentsData = symbols.into_iter().map(|s| InstrumentItem {
-        symbol: s.symbol.clone(),
-        brsymbol: s.symbol, // broker symbol same as symbol
-        name: s.name,
-        exchange: s.exchange,
-        token: s.token,
-        expiry: s.expiry,
-        strike: s.strike,
-        lotsize: s.lot_size,
-        instrumenttype: s.instrument_type,
-        tick_size: s.tick_size,
-    }).collect();
+    let data: InstrumentsData = symbols
+        .into_iter()
+        .map(|s| InstrumentItem {
+            symbol: s.symbol.clone(),
+            brsymbol: s.symbol, // broker symbol same as symbol
+            name: s.name,
+            exchange: s.exchange,
+            token: s.token,
+            expiry: s.expiry,
+            strike: s.strike,
+            lotsize: s.lot_size,
+            instrumenttype: s.instrument_type,
+            tick_size: s.tick_size,
+        })
+        .collect();
 
-    (
-        StatusCode::OK,
-        Json(ApiResponse::success_with_data(data))
-    )
+    (StatusCode::OK, Json(ApiResponse::success_with_data(data)))
 }
 
 /// Calculate synthetic future - POST /api/v1/syntheticfuture
 pub async fn get_synthetic_future(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<SyntheticFutureRequest>,
+    ApiJson(req): ApiJson<SyntheticFutureRequest>,
 ) -> impl IntoResponse {
-    info!("Synthetic future request: {} {} {}", req.underlying, req.exchange, req.expiry_date);
+    info!(
+        "Synthetic future request: {} {} {}",
+        req.underlying, req.exchange, req.expiry_date
+    );
 
     if let Err(e) = state.validate_api_key(&req.apikey) {
-        return (StatusCode::FORBIDDEN, Json(ApiResponse::<SyntheticFutureData>::error(&e)));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse::<SyntheticFutureData>::error(&e)),
+        );
     }
 
     let app_state = match state.get_app_state() {
@@ -1649,12 +1740,20 @@ pub async fn get_synthetic_future(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<SyntheticFutureData>::error("Internal error"))
+                Json(ApiResponse::<SyntheticFutureData>::error("Internal error")),
             );
         }
     };
 
-    match OptionsService::get_synthetic_future(&app_state, &req.underlying, &req.exchange, &req.expiry_date, Some(&req.apikey)).await {
+    match OptionsService::get_synthetic_future(
+        &app_state,
+        &req.underlying,
+        &req.exchange,
+        &req.expiry_date,
+        Some(&req.apikey),
+    )
+    .await
+    {
         Ok(result) => {
             let data = SyntheticFutureData {
                 underlying: result.underlying,
@@ -1663,29 +1762,29 @@ pub async fn get_synthetic_future(
                 atm_strike: result.atm_strike,
                 synthetic_future_price: result.synthetic_future_price,
             };
-            (
-                StatusCode::OK,
-                Json(ApiResponse::success_with_data(data))
-            )
+            (StatusCode::OK, Json(ApiResponse::success_with_data(data)))
         }
-        Err(e) => {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<SyntheticFutureData>::error(&e.to_string()))
-            )
-        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<SyntheticFutureData>::error(
+                &e.client_message(),
+            )),
+        ),
     }
 }
 
 /// Get option chain - POST /api/v1/optionchain
 pub async fn get_option_chain(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<OptionChainRequest>,
+    ApiJson(req): ApiJson<OptionChainRequest>,
 ) -> impl IntoResponse {
     info!("Option chain request: {} {}", req.underlying, req.exchange);
 
     if let Err(e) = state.validate_api_key(&req.apikey) {
-        return (StatusCode::FORBIDDEN, Json(ApiResponse::<OptionChainData>::error(&e)));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse::<OptionChainData>::error(&e)),
+        );
     }
 
     let app_state = match state.get_app_state() {
@@ -1693,26 +1792,38 @@ pub async fn get_option_chain(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<OptionChainData>::error("Internal error"))
+                Json(ApiResponse::<OptionChainData>::error("Internal error")),
             );
         }
     };
 
-    match OptionsService::get_option_chain(&app_state, &req.underlying, &req.exchange, req.expiry_date.as_deref(), Some(&req.apikey)).await {
+    match OptionsService::get_option_chain(
+        &app_state,
+        &req.underlying,
+        &req.exchange,
+        req.expiry_date.as_deref(),
+        Some(&req.apikey),
+    )
+    .await
+    {
         Ok(result) => {
-            let strikes: Vec<OptionStrike> = result.strikes.into_iter().map(|s| OptionStrike {
-                strike: s.strike,
-                ce_symbol: s.call_symbol.unwrap_or_default(),
-                ce_ltp: s.call_ltp.unwrap_or(0.0),
-                ce_oi: s.call_oi.unwrap_or(0),
-                ce_volume: s.call_volume.unwrap_or(0),
-                ce_iv: s.call_iv.unwrap_or(0.0),
-                pe_symbol: s.put_symbol.unwrap_or_default(),
-                pe_ltp: s.put_ltp.unwrap_or(0.0),
-                pe_oi: s.put_oi.unwrap_or(0),
-                pe_volume: s.put_volume.unwrap_or(0),
-                pe_iv: s.put_iv.unwrap_or(0.0),
-            }).collect();
+            let strikes: Vec<OptionStrike> = result
+                .strikes
+                .into_iter()
+                .map(|s| OptionStrike {
+                    strike: s.strike,
+                    ce_symbol: s.call_symbol.unwrap_or_default(),
+                    ce_ltp: s.call_ltp.unwrap_or(0.0),
+                    ce_oi: s.call_oi.unwrap_or(0),
+                    ce_volume: s.call_volume.unwrap_or(0),
+                    ce_iv: s.call_iv.unwrap_or(0.0),
+                    pe_symbol: s.put_symbol.unwrap_or_default(),
+                    pe_ltp: s.put_ltp.unwrap_or(0.0),
+                    pe_oi: s.put_oi.unwrap_or(0),
+                    pe_volume: s.put_volume.unwrap_or(0),
+                    pe_iv: s.put_iv.unwrap_or(0.0),
+                })
+                .collect();
             let data = OptionChainData {
                 underlying: result.underlying,
                 underlying_ltp: result.underlying_ltp,
@@ -1720,29 +1831,27 @@ pub async fn get_option_chain(
                 atm_strike: result.atm_strike,
                 strikes,
             };
-            (
-                StatusCode::OK,
-                Json(ApiResponse::success_with_data(data))
-            )
+            (StatusCode::OK, Json(ApiResponse::success_with_data(data)))
         }
-        Err(e) => {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<OptionChainData>::error(&e.to_string()))
-            )
-        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<OptionChainData>::error(&e.client_message())),
+        ),
     }
 }
 
 /// Get option Greeks - POST /api/v1/optiongreeks
 pub async fn get_option_greeks(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<OptionGreeksRequest>,
+    ApiJson(req): ApiJson<OptionGreeksRequest>,
 ) -> impl IntoResponse {
     info!("Option Greeks request: {} {}", req.symbol, req.exchange);
 
     if let Err(e) = state.validate_api_key(&req.apikey) {
-        return (StatusCode::FORBIDDEN, Json(ApiResponse::<OptionGreeksData>::error(&e)));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse::<OptionGreeksData>::error(&e)),
+        );
     }
 
     let app_state = match state.get_app_state() {
@@ -1750,12 +1859,19 @@ pub async fn get_option_greeks(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<OptionGreeksData>::error("Internal error"))
+                Json(ApiResponse::<OptionGreeksData>::error("Internal error")),
             );
         }
     };
 
-    match OptionsService::get_option_greeks(&app_state, &req.symbol, &req.exchange, Some(&req.apikey)).await {
+    match OptionsService::get_option_greeks(
+        &app_state,
+        &req.symbol,
+        &req.exchange,
+        Some(&req.apikey),
+    )
+    .await
+    {
         Ok(result) => {
             let data = OptionGreeksData {
                 symbol: result.symbol,
@@ -1767,29 +1883,30 @@ pub async fn get_option_greeks(
                 vega: result.vega,
                 rho: result.rho,
             };
-            (
-                StatusCode::OK,
-                Json(ApiResponse::success_with_data(data))
-            )
+            (StatusCode::OK, Json(ApiResponse::success_with_data(data)))
         }
-        Err(e) => {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<OptionGreeksData>::error(&e.to_string()))
-            )
-        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<OptionGreeksData>::error(&e.client_message())),
+        ),
     }
 }
 
 /// Place options order - POST /api/v1/optionsorder
 pub async fn place_options_order(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<OptionsOrderRequest>,
+    ApiJson(req): ApiJson<OptionsOrderRequest>,
 ) -> impl IntoResponse {
-    info!("Options order request: {} {} {} {}", req.underlying, req.exchange, req.option_type, req.action);
+    info!(
+        "Options order request: {} {} {} {}",
+        req.underlying, req.exchange, req.option_type, req.action
+    );
 
     if let Err(e) = state.validate_api_key(&req.apikey) {
-        return (StatusCode::FORBIDDEN, Json(ApiResponse::<OptionsOrderResult>::error(&e)));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse::<OptionsOrderResult>::error(&e)),
+        );
     }
 
     let app_state = match state.get_app_state() {
@@ -1797,7 +1914,7 @@ pub async fn place_options_order(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<OptionsOrderResult>::error("Internal error"))
+                Json(ApiResponse::<OptionsOrderResult>::error("Internal error")),
             );
         }
     };
@@ -1824,35 +1941,38 @@ pub async fn place_options_order(
                     symbol: result.order_id.clone().unwrap_or_default(),
                     orderid: result.order_id.unwrap_or_default(),
                 };
-                (
-                    StatusCode::OK,
-                    Json(ApiResponse::success_with_data(data))
-                )
+                (StatusCode::OK, Json(ApiResponse::success_with_data(data)))
             } else {
                 (
                     StatusCode::BAD_REQUEST,
-                    Json(ApiResponse::<OptionsOrderResult>::error(&result.message))
+                    Json(ApiResponse::<OptionsOrderResult>::error(&result.message)),
                 )
             }
         }
-        Err(e) => {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<OptionsOrderResult>::error(&e.to_string()))
-            )
-        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<OptionsOrderResult>::error(
+                &e.client_message(),
+            )),
+        ),
     }
 }
 
 /// Get options symbol - POST /api/v1/optionsymbol
 pub async fn get_option_symbol(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<OptionSymbolRequest>,
+    ApiJson(req): ApiJson<OptionSymbolRequest>,
 ) -> impl IntoResponse {
-    info!("Option symbol request: {} {} {}", req.underlying, req.exchange, req.option_type);
+    info!(
+        "Option symbol request: {} {} {}",
+        req.underlying, req.exchange, req.option_type
+    );
 
     if let Err(e) = state.validate_api_key(&req.apikey) {
-        return (StatusCode::FORBIDDEN, Json(ApiResponse::<OptionSymbolResult>::error(&e)));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse::<OptionSymbolResult>::error(&e)),
+        );
     }
 
     let app_state = match state.get_app_state() {
@@ -1860,13 +1980,20 @@ pub async fn get_option_symbol(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<OptionSymbolResult>::error("Internal error"))
+                Json(ApiResponse::<OptionSymbolResult>::error("Internal error")),
             );
         }
     };
 
     // Get underlying LTP for strike calculation (default to 0 if unavailable)
-    let underlying_ltp = match QuotesService::get_quote(&app_state, &req.exchange, &req.underlying, Some(&req.apikey)).await {
+    let underlying_ltp = match QuotesService::get_quote(
+        &app_state,
+        &req.exchange,
+        &req.underlying,
+        Some(&req.apikey),
+    )
+    .await
+    {
         Ok(q) => q.ltp,
         Err(_) => 0.0,
     };
@@ -1874,7 +2001,15 @@ pub async fn get_option_symbol(
     // Convert offset to strike_selection string
     let strike_selection = offset_to_strike_selection(req.offset);
 
-    match OptionsService::get_option_symbol(&app_state, &req.underlying, &req.exchange, &req.option_type, &strike_selection, req.expiry_date.as_deref(), underlying_ltp) {
+    match OptionsService::get_option_symbol(
+        &app_state,
+        &req.underlying,
+        &req.exchange,
+        &req.option_type,
+        &strike_selection,
+        req.expiry_date.as_deref(),
+        underlying_ltp,
+    ) {
         Ok(result) => {
             let data = OptionSymbolResult {
                 symbol: result.symbol,
@@ -1884,29 +2019,33 @@ pub async fn get_option_symbol(
                 option_type: result.option_type,
                 expiry: result.expiry,
             };
-            (
-                StatusCode::OK,
-                Json(ApiResponse::success_with_data(data))
-            )
+            (StatusCode::OK, Json(ApiResponse::success_with_data(data)))
         }
-        Err(e) => {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<OptionSymbolResult>::error(&e.to_string()))
-            )
-        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<OptionSymbolResult>::error(
+                &e.client_message(),
+            )),
+        ),
     }
 }
 
 /// Place options multi-order - POST /api/v1/optionsmultiorder
 pub async fn place_options_multi_order(
     AxumState(state): AxumState<Arc<WebhookState>>,
-    Json(req): Json<OptionsMultiOrderRequest>,
+    ApiJson(req): ApiJson<OptionsMultiOrderRequest>,
 ) -> impl IntoResponse {
-    info!("Options multi-order request: {} {} legs", req.underlying, req.legs.len());
+    info!(
+        "Options multi-order request: {} {} legs",
+        req.underlying,
+        req.legs.len()
+    );
 
     if let Err(e) = state.validate_api_key(&req.apikey) {
-        return (StatusCode::FORBIDDEN, Json(ApiResponse::<OptionsMultiOrderResult>::error(&e)));
+        return (
+            StatusCode::FORBIDDEN,
+            Json(ApiResponse::<OptionsMultiOrderResult>::error(&e)),
+        );
     }
 
     let app_state = match state.get_app_state() {
@@ -1914,46 +2053,67 @@ pub async fn place_options_multi_order(
         None => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<OptionsMultiOrderResult>::error("Internal error"))
+                Json(ApiResponse::<OptionsMultiOrderResult>::error(
+                    "Internal error",
+                )),
             );
         }
     };
 
     // Get product from first leg (or default to MIS)
-    let product = req.legs.first().map(|l| l.product.clone()).unwrap_or_else(|| "MIS".to_string());
+    let product = req
+        .legs
+        .first()
+        .map(|l| l.product.clone())
+        .unwrap_or_else(|| "MIS".to_string());
 
-    let legs: Vec<crate::services::options_service::OptionsLeg> = req.legs.iter().map(|leg| {
-        crate::services::options_service::OptionsLeg {
+    let legs: Vec<crate::services::options_service::OptionsLeg> = req
+        .legs
+        .iter()
+        .map(|leg| crate::services::options_service::OptionsLeg {
             option_type: leg.option_type.clone(),
             strike_selection: offset_to_strike_selection(leg.offset),
             action: leg.action.clone(),
             quantity: leg.quantity,
-        }
-    }).collect();
+        })
+        .collect();
 
-    match OptionsService::place_options_multi_order(&app_state, &req.underlying, &req.exchange, req.expiry_date.as_deref(), &product, legs, Some(&req.apikey)).await {
+    match OptionsService::place_options_multi_order(
+        &app_state,
+        &req.underlying,
+        &req.exchange,
+        req.expiry_date.as_deref(),
+        &product,
+        legs,
+        Some(&req.apikey),
+    )
+    .await
+    {
         Ok(order_results) => {
-            let results: Vec<OptionsOrderLegResult> = order_results.into_iter().enumerate().map(|(i, r)| {
-                OptionsOrderLegResult {
+            let results: Vec<OptionsOrderLegResult> = order_results
+                .into_iter()
+                .enumerate()
+                .map(|(i, r)| OptionsOrderLegResult {
                     leg: (i + 1) as i32,
                     symbol: r.order_id.clone().unwrap_or_default(),
                     orderid: r.order_id,
-                    status: if r.success { "success".to_string() } else { "error".to_string() },
+                    status: if r.success {
+                        "success".to_string()
+                    } else {
+                        "error".to_string()
+                    },
                     message: if r.success { None } else { Some(r.message) },
-                }
-            }).collect();
+                })
+                .collect();
             let data = OptionsMultiOrderResult { results };
-            (
-                StatusCode::OK,
-                Json(ApiResponse::success_with_data(data))
-            )
+            (StatusCode::OK, Json(ApiResponse::success_with_data(data)))
         }
-        Err(e) => {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(ApiResponse::<OptionsMultiOrderResult>::error(&e.to_string()))
-            )
-        }
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(ApiResponse::<OptionsMultiOrderResult>::error(
+                &e.client_message(),
+            )),
+        ),
     }
 }
 
@@ -2001,18 +2161,24 @@ fn validate_trading_hours(strategy: &Strategy, payload: &WebhookPayload) -> Resu
     let squareoff_time = strategy.squareoff_time.as_deref().unwrap_or("15:25");
 
     // Before start time - reject all
-    if current_time < start_time.to_string() {
+    if current_time.as_str() < start_time {
         return Err(format!("Trading not started. Starts at {}", start_time));
     }
 
     // After squareoff time - reject all
-    if current_time > squareoff_time.to_string() {
-        return Err(format!("Trading ended. Squareoff was at {}", squareoff_time));
+    if current_time.as_str() > squareoff_time {
+        return Err(format!(
+            "Trading ended. Squareoff was at {}",
+            squareoff_time
+        ));
     }
 
     // Between end_time and squareoff_time - only exit orders allowed
-    if current_time > end_time.to_string() && is_entry {
-        return Err(format!("Entry orders not allowed after {}. Only exit orders until {}", end_time, squareoff_time));
+    if current_time.as_str() > end_time && is_entry {
+        return Err(format!(
+            "Entry orders not allowed after {}. Only exit orders until {}",
+            end_time, squareoff_time
+        ));
     }
 
     Ok(())
@@ -2044,124 +2210,6 @@ fn validate_trading_mode(trading_mode: &str, action: &str) -> Result<(), String>
             Ok(())
         }
         "BOTH" => Ok(()),
-        _ => Err(format!("Invalid trading mode: {}", trading_mode))
+        _ => Err(format!("Invalid trading mode: {}", trading_mode)),
     }
-}
-
-// ============================================================================
-// OAuth Callback Handler
-// ============================================================================
-
-use axum::extract::Query;
-use serde::Deserialize as SerdeDeserialize;
-
-/// OAuth callback query parameters
-#[derive(Debug, SerdeDeserialize)]
-pub struct OAuthCallbackParams {
-    pub code: Option<String>,
-    pub auth_code: Option<String>,
-    pub state: Option<String>,
-    pub s: Option<String>,
-    pub request_token: Option<String>,
-}
-
-/// OAuth callback result sent to frontend
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct OAuthCallbackResult {
-    pub broker_id: String,
-    pub success: bool,
-    pub auth_code: Option<String>,
-    pub message: String,
-}
-
-/// OAuth callback handler - GET /{broker}/callback
-///
-/// Handles OAuth redirects from brokers like Fyers, Zerodha, Upstox
-pub async fn oauth_callback(
-    AxumState(state): AxumState<Arc<WebhookState>>,
-    Path(broker_id): Path<String>,
-    Query(params): Query<OAuthCallbackParams>,
-) -> impl IntoResponse {
-    info!("OAuth callback received for broker: {}", broker_id);
-    info!("Params: code={:?}, auth_code={:?}, state={:?}", params.code, params.auth_code, params.state);
-
-    // Get auth_code from various possible parameter names
-    let auth_code = params.auth_code
-        .or(params.code)
-        .or(params.request_token);
-
-    let result = if let Some(code) = &auth_code {
-        // Emit event to frontend with the auth code
-        let callback_result = OAuthCallbackResult {
-            broker_id: broker_id.clone(),
-            success: true,
-            auth_code: Some(code.clone()),
-            message: "OAuth callback received successfully".to_string(),
-        };
-
-        state.emit("oauth_callback", &callback_result);
-
-        callback_result
-    } else {
-        // No auth code found
-        let callback_result = OAuthCallbackResult {
-            broker_id: broker_id.clone(),
-            success: false,
-            auth_code: None,
-            message: "No auth code received in callback".to_string(),
-        };
-
-        state.emit("oauth_callback", &callback_result);
-
-        callback_result
-    };
-
-    // Return HTML page that closes the window
-    let html = format!(r#"
-<!DOCTYPE html>
-<html>
-<head>
-    <title>OpenAlgo - Authentication</title>
-    <style>
-        body {{
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            margin: 0;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }}
-        .container {{
-            text-align: center;
-            padding: 40px;
-            background: rgba(255,255,255,0.1);
-            border-radius: 16px;
-            backdrop-filter: blur(10px);
-        }}
-        h1 {{ margin-bottom: 16px; }}
-        p {{ opacity: 0.9; }}
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>{}</h1>
-        <p>{}</p>
-        <p>You can close this window and return to the app.</p>
-    </div>
-    <script>
-        // Try to close the window after a short delay
-        setTimeout(function() {{
-            window.close();
-        }}, 2000);
-    </script>
-</body>
-</html>
-"#,
-        if result.success { "Authentication Successful" } else { "Authentication Failed" },
-        result.message
-    );
-
-    axum::response::Html(html)
 }

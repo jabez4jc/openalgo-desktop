@@ -14,17 +14,18 @@ pub struct LatencyLog {
     pub order_id: String,
     pub broker: String,
     pub symbol: String,
-    pub order_type: String,         // MARKET, LIMIT, PLACE, SMART, etc.
-    pub rtt_ms: f64,                // Round-trip time (comparable to Postman)
-    pub validation_ms: f64,         // Pre-request processing
-    pub broker_response_ms: f64,    // Broker API response time
-    pub overhead_ms: f64,           // Our processing overhead
-    pub total_ms: f64,              // Total latency
-    pub status: String,             // SUCCESS, FAILED
+    pub order_type: String,      // MARKET, LIMIT, PLACE, SMART, etc.
+    pub rtt_ms: f64,             // Round-trip time (comparable to Postman)
+    pub validation_ms: f64,      // Pre-request processing
+    pub broker_response_ms: f64, // Broker API response time
+    pub overhead_ms: f64,        // Our processing overhead
+    pub total_ms: f64,           // Total latency
+    pub status: String,          // SUCCESS, FAILED
     pub error: Option<String>,
 }
 
 /// Create latency log entry
+#[allow(clippy::too_many_arguments)]
 pub fn log_latency(
     conn: &Connection,
     order_id: &str,
@@ -46,9 +47,17 @@ pub fn log_latency(
             status, error
         ) VALUES (datetime('now'), ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
         params![
-            order_id, broker, symbol, order_type,
-            rtt_ms, validation_ms, broker_response_ms, overhead_ms, total_ms,
-            status, error
+            order_id,
+            broker,
+            symbol,
+            order_type,
+            rtt_ms,
+            validation_ms,
+            broker_response_ms,
+            overhead_ms,
+            total_ms,
+            status,
+            error
         ],
     )?;
     Ok(conn.last_insert_rowid())
@@ -62,7 +71,7 @@ pub fn get_recent_logs(conn: &Connection, limit: i64) -> Result<Vec<LatencyLog>>
                 status, error
          FROM latency_logs
          ORDER BY timestamp DESC
-         LIMIT ?1"
+         LIMIT ?1",
     )?;
 
     let rows = stmt.query_map(params![limit], |row| {
@@ -99,9 +108,9 @@ pub struct LatencyStats {
     pub p90_total: f64,
     pub p95_total: f64,
     pub p99_total: f64,
-    pub sla_100ms: f64,     // % under 100ms
-    pub sla_150ms: f64,     // % under 150ms
-    pub sla_200ms: f64,     // % under 200ms
+    pub sla_100ms: f64, // % under 100ms
+    pub sla_150ms: f64, // % under 150ms
+    pub sla_200ms: f64, // % under 200ms
     pub broker_stats: std::collections::HashMap<String, BrokerLatencyStats>,
 }
 
@@ -119,54 +128,66 @@ pub struct BrokerLatencyStats {
 /// Get latency statistics
 pub fn get_stats(conn: &Connection) -> Result<LatencyStats> {
     // Get overall stats
-    let total_orders: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM latency_logs",
-        [],
-        |row| row.get(0),
-    ).unwrap_or(0);
+    let total_orders: i64 = conn
+        .query_row("SELECT COUNT(*) FROM latency_logs", [], |row| row.get(0))
+        .unwrap_or(0);
 
-    let failed_orders: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM latency_logs WHERE status = 'FAILED'",
-        [],
-        |row| row.get(0),
-    ).unwrap_or(0);
+    let failed_orders: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM latency_logs WHERE status = 'FAILED'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
 
-    let avg_rtt: f64 = conn.query_row(
-        "SELECT COALESCE(AVG(rtt_ms), 0) FROM latency_logs",
-        [],
-        |row| row.get(0),
-    ).unwrap_or(0.0);
+    let avg_rtt: f64 = conn
+        .query_row(
+            "SELECT COALESCE(AVG(rtt_ms), 0) FROM latency_logs",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0.0);
 
-    let avg_overhead: f64 = conn.query_row(
-        "SELECT COALESCE(AVG(overhead_ms), 0) FROM latency_logs",
-        [],
-        |row| row.get(0),
-    ).unwrap_or(0.0);
+    let avg_overhead: f64 = conn
+        .query_row(
+            "SELECT COALESCE(AVG(overhead_ms), 0) FROM latency_logs",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0.0);
 
-    let avg_total: f64 = conn.query_row(
-        "SELECT COALESCE(AVG(total_ms), 0) FROM latency_logs",
-        [],
-        |row| row.get(0),
-    ).unwrap_or(0.0);
+    let avg_total: f64 = conn
+        .query_row(
+            "SELECT COALESCE(AVG(total_ms), 0) FROM latency_logs",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0.0);
 
     // SLA calculations
-    let under_100: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM latency_logs WHERE total_ms < 100",
-        [],
-        |row| row.get(0),
-    ).unwrap_or(0);
+    let under_100: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM latency_logs WHERE total_ms < 100",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
 
-    let under_150: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM latency_logs WHERE total_ms < 150",
-        [],
-        |row| row.get(0),
-    ).unwrap_or(0);
+    let under_150: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM latency_logs WHERE total_ms < 150",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
 
-    let under_200: i64 = conn.query_row(
-        "SELECT COUNT(*) FROM latency_logs WHERE total_ms < 200",
-        [],
-        |row| row.get(0),
-    ).unwrap_or(0);
+    let under_200: i64 = conn
+        .query_row(
+            "SELECT COUNT(*) FROM latency_logs WHERE total_ms < 200",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
 
     let success_rate = if total_orders > 0 {
         ((total_orders - failed_orders) as f64 / total_orders as f64) * 100.0
@@ -174,17 +195,31 @@ pub fn get_stats(conn: &Connection) -> Result<LatencyStats> {
         0.0
     };
 
-    let sla_100ms = if total_orders > 0 { (under_100 as f64 / total_orders as f64) * 100.0 } else { 0.0 };
-    let sla_150ms = if total_orders > 0 { (under_150 as f64 / total_orders as f64) * 100.0 } else { 0.0 };
-    let sla_200ms = if total_orders > 0 { (under_200 as f64 / total_orders as f64) * 100.0 } else { 0.0 };
+    let sla_100ms = if total_orders > 0 {
+        (under_100 as f64 / total_orders as f64) * 100.0
+    } else {
+        0.0
+    };
+    let sla_150ms = if total_orders > 0 {
+        (under_150 as f64 / total_orders as f64) * 100.0
+    } else {
+        0.0
+    };
+    let sla_200ms = if total_orders > 0 {
+        (under_200 as f64 / total_orders as f64) * 100.0
+    } else {
+        0.0
+    };
 
     // Get percentiles (simplified - get all values and calculate)
     let mut all_latencies: Vec<f64> = Vec::new();
     {
-        let mut stmt = conn.prepare("SELECT total_ms FROM latency_logs WHERE total_ms IS NOT NULL ORDER BY total_ms")?;
+        let mut stmt = conn.prepare(
+            "SELECT total_ms FROM latency_logs WHERE total_ms IS NOT NULL ORDER BY total_ms",
+        )?;
         let rows = stmt.query_map([], |row| row.get::<_, f64>(0))?;
-        for row in rows {
-            if let Ok(v) = row {
+        for v in rows.flatten() {
+            {
                 all_latencies.push(v);
             }
         }
@@ -202,7 +237,7 @@ pub fn get_stats(conn: &Connection) -> Result<LatencyStats> {
                     SUM(CASE WHEN total_ms < 150 THEN 1 ELSE 0 END)
              FROM latency_logs
              WHERE broker IS NOT NULL
-             GROUP BY broker"
+             GROUP BY broker",
         )?;
 
         let rows = stmt.query_map([], |row| {
@@ -216,9 +251,13 @@ pub fn get_stats(conn: &Connection) -> Result<LatencyStats> {
             ))
         })?;
 
-        for row in rows {
-            if let Ok((broker, total, failed, avg_rtt, avg_total, under_150)) = row {
-                let sla = if total > 0 { (under_150 as f64 / total as f64) * 100.0 } else { 0.0 };
+        for (broker, total, failed, avg_rtt, avg_total, under_150) in rows.flatten() {
+            {
+                let sla = if total > 0 {
+                    (under_150 as f64 / total as f64) * 100.0
+                } else {
+                    0.0
+                };
 
                 // Get percentiles for this broker
                 let mut broker_latencies: Vec<f64> = Vec::new();
@@ -227,23 +266,26 @@ pub fn get_stats(conn: &Connection) -> Result<LatencyStats> {
                         "SELECT total_ms FROM latency_logs WHERE broker = ?1 AND total_ms IS NOT NULL ORDER BY total_ms"
                     )?;
                     let prows = pstmt.query_map(params![&broker], |row| row.get::<_, f64>(0))?;
-                    for prow in prows {
-                        if let Ok(v) = prow {
+                    for v in prows.flatten() {
+                        {
                             broker_latencies.push(v);
                         }
                     }
                 }
                 let (p50, _, _, p99) = calculate_percentiles(&broker_latencies);
 
-                broker_stats.insert(broker, BrokerLatencyStats {
-                    total_orders: total,
-                    failed_orders: failed,
-                    avg_rtt,
-                    avg_total,
-                    p50_total: p50,
-                    p99_total: p99,
-                    sla_150ms: sla,
-                });
+                broker_stats.insert(
+                    broker,
+                    BrokerLatencyStats {
+                        total_orders: total,
+                        failed_orders: failed,
+                        avg_rtt,
+                        avg_total,
+                        p50_total: p50,
+                        p99_total: p99,
+                        sla_150ms: sla,
+                    },
+                );
             }
         }
     }
@@ -297,10 +339,23 @@ fn calculate_percentiles(sorted_values: &[f64]) -> (f64, f64, f64, f64) {
 /// Purge old non-order latency logs (keep order logs forever)
 pub fn purge_old_data_logs(conn: &Connection, days: i64) -> Result<usize> {
     // Order types to keep forever
-    let order_types = vec!["PLACE", "SMART", "MODIFY", "CANCEL", "CLOSE", "CANCEL_ALL", "BASKET", "SPLIT", "OPTIONS", "OPTIONS_MULTI"];
+    let order_types = vec![
+        "PLACE",
+        "SMART",
+        "MODIFY",
+        "CANCEL",
+        "CLOSE",
+        "CANCEL_ALL",
+        "BASKET",
+        "SPLIT",
+        "OPTIONS",
+        "OPTIONS_MULTI",
+    ];
 
     // Build parameterized query safely - days is passed as parameter, not interpolated
-    let placeholders: Vec<String> = (2..=order_types.len() + 1).map(|i| format!("?{}", i)).collect();
+    let placeholders: Vec<String> = (2..=order_types.len() + 1)
+        .map(|i| format!("?{}", i))
+        .collect();
     let sql = format!(
         "DELETE FROM latency_logs WHERE timestamp < datetime('now', ?1) AND order_type NOT IN ({})",
         placeholders.join(", ")

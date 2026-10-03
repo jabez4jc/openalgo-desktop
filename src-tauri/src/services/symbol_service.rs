@@ -70,8 +70,8 @@ impl SymbolService {
                     instrument_type: s.instrument_type.clone(),
                     lot_size: s.lot_size,
                     tick_size: s.tick_size,
-                    strike: None,  // Not available in SymbolInfo
-                    expiry: None,  // Not available in SymbolInfo
+                    strike: None, // Not available in SymbolInfo
+                    expiry: None, // Not available in SymbolInfo
                 }
             })
             .collect();
@@ -129,10 +129,7 @@ impl SymbolService {
     }
 
     /// Get all instruments for an exchange
-    pub fn get_instruments(
-        state: &AppState,
-        exchange: Option<&str>,
-    ) -> Vec<SymbolSearchResult> {
+    pub fn get_instruments(state: &AppState, exchange: Option<&str>) -> Vec<SymbolSearchResult> {
         state
             .symbol_cache
             .iter()
@@ -211,7 +208,9 @@ impl SymbolService {
             .ok_or_else(|| AppError::Broker("Broker not found".to_string()))?;
 
         // Download master contract from broker
-        let symbols = broker.download_master_contract(&session.auth_token).await?;
+        let symbols = broker
+            .download_master_contract(session.auth_token.expose())
+            .await?;
 
         // Convert to SymbolInfo
         let symbol_infos: Vec<SymbolInfo> = symbols

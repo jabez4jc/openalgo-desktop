@@ -70,10 +70,16 @@ impl OrderService {
                 order.broker_symbol = Some(brsymbol);
             }
             // Set the exchange token (needed for Angel One)
-            info!("Resolved symbol token: {} -> {}", order.symbol, symbol_info.token);
+            info!(
+                "Resolved symbol token: {} -> {}",
+                order.symbol, symbol_info.token
+            );
             order.symbol_token = Some(symbol_info.token);
         } else {
-            warn!("Symbol not found in cache: {}:{}", order.exchange, order.symbol);
+            warn!(
+                "Symbol not found in cache: {}:{}",
+                order.exchange, order.symbol
+            );
         }
 
         // Get broker adapter
@@ -83,7 +89,7 @@ impl OrderService {
             .ok_or_else(|| AppError::Broker(format!("Broker '{}' not found", broker_id)))?;
 
         // Place order via broker
-        match broker.place_order(&auth_token, order.clone()).await {
+        match broker.place_order(auth_token.expose(), order.clone()).await {
             Ok(response) => {
                 // Log the order
                 Self::log_order(state, "placeorder", &order, &response, api_key);
@@ -91,7 +97,9 @@ impl OrderService {
                 Ok(PlaceOrderResult {
                     success: true,
                     order_id: Some(response.order_id),
-                    message: response.message.unwrap_or_else(|| "Order placed successfully".to_string()),
+                    message: response
+                        .message
+                        .unwrap_or_else(|| "Order placed successfully".to_string()),
                     mode: "live".to_string(),
                 })
             }
@@ -134,11 +142,16 @@ impl OrderService {
             .get(&broker_id)
             .ok_or_else(|| AppError::Broker(format!("Broker '{}' not found", broker_id)))?;
 
-        match broker.modify_order(&auth_token, order_id, order).await {
+        match broker
+            .modify_order(auth_token.expose(), order_id, order)
+            .await
+        {
             Ok(response) => Ok(ModifyOrderResult {
                 success: true,
                 order_id: response.order_id,
-                message: response.message.unwrap_or_else(|| "Order modified successfully".to_string()),
+                message: response
+                    .message
+                    .unwrap_or_else(|| "Order modified successfully".to_string()),
             }),
             Err(e) => {
                 error!("Failed to modify order: {}", e);
@@ -170,7 +183,10 @@ impl OrderService {
                     });
                 }
                 Ok(false) => {
-                    return Err(AppError::NotFound(format!("Order {} not found in sandbox", order_id)));
+                    return Err(AppError::NotFound(format!(
+                        "Order {} not found in sandbox",
+                        order_id
+                    )));
                 }
                 Err(e) => {
                     return Err(e);
@@ -185,7 +201,9 @@ impl OrderService {
             .get(&broker_id)
             .ok_or_else(|| AppError::Broker(format!("Broker '{}' not found", broker_id)))?;
 
-        broker.cancel_order(&auth_token, order_id, variety).await?;
+        broker
+            .cancel_order(auth_token.expose(), order_id, variety)
+            .await?;
 
         Ok(CancelOrderResult {
             success: true,
@@ -218,13 +236,19 @@ impl OrderService {
             .ok_or_else(|| AppError::Broker(format!("Broker '{}' not found", broker_id)))?;
 
         // Get all open orders
-        let orders = broker.get_order_book(&auth_token).await?;
+        let orders = broker.get_order_book(auth_token.expose()).await?;
 
         let mut results = Vec::new();
         for order in orders {
             // Only cancel pending/open orders
-            if order.status == "PENDING" || order.status == "OPEN" || order.status == "TRIGGER PENDING" {
-                match broker.cancel_order(&auth_token, &order.order_id, None).await {
+            if order.status == "PENDING"
+                || order.status == "OPEN"
+                || order.status == "TRIGGER PENDING"
+            {
+                match broker
+                    .cancel_order(auth_token.expose(), &order.order_id, None)
+                    .await
+                {
                     Ok(_) => {
                         results.push(CancelOrderResult {
                             success: true,
@@ -254,11 +278,14 @@ impl OrderService {
     ///
     /// If api_key is provided (REST API call), validate it and get auth from DB.
     /// Otherwise, use the current broker session (Tauri command call).
-    fn get_auth(state: &AppState, api_key: Option<&str>) -> Result<(String, String)> {
+    fn get_auth(
+        state: &AppState,
+        api_key: Option<&str>,
+    ) -> Result<(crate::security::Secret, String)> {
         match api_key {
             Some(key) => {
                 // REST API call - validate API key and get auth token
-                let _api_key_info = state.sqlite.validate_api_key(key, &state.security)?;
+                crate::services::apikey_service::require_valid(state, key)?;
 
                 // Get the current broker session (API key holder shares the session)
                 let session = state

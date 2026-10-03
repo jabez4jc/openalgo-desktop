@@ -91,7 +91,8 @@ impl SmartOrderService {
         let action = req.action.to_uppercase();
 
         // Calculate required order
-        let (order_action, order_qty) = Self::calculate_smart_action(current_qty, target_size, &action);
+        let (order_action, order_qty) =
+            Self::calculate_smart_action(current_qty, target_size, &action);
 
         if order_qty == 0 {
             return Ok(SmartOrderResult {
@@ -109,15 +110,18 @@ impl SmartOrderService {
             exchange: req.exchange.clone(),
             side: order_action.clone(),
             quantity: order_qty,
-            order_type: req.pricetype.clone().unwrap_or_else(|| "MARKET".to_string()),
+            order_type: req
+                .pricetype
+                .clone()
+                .unwrap_or_else(|| "MARKET".to_string()),
             product: req.product.clone(),
             price: req.price.unwrap_or(0.0),
             trigger_price: None,
             disclosed_quantity: None,
             validity: "DAY".to_string(),
             amo: false,
-            broker_symbol: None,  // Set by OrderService from symbol cache
-            symbol_token: None,   // Set by OrderService from symbol cache
+            broker_symbol: None, // Set by OrderService from symbol cache
+            symbol_token: None,  // Set by OrderService from symbol cache
         };
 
         let result = OrderService::place_order(state, order_request, api_key).await?;
@@ -142,7 +146,11 @@ impl SmartOrderService {
             req.symbol, req.action, req.quantity, req.split_size
         );
 
-        let split_size = if req.split_size > 0 { req.split_size } else { 100 };
+        let split_size = if req.split_size > 0 {
+            req.split_size
+        } else {
+            100
+        };
         let total_qty = req.quantity;
         let num_orders = (total_qty + split_size - 1) / split_size;
 
@@ -159,15 +167,18 @@ impl SmartOrderService {
                 exchange: req.exchange.clone(),
                 side: req.action.clone(),
                 quantity: qty,
-                order_type: req.pricetype.clone().unwrap_or_else(|| "MARKET".to_string()),
+                order_type: req
+                    .pricetype
+                    .clone()
+                    .unwrap_or_else(|| "MARKET".to_string()),
                 product: req.product.clone(),
                 price: req.price.unwrap_or(0.0),
                 trigger_price: None,
                 disclosed_quantity: None,
                 validity: "DAY".to_string(),
                 amo: false,
-                broker_symbol: None,  // Set by OrderService from symbol cache
-                symbol_token: None,   // Set by OrderService from symbol cache
+                broker_symbol: None, // Set by OrderService from symbol cache
+                symbol_token: None,  // Set by OrderService from symbol cache
             };
 
             match OrderService::place_order(state, order_request, api_key).await {
@@ -198,7 +209,10 @@ impl SmartOrderService {
         orders: Vec<OrderRequest>,
         api_key: Option<&str>,
     ) -> Result<Vec<PlaceOrderResult>> {
-        info!("SmartOrderService::place_basket_order - {} orders", orders.len());
+        info!(
+            "SmartOrderService::place_basket_order - {} orders",
+            orders.len()
+        );
 
         let mut results = Vec::new();
 

@@ -25,10 +25,7 @@ impl HoldingsService {
     ///
     /// In analyze mode, returns sandbox holdings.
     /// Otherwise, returns live broker holdings.
-    pub async fn get_holdings(
-        state: &AppState,
-        api_key: Option<&str>,
-    ) -> Result<HoldingsResult> {
+    pub async fn get_holdings(state: &AppState, api_key: Option<&str>) -> Result<HoldingsResult> {
         info!("HoldingsService::get_holdings");
 
         // Check if in analyze mode
@@ -45,7 +42,7 @@ impl HoldingsService {
             .get(&broker_id)
             .ok_or_else(|| AppError::Broker(format!("Broker '{}' not found", broker_id)))?;
 
-        let holdings = broker.get_holdings(&auth_token).await?;
+        let holdings = broker.get_holdings(auth_token.expose()).await?;
 
         Ok(HoldingsResult {
             success: true,
@@ -58,10 +55,13 @@ impl HoldingsService {
     // Private Helper Methods
     // ========================================================================
 
-    fn get_auth(state: &AppState, api_key: Option<&str>) -> Result<(String, String)> {
+    fn get_auth(
+        state: &AppState,
+        api_key: Option<&str>,
+    ) -> Result<(crate::security::Secret, String)> {
         match api_key {
             Some(key) => {
-                let _api_key_info = state.sqlite.validate_api_key(key, &state.security)?;
+                crate::services::apikey_service::require_valid(state, key)?;
                 let session = state
                     .get_broker_session()
                     .ok_or_else(|| AppError::Auth("Broker not connected".to_string()))?;

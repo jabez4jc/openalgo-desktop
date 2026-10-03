@@ -58,7 +58,10 @@ impl HistoryService {
         );
 
         // Try DuckDB cache first
-        match state.duckdb.query_market_data(symbol, exchange, interval, from_date, to_date) {
+        match state
+            .duckdb
+            .query_market_data(symbol, exchange, interval, from_date, to_date)
+        {
             Ok(rows) if !rows.is_empty() => {
                 let candles: Vec<CandleData> = rows
                     .into_iter()
@@ -161,7 +164,9 @@ impl HistoryService {
             .collect();
 
         let count = rows.len();
-        state.duckdb.insert_market_data(symbol, exchange, interval, &rows)?;
+        state
+            .duckdb
+            .insert_market_data(symbol, exchange, interval, &rows)?;
 
         Ok(count)
     }
