@@ -21,6 +21,7 @@
 //! | [`sandbox_feed`] | the sandbox engine's quote, tick and symbol adapters |
 
 pub mod account_service;
+pub mod action_center_service;
 pub mod analyzer_service;
 pub mod apikey_service;
 pub mod auth_service;
@@ -36,6 +37,7 @@ pub mod market_data_service;
 pub mod monitor;
 pub mod options_order_service;
 pub mod options_service;
+pub mod order_router;
 pub mod order_service;
 pub mod sandbox_feed;
 pub mod schema;

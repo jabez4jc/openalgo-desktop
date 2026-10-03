@@ -7,7 +7,7 @@ use super::core::{
     analyzer_request, broker_handle, i, meta, mode_of, num, publish, s, safe_request, Reply,
 };
 use super::options_service::{resolve_option, ResolvedOption};
-use super::order_service::{place_order_with, semi_auto_refusal, Route};
+use super::order_service::{place_order_with, route_to_pending, Route};
 use crate::events::Event;
 use crate::state::AppState;
 use serde_json::{json, Map, Value};
@@ -62,7 +62,7 @@ async fn place_split(
 
 /// `optionsorder`.
 pub async fn options_order(ctx: &AppState, req: &Value, route: Route) -> Reply {
-    if let Some(r) = semi_auto_refusal(ctx) {
+    if let Some(r) = route_to_pending(ctx, "optionsorder", req, route) {
         return r;
     }
     let h = match broker_handle(ctx) {
@@ -161,7 +161,7 @@ pub async fn options_order(ctx: &AppState, req: &Value, route: Route) -> Reply {
 
 /// `optionsmultiorder`.
 pub async fn options_multi_order(ctx: &AppState, req: &Value, route: Route) -> Reply {
-    if let Some(r) = semi_auto_refusal(ctx) {
+    if let Some(r) = route_to_pending(ctx, "optionsmultiorder", req, route) {
         return r;
     }
     let h = match broker_handle(ctx) {

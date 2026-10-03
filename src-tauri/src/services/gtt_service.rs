@@ -10,7 +10,7 @@ use super::core::{
     analyzer_request, broker_handle, f, i, is_analyze, meta, mode_of, publish, s, safe_request,
     Reply,
 };
-use super::order_service::semi_auto_refusal;
+use super::order_service::{route_to_pending, Route};
 use crate::brokers::types::{GttOrder, GttRequest, GttTriggerType, QuoteKey};
 use crate::error::AppError;
 use crate::events::{Event, GttKind};
@@ -124,7 +124,13 @@ fn live_error(e: &AppError, internal: &str, broker: &str) -> Reply {
 
 /// `placegttorder`.
 pub async fn place_gtt(ctx: &AppState, req: &Value) -> Reply {
-    if let Some(r) = semi_auto_refusal(ctx) {
+    place_gtt_with(ctx, req, Route::API).await
+}
+
+/// `placegttorder` for a caller that says how it routes (the Action
+/// Center executes an approved GTT with [`Route::INTERNAL`]).
+pub async fn place_gtt_with(ctx: &AppState, req: &Value, route: Route) -> Reply {
+    if let Some(r) = route_to_pending(ctx, "placegttorder", req, route) {
         return r;
     }
     let analyze = is_analyze(ctx);
@@ -178,18 +184,17 @@ pub async fn place_gtt(ctx: &AppState, req: &Value) -> Reply {
     reply
 }
 
-fn semi_auto(ctx: &AppState) -> bool {
-    matches!(
-        super::apikey_service::ApiKeyService::order_mode(ctx).as_deref(),
-        Ok("semi_auto")
-    )
-}
-
 /// `modifygttorder`.
 pub async fn modify_gtt(ctx: &AppState, req: &Value) -> Reply {
+    modify_gtt_with(ctx, req, Route::API).await
+}
+
+/// `modifygttorder`; [`Route::INTERNAL`] (a page action) is not subject to
+/// the Semi-Auto block.
+pub async fn modify_gtt_with(ctx: &AppState, req: &Value, route: Route) -> Reply {
     let trigger_id = s(req, "trigger_id");
     let analyze = is_analyze(ctx);
-    if !analyze && semi_auto(ctx) {
+    if !analyze && route.semi_auto(ctx) {
         let reply = Reply::error(
             403,
             "Modify GTT order is not allowed in Semi-Auto mode. Switch to Auto mode.",
@@ -265,12 +270,18 @@ pub async fn modify_gtt(ctx: &AppState, req: &Value) -> Reply {
 
 /// `cancelgttorder`.
 pub async fn cancel_gtt(ctx: &AppState, req: &Value) -> Reply {
+    cancel_gtt_with(ctx, req, Route::API).await
+}
+
+/// `cancelgttorder`; [`Route::INTERNAL`] (a page action) is not subject to
+/// the Semi-Auto block.
+pub async fn cancel_gtt_with(ctx: &AppState, req: &Value, route: Route) -> Reply {
     let trigger_id = s(req, "trigger_id");
     let analyze = is_analyze(ctx);
     if trigger_id.is_empty() {
         return Reply::error(400, "trigger_id is missing");
     }
-    if !analyze && semi_auto(ctx) {
+    if !analyze && route.semi_auto(ctx) {
         let reply = Reply::error(
             403,
             "Cancel GTT order is not allowed in Semi-Auto mode. Switch to Auto mode.",

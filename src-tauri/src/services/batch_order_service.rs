@@ -11,7 +11,7 @@ use super::core::{
     safe_request, BrokerHandle, Reply,
 };
 use super::order_service::{
-    fractional_refusal, place_live, sandbox_order, semi_auto_refusal, Route, FRACTIONAL_REFUSED,
+    fractional_refusal, place_live, route_to_pending, sandbox_order, Route, FRACTIONAL_REFUSED,
 };
 use crate::brokers::types::QuoteKey;
 use crate::events::{Event, Mode};
@@ -103,7 +103,7 @@ async fn sandbox_place(
 
 /// `basketorder`.
 pub async fn basket_order(ctx: &AppState, req: &Value, route: Route) -> Reply {
-    if let Some(r) = semi_auto_refusal(ctx) {
+    if let Some(r) = route_to_pending(ctx, "basketorder", req, route) {
         return r;
     }
     let strategy = s(req, "strategy");
@@ -223,7 +223,9 @@ fn split_event(mode: Mode, request: Value, reply: &Reply, req: &Value) -> Event 
 
 /// `splitorder`.
 pub async fn split_order(ctx: &AppState, req: &Value, route: Route) -> Reply {
-    if let Some(r) = semi_auto_refusal(ctx).or_else(|| fractional_refusal(req)) {
+    if let Some(r) =
+        route_to_pending(ctx, "splitorder", req, route).or_else(|| fractional_refusal(req))
+    {
         return r;
     }
     let analyze = route.analyze(ctx);

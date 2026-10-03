@@ -27,28 +27,52 @@ pub struct Route {
     /// The caller already decided this goes to the live broker (an exit of
     /// a position it opened live); the analyzer toggle is not consulted.
     pub force_live: bool,
+    /// The caller is the app itself acting for the signed-in trader (a page
+    /// action, or an order the trader approved in the Action Center), not an
+    /// API-key client: the Semi-Auto order mode does not apply (web: the
+    /// `auth_token` + `broker` internal call path).
+    pub internal: bool,
 }
 
 impl Route {
-    pub const API: Route = Route { force_live: false };
-    pub const LIVE: Route = Route { force_live: true };
+    pub const API: Route = Route {
+        force_live: false,
+        internal: false,
+    };
+    pub const LIVE: Route = Route {
+        force_live: true,
+        internal: false,
+    };
+    pub const INTERNAL: Route = Route {
+        force_live: false,
+        internal: true,
+    };
 
     pub fn analyze(&self, ctx: &AppState) -> bool {
         !self.force_live && is_analyze(ctx)
     }
+
+    /// Semi-Auto applies to this call (an API-key client in Semi-Auto mode).
+    pub fn semi_auto(&self, ctx: &AppState) -> bool {
+        !self.internal && semi_auto(ctx)
+    }
 }
 
-/// Semi-Auto mode routes new orders to the Action Center on the web. The
-/// desktop has no Action Center yet, so a new order is refused rather than
-/// sent live behind the trader's back.
-pub fn semi_auto_refusal(ctx: &AppState) -> Option<Reply> {
-    match super::apikey_service::ApiKeyService::order_mode(ctx) {
-        Ok(m) if m == "semi_auto" => Some(Reply::error(
-            403,
-            "Your API key is in Semi-Auto mode, which needs the Action Center to approve orders. Switch the order mode to Auto on the API Key page to place orders from this app.",
-        )),
-        _ => None,
+// -- Semi-Auto routing (web `order_router_service`) -------------------------
+// A new order from an API-key client in Semi-Auto mode is queued in the
+// Action Center instead of being executed; see `super::order_router`.
+
+/// Queue the order for approval when the route is subject to Semi-Auto.
+pub fn route_to_pending(
+    ctx: &AppState,
+    api_type: &str,
+    req: &Value,
+    route: Route,
+) -> Option<Reply> {
+    if route.internal {
+        return None;
     }
+    super::order_router::queue_if_semi_auto(ctx, api_type, req)
 }
 
 /// Fractional quantities pass the web schema on CRYPTO, but the order
@@ -60,7 +84,7 @@ pub fn fractional_refusal(req: &Value) -> Option<Reply> {
     (f(req, "quantity").fract() != 0.0).then(|| Reply::error(400, FRACTIONAL_REFUSED))
 }
 
-fn semi_auto(ctx: &AppState) -> bool {
+pub fn semi_auto(ctx: &AppState) -> bool {
     matches!(
         super::apikey_service::ApiKeyService::order_mode(ctx).as_deref(),
         Ok("semi_auto")
@@ -182,7 +206,9 @@ pub async fn place_order(ctx: &AppState, req: &Value, route: Route) -> Reply {
 /// `placeorder`, optionally without the `order.placed` / `order.failed`
 /// event (split legs of an options order report one completion event).
 pub async fn place_order_with(ctx: &AppState, req: &Value, route: Route, emit: bool) -> Reply {
-    if let Some(r) = semi_auto_refusal(ctx).or_else(|| fractional_refusal(req)) {
+    if let Some(r) =
+        route_to_pending(ctx, "placeorder", req, route).or_else(|| fractional_refusal(req))
+    {
         return r;
     }
     if route.analyze(ctx) {
@@ -272,7 +298,7 @@ pub fn smart_decision(current: i64, target: i64, quantity: i64, action: &str) ->
 /// same open quantity (bounded: a fixed number of stripes).
 const STRIPES: usize = 64;
 
-fn stripe(key: &str) -> &'static tokio::sync::Mutex<()> {
+pub(crate) fn stripe(key: &str) -> &'static tokio::sync::Mutex<()> {
     static LOCKS: OnceLock<Vec<tokio::sync::Mutex<()>>> = OnceLock::new();
     let locks = LOCKS.get_or_init(|| (0..STRIPES).map(|_| tokio::sync::Mutex::new(())).collect());
     let mut h: u64 = 1469598103934665603;
@@ -294,7 +320,9 @@ fn no_action_event(mode: Mode, req: &Value, request: Value, reply: &Reply) -> Ev
 
 /// `placesmartorder`.
 pub async fn place_smart_order(ctx: &AppState, req: &Value, route: Route) -> Reply {
-    if let Some(r) = semi_auto_refusal(ctx).or_else(|| fractional_refusal(req)) {
+    if let Some(r) =
+        route_to_pending(ctx, "smartorder", req, route).or_else(|| fractional_refusal(req))
+    {
         return r;
     }
     let target = f(req, "position_size").trunc() as i64;
@@ -424,7 +452,7 @@ pub async fn modify_order(ctx: &AppState, req: &Value, route: Route) -> Reply {
         orderid: orderid.clone(),
         error_message: reply.message(),
     };
-    if !analyze && semi_auto(ctx) {
+    if !analyze && route.semi_auto(ctx) {
         let reply = Reply::error(
             403,
             "Modify order operation is not allowed in Semi-Auto mode. Please switch to Auto mode to modify orders.",
@@ -513,7 +541,7 @@ pub async fn cancel_order(ctx: &AppState, req: &Value, route: Route) -> Reply {
         publish(ctx, failed(mode_of(analyze), safe_request(req), &reply));
         return reply;
     }
-    if !analyze && semi_auto(ctx) {
+    if !analyze && route.semi_auto(ctx) {
         let reply = Reply::error(
             403,
             "Cancel order operation is not allowed in Semi-Auto mode. Please switch to Auto mode to cancel orders.",
@@ -585,7 +613,7 @@ fn all_cancelled_event(mode: Mode, request: Value, reply: &Reply) -> Event {
 /// `cancelallorder`.
 pub async fn cancel_all_orders(ctx: &AppState, req: &Value, route: Route) -> Reply {
     let analyze = route.analyze(ctx);
-    if !analyze && semi_auto(ctx) {
+    if !analyze && route.semi_auto(ctx) {
         let reply = Reply::error(
             403,
             "Cancel all orders operation is not allowed in Semi-Auto mode. Please switch to Auto mode to cancel orders.",
@@ -648,7 +676,7 @@ pub async fn close_position(ctx: &AppState, req: &Value, route: Route) -> Reply 
         meta: meta(mode, "closeposition", request, &reply.body),
         message: Some(reply.message()),
     };
-    if !analyze && semi_auto(ctx) {
+    if !analyze && route.semi_auto(ctx) {
         let reply = Reply::error(
             403,
             "Close position operation is not allowed in Semi-Auto mode. Please switch to Auto mode to close positions.",

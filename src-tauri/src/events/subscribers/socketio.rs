@@ -234,6 +234,8 @@ pub fn translate(event: &Event) -> Option<(&'static str, Value)> {
         )),
         Event::CacheLoaded { payload } => Some(("cache_loaded", payload.clone())),
         Event::ForceLogout { message } => Some(("force_logout", json!({"message": message}))),
+        Event::PendingOrderCreated { payload } => Some(("pending_order_created", payload.clone())),
+        Event::PendingOrderUpdated { payload } => Some(("pending_order_updated", payload.clone())),
         Event::BrokerConnected { .. } => Some((
             "active_sessions_update",
             json!({"count": 1, "sessions": []}),
@@ -293,6 +295,8 @@ impl Subscriber for SocketIoSubscriber {
             Topic::MasterContractDownload,
             Topic::CacheLoaded,
             Topic::ForceLogout,
+            Topic::PendingOrderCreated,
+            Topic::PendingOrderUpdated,
         ]
     }
 
