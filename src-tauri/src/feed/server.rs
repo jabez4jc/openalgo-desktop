@@ -261,10 +261,21 @@ async fn accept_loop(listener: TcpListener, shared: Arc<Shared>, token: Cancella
     }
 }
 
+/// tungstenite stops reading at its own size limit, which leaves the rest of
+/// the oversized payload unread in the socket; closing such a socket makes
+/// Windows send a reset that discards our close frame. So tungstenite accepts
+/// up to twice our limit and the read loop enforces the real one on a message
+/// it has consumed in full, which closes cleanly with 1009 everywhere.
+fn transport_limit(cfg: &FeedConfig) -> usize {
+    cfg.max_message_bytes
+        .saturating_mul(2)
+        .max(cfg.max_message_bytes.saturating_add(64 * 1024))
+}
+
 fn ws_config(cfg: &FeedConfig) -> WebSocketConfig {
     WebSocketConfig {
-        max_message_size: Some(cfg.max_message_bytes),
-        max_frame_size: Some(cfg.max_message_bytes),
+        max_message_size: Some(transport_limit(cfg)),
+        max_frame_size: Some(transport_limit(cfg)),
         max_write_buffer_size: cfg.max_message_bytes.max(64 * 1024) * 4,
         ..Default::default()
     }
@@ -424,6 +435,12 @@ async fn serve_conn(stream: TcpStream, shared: Arc<Shared>, token: CancellationT
                     }
                 };
                 last_seen = Instant::now();
+                if msg.len() > shared.cfg.max_message_bytes {
+                    // Over the message size limit: close 1009 as the web does.
+                    outbox.close(1009, "message too big");
+                    closing = true;
+                    break;
+                }
                 match msg {
                     Message::Text(t) => session.handle(&t).await,
                     Message::Binary(b) => match String::from_utf8(b) {
