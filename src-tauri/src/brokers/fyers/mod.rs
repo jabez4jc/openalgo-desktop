@@ -526,9 +526,8 @@ impl Broker for FyersBroker {
             .send()
             .await?;
 
-        // Get raw response text for debugging
+        // The body carries the access token: never log it.
         let response_text = response.text().await?;
-        tracing::info!("Fyers validate-authcode response: {}", response_text);
 
         #[derive(Deserialize)]
         #[allow(dead_code)]
@@ -540,10 +539,11 @@ impl Broker for FyersBroker {
         }
 
         let result: ValidateResponse = serde_json::from_str(&response_text).map_err(|e| {
-            AppError::Auth(format!(
-                "Failed to parse Fyers response: {} - Raw: {}",
-                e, response_text
-            ))
+            tracing::warn!(
+                "Fyers sign-in response could not be read: {:?}",
+                e.classify()
+            );
+            AppError::Auth("Fyers did not accept the sign-in. Try again.".to_string())
         })?;
 
         if result.s != "ok" {
