@@ -12,6 +12,7 @@ pub mod common;
 pub mod dhan;
 pub mod dhan_sandbox;
 pub mod families;
+pub mod firstock;
 pub mod flattrade;
 pub mod fyers;
 pub mod groww;
@@ -321,6 +322,7 @@ impl BrokerRegistry {
             Arc::new(flattrade::broker(symbols.clone())),
             Arc::new(tradesmart::broker(symbols.clone())),
             Arc::new(zebu::broker(symbols.clone())),
+            Arc::new(firstock::FirstockBroker::new(symbols.clone())),
         ];
         Self::with_symbols(symbols, brokers)
     }
@@ -390,6 +392,7 @@ mod tests {
                 "angel",
                 "dhan",
                 "dhan_sandbox",
+                "firstock",
                 "flattrade",
                 "fyers",
                 "groww",
