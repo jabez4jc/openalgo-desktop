@@ -1,0 +1,84 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/multioptiongreeks",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "symbols": [
+        {
+          "symbol": "NIFTY06OCT2622400CE",
+          "exchange": "NFO"
+        },
+        {
+          "symbol": "NIFTY06OCT2622400PE",
+          "exchange": "NFO"
+        }
+      ],
+      "interest_rate": 6.5
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "793",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": [
+        {
+          "days_to_expiry": 3.2468,
+          "exchange": "NFO",
+          "expiry_date": "06-Oct-2026",
+          "greeks": {
+            "delta": 0.5682,
+            "gamma": 0.001217,
+            "rho": -0.013961,
+            "theta": -19.4965,
+            "vega": 8.3185
+          },
+          "implied_volatility": 15.24,
+          "interest_rate": 6.5,
+          "option_price": 156.95,
+          "option_type": "CE",
+          "spot_price": 22453.35,
+          "status": "success",
+          "strike": 22400.0,
+          "symbol": "NIFTY06OCT2622400CE",
+          "underlying": "NIFTY"
+        },
+        {
+          "days_to_expiry": 3.2468,
+          "exchange": "NFO",
+          "expiry_date": "06-Oct-2026",
+          "greeks": {
+            "delta": -0.4312,
+            "gamma": 0.001217,
+            "rho": -0.009216,
+            "theta": -19.5011,
+            "vega": 8.3185
+          },
+          "implied_volatility": 15.24,
+          "interest_rate": 6.5,
+          "option_price": 103.6,
+          "option_type": "PE",
+          "spot_price": 22453.35,
+          "status": "success",
+          "strike": 22400.0,
+          "symbol": "NIFTY06OCT2622400PE",
+          "underlying": "NIFTY"
+        }
+      ],
+      "status": "success",
+      "summary": {
+        "failed": 0,
+        "success": 2,
+        "total": 2
+      }
+    }
+  }
+}

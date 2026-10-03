@@ -1,0 +1,33 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/placeorder",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "strategy": "fixtures",
+      "exchange": "NFO",
+      "symbol": "NIFTY06OCT2622400CE",
+      "action": "BUY",
+      "quantity": 65,
+      "pricetype": "MARKET",
+      "product": "MIS"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "65",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "mode": "analyze",
+      "orderid": "26100394074609",
+      "status": "success"
+    }
+  }
+}

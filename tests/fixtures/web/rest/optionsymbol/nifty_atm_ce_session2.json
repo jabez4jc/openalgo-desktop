@@ -1,0 +1,35 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/optionsymbol",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "underlying": "NIFTY",
+      "exchange": "NSE_INDEX",
+      "expiry_date": "06OCT26",
+      "offset": "ATM",
+      "option_type": "CE"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "156",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "status": "success",
+      "symbol": "NIFTY06OCT2622400CE",
+      "exchange": "NFO",
+      "lotsize": 65,
+      "tick_size": 0.05,
+      "freeze_qty": 1800,
+      "underlying_ltp": 22421.95
+    }
+  }
+}

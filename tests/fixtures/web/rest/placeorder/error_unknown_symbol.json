@@ -1,0 +1,33 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/placeorder",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "strategy": "fixtures",
+      "exchange": "NSE",
+      "symbol": "NOTASYMBOL",
+      "action": "BUY",
+      "quantity": 1,
+      "pricetype": "MARKET",
+      "product": "MIS"
+    }
+  },
+  "response": {
+    "status_code": 400,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "83",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "message": "Symbol NOTASYMBOL not found on NSE",
+      "mode": "analyze",
+      "status": "error"
+    }
+  }
+}

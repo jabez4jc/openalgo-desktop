@@ -1,0 +1,26 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/market/timings",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "date": "03/10/2026"
+    }
+  },
+  "response": {
+    "status_code": 400,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "67",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "message": "Invalid date format. Use YYYY-MM-DD",
+      "status": "error"
+    }
+  }
+}

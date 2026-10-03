@@ -1,0 +1,38 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/history",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "symbol": "RELIANCE",
+      "exchange": "NSE",
+      "interval": "D",
+      "start_date": "01-09-2026",
+      "end_date": "02-10-2026"
+    }
+  },
+  "response": {
+    "status_code": 400,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "99",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "message": {
+        "end_date": [
+          "Not a valid date."
+        ],
+        "start_date": [
+          "Not a valid date."
+        ]
+      },
+      "status": "error"
+    }
+  },
+  "note": "Date format must be YYYY-MM-DD"
+}

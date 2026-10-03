@@ -1,0 +1,20 @@
+from mut import *
+import json
+C = json.load(open(os.path.join(HERE, "..", "ctx.json")))
+G = json.load(open(os.path.join(HERE, "..", "gtt.json")))
+S = "fixtures"; L = C["sbin_ltp"]
+guard()
+g = dict(strategy=S, exchange="NSE", symbol="SBIN", action="BUY", product="CNC", quantity=2, pricetype="LIMIT")
+P("modifygttorder", "single_change_trigger_and_qty", k(**g, trigger_id=G["t1"], trigger_type="SINGLE", price=round(L*0.88, 1), triggerprice_sl=round(L*0.88, 1)))
+P("modifygttorder", "oco_change_target", k(**dict(g, action="SELL", quantity=1), trigger_id=G["t2"], trigger_type="OCO", price=round(L,1), triggerprice_sl=round(L*0.9, 1), stoploss=round(L*0.89, 1), triggerprice_tg=round(L*1.15, 1), target=round(L*1.16, 1)))
+P("modifygttorder", "error_unknown_trigger_id", k(**g, trigger_id="GTT-000000-deadbeef", trigger_type="SINGLE", price=900, triggerprice_sl=900))
+P("modifygttorder", "error_missing_trigger_id", k(**g, trigger_type="SINGLE", price=900, triggerprice_sl=900))
+P("gttorderbook", "after_modify", k())
+P("cancelgttorder", "single", k(strategy=S, trigger_id=G["t1"]))
+P("cancelgttorder", "error_already_cancelled", k(strategy=S, trigger_id=G["t1"]))
+P("cancelgttorder", "error_unknown_trigger_id", k(strategy=S, trigger_id="GTT-000000-deadbeef"))
+P("cancelgttorder", "error_missing_trigger_id", k(strategy=S))
+P("modifygttorder", "error_cancelled_trigger", k(**g, trigger_id=G["t1"], trigger_type="SINGLE", price=900, triggerprice_sl=900))
+P("gttorderbook", "after_cancel_all_statuses", k())
+P("gttorderbook", "status_cancelled", k(status="cancelled"))
+P("gttorderbook", "error_bad_status", k(status="bogus"))

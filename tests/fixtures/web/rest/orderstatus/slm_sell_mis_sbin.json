@@ -1,0 +1,44 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/orderstatus",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "strategy": "fixtures",
+      "orderid": "26100363343152"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "356",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": {
+        "action": "SELL",
+        "average_price": 0.0,
+        "exchange": "NSE",
+        "filled_quantity": 0,
+        "order_status": "trigger pending",
+        "orderid": "26100363343152",
+        "pending_quantity": 1,
+        "price": 0.0,
+        "price_type": "SL-M",
+        "product": "MIS",
+        "quantity": 1,
+        "strategy": "fixtures",
+        "symbol": "SBIN",
+        "timestamp": "2026-10-03 09:42:29",
+        "trigger_price": 906.4
+      },
+      "mode": "analyze",
+      "status": "success"
+    }
+  }
+}

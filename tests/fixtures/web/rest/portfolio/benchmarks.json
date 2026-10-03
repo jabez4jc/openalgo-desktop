@@ -1,0 +1,1147 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v1/portfolio/benchmarks?apikey=<APIKEY>",
+    "headers": {},
+    "body": null
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "17606",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": [
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX ALLCAP",
+          "symbol": "ALLCAP"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX BANKEX",
+          "symbol": "BANKEX"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX BASMTR",
+          "symbol": "BASMTR"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX BHRT22",
+          "symbol": "BHRT22"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE 1000",
+          "symbol": "BSE 1000"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE 200 EQUAL WEIGHT",
+          "symbol": "BSE 200 EQUAL WEIGHT"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX BSE 500 MOMENTUM 50",
+          "symbol": "BSE 500 MOMENTUM 50"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX BSE 500 QUALITY 50",
+          "symbol": "BSE 500 QUALITY 50"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE CAPITAL MKTS & INSURANCE",
+          "symbol": "BSE CAPITAL MKTS & INSURANCE"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX BSE FOCUSED IT",
+          "symbol": "BSE FOCUSED IT"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX BSE FOCUSED MIDCAP",
+          "symbol": "BSE FOCUSED MIDCAP"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX BSE HOUSING FINANCE",
+          "symbol": "BSE HOUSING FINANCE"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX BSE INDIA 150",
+          "symbol": "BSE INDIA 150"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX BSE INDIA SECT LEADER",
+          "symbol": "BSE INDIA SECT LEADER"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INTERNET ECONOMY",
+          "symbol": "BSE INTERNET ECONOMY"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX BSE LGMD60:40ST DIV50",
+          "symbol": "BSE LGMD60:40ST DIV50"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX BSE MIDSMALL PVT BNKS",
+          "symbol": "BSE MIDSMALL PVT BNKS"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE POWER & ENERGY",
+          "symbol": "BSE POWER & ENERGY"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE PSU BANK",
+          "symbol": "BSE PSU BANK"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE SELECT BUSINESS GROUPS",
+          "symbol": "BSE SELECT BUSINESS GROUPS"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE SENSEX SIXTY",
+          "symbol": "BSE SENSEX SIXTY"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE SENSEX SIXTY 65:35",
+          "symbol": "BSE SENSEX SIXTY 65:35"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE SERVICES",
+          "symbol": "BSE SERVICES"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE SME IPO",
+          "symbol": "BSE SME IPO"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX BSE100",
+          "symbol": "BSE100"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX BSE200",
+          "symbol": "BSE200"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX LMI250",
+          "symbol": "BSE250LARGEMIDCAPINDEX"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX MSL400",
+          "symbol": "BSE400MIDSMALLCAPINDEX"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX BSE500",
+          "symbol": "BSE500"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX AUTO",
+          "symbol": "BSEAUTO"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX BSE CG",
+          "symbol": "BSECAPITALGOODS"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX CARBON",
+          "symbol": "BSECARBONEX"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX BSE CD",
+          "symbol": "BSECONSUMERDURABLES"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX CPSE",
+          "symbol": "BSECPSE"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX DOL100",
+          "symbol": "BSEDOLLEX100"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX DOL200",
+          "symbol": "BSEDOLLEX200"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX DOL30",
+          "symbol": "BSEDOLLEX30"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX BSEDSI",
+          "symbol": "BSEDSI"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX BSEEVI",
+          "symbol": "BSEEVI"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX BSEFMC",
+          "symbol": "BSEFASTMOVINGCONSUMERGOODS"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX GREENX",
+          "symbol": "BSEGREENEX"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX BSE HC",
+          "symbol": "BSEHEALTHCARE"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX INDSTR",
+          "symbol": "BSEINDUSTRIALS"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX BSE IT",
+          "symbol": "BSEINFORMATIONTECHNOLOGY"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX BSEIPO",
+          "symbol": "BSEIPO"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX LRGCAP",
+          "symbol": "BSELARGECAP"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX BSELVI",
+          "symbol": "BSELVI"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX MIDSEL",
+          "symbol": "BSEMIDCAPSELECTINDEX"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX BSEMOI",
+          "symbol": "BSEMOI"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX OILGAS",
+          "symbol": "BSEOIL&GAS"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX BSEPBI",
+          "symbol": "BSEPBI"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX POWER",
+          "symbol": "BSEPOWER"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX BSEPSU",
+          "symbol": "BSEPSU"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX BSEQUI",
+          "symbol": "BSEQUI"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX REALTY",
+          "symbol": "BSEREALTY"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX SNXT50",
+          "symbol": "BSESENSEXNEXT50"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX SMLCAP",
+          "symbol": "BSESMALLCAP"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX SMLSEL",
+          "symbol": "BSESMALLCAPSELECTINDEX"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX TECK",
+          "symbol": "BSETECK"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX TELCOM",
+          "symbol": "BSETELECOM"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX CDGS",
+          "symbol": "CDGS"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX DFRGRI",
+          "symbol": "DFRGRI"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE ENERGY INDEX",
+          "symbol": "ENERGY INDEX"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX ESG100",
+          "symbol": "ESG100"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "FINANCIAL SERVICES",
+          "symbol": "FINANCIAL SERVICES"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INFRA INDEX",
+          "symbol": "INFRA INDEX"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX LCTMCI",
+          "symbol": "LCTMCI"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE METAL INDEX",
+          "symbol": "METAL INDEX"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX MFG",
+          "symbol": "MFG"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE MID150 INDEX",
+          "symbol": "MID150 INDEX"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE MIDCAP INDEX",
+          "symbol": "MIDCAP INDEX"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "SENSEX",
+          "symbol": "SENSEX"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "SENSEX NEXT 30",
+          "symbol": "SENSEX NEXT 30"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX SNSX50",
+          "symbol": "SENSEX50"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX SML250",
+          "symbol": "SML250"
+        },
+        {
+          "exchange": "BSE_INDEX",
+          "name": "BSE INDEX UTILS",
+          "symbol": "UTILS"
+        },
+        {
+          "exchange": "GLOBAL_INDEX",
+          "name": "AUSTRALIA 200",
+          "symbol": "AUS200"
+        },
+        {
+          "exchange": "GLOBAL_INDEX",
+          "name": "FRANCE 40",
+          "symbol": "FRANCE40"
+        },
+        {
+          "exchange": "GLOBAL_INDEX",
+          "name": "GERMANY 40",
+          "symbol": "GERMANY40"
+        },
+        {
+          "exchange": "GLOBAL_INDEX",
+          "name": "GIFT NIFTY",
+          "symbol": "GIFTNIFTY"
+        },
+        {
+          "exchange": "GLOBAL_INDEX",
+          "name": "HANG SENG",
+          "symbol": "HANGSENG"
+        },
+        {
+          "exchange": "GLOBAL_INDEX",
+          "name": "JAPAN 225",
+          "symbol": "JAPAN225"
+        },
+        {
+          "exchange": "GLOBAL_INDEX",
+          "name": "SHANGHAI CHINA",
+          "symbol": "SHANGHAICHINA"
+        },
+        {
+          "exchange": "GLOBAL_INDEX",
+          "name": "UK 100",
+          "symbol": "UK100"
+        },
+        {
+          "exchange": "GLOBAL_INDEX",
+          "name": "US 100",
+          "symbol": "US100"
+        },
+        {
+          "exchange": "GLOBAL_INDEX",
+          "name": "US 10 YEAR TREASURY YIELD",
+          "symbol": "US10YRYIELD"
+        },
+        {
+          "exchange": "GLOBAL_INDEX",
+          "name": "US 30",
+          "symbol": "US30"
+        },
+        {
+          "exchange": "GLOBAL_INDEX",
+          "name": "US 500",
+          "symbol": "US500"
+        },
+        {
+          "exchange": "GLOBAL_INDEX",
+          "name": "US COMPOSITE",
+          "symbol": "USCOMPOSITE"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY BANK",
+          "symbol": "BANKNIFTY"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NSE INDEX BHARATBOND-APR30",
+          "symbol": "BHARATBOND-APR30"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NSE INDEX BHARATBOND-APR31",
+          "symbol": "BHARATBOND-APR31"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NSE INDEX BHARATBOND-APR32",
+          "symbol": "BHARATBOND-APR32"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NSE INDEX BHARATBOND-APR33",
+          "symbol": "BHARATBOND-APR33"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY FIN SERVICE",
+          "symbol": "FINNIFTY"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "HANGSENG BEES-NAV",
+          "symbol": "HANGSENG BEES-NAV"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "INDIA VIX",
+          "symbol": "INDIAVIX"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY MIDCAP SELECT (MIDCPNIFTY)",
+          "symbol": "MIDCPNIFTY"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY 50",
+          "symbol": "NIFTY"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY ALPHALOWVOL",
+          "symbol": "NIFTY ALPHALOWVOL"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY ALPHA QUALITY LOW-VOLATILITY 30",
+          "symbol": "NIFTY AQL 30"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY ALPHA QUALITY VALUE LOW VOLATILITY 30",
+          "symbol": "NIFTY AQLV 30"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY CAPITAL MARKETS",
+          "symbol": "NIFTY CAPITAL MKT"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NSE INDEX NIFTY CHEMICALS",
+          "symbol": "NIFTY CHEMICALS"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY CONSR DURBL",
+          "symbol": "NIFTY CONSR DURBL"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY CORE HOUSING",
+          "symbol": "NIFTY CORE HOUSING"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY INDIA SELECT 5 CORPORATE GROUPS",
+          "symbol": "NIFTY CORP MAATR"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY EV & NEW AGE AUTOMOTIVE",
+          "symbol": "NIFTY EV"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY FINANCIAL SERVICES",
+          "symbol": "NIFTY FINSEREXBNK"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY FINSRV25 50",
+          "symbol": "NIFTY FINSRV25 50"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY FPI 150",
+          "symbol": "NIFTY FPI 150"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY HEALTHCARE",
+          "symbol": "NIFTY HEALTHCARE"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY HIGHBETA 50",
+          "symbol": "NIFTY HIGHBETA 50"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY HOUSING",
+          "symbol": "NIFTY HOUSING"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY INDIA DEFENCE",
+          "symbol": "NIFTY IND DEFENCE"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY IND DIGITAL",
+          "symbol": "NIFTY IND DIGITAL"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY INDIA TOURISM",
+          "symbol": "NIFTY IND TOURISM"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY INDIA MFG",
+          "symbol": "NIFTY INDIA MFG"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NSE INDEX NIFTY INFRALOG",
+          "symbol": "NIFTY INFRALOG"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY INTERNET",
+          "symbol": "NIFTY INTERNET"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY IPO",
+          "symbol": "NIFTY IPO"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY LARGEMID250",
+          "symbol": "NIFTY LARGEMID250"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY LOW VOLATILITY 50",
+          "symbol": "NIFTY LOW VOL 50"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY M150 QLTY50",
+          "symbol": "NIFTY M150 QLTY50"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY MICROCAP250",
+          "symbol": "NIFTY MICROCAP250"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY MIDSML HLTH",
+          "symbol": "NIFTY MIDSML HLTH"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY MOBILITY",
+          "symbol": "NIFTY MOBILITY"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY MIDSMALL FINANCIAL SERVICES",
+          "symbol": "NIFTY MS FIN SERV"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY MIDSMALL INDIA CONSUMPTION",
+          "symbol": "NIFTY MS IND CONS"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY MIDSMALL IT & TELECOM",
+          "symbol": "NIFTY MS IT TELCM"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY MULTI INFRA",
+          "symbol": "NIFTY MULTI INFRA"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY MULTI MFG",
+          "symbol": "NIFTY MULTI MFG"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY500 MULTICAP MOMENTUM QUALITY 50",
+          "symbol": "NIFTY MULTI MQ 50"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY INDIA NEW AGE CONSUMPTION",
+          "symbol": "NIFTY NEW CONSUMP"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY NON-CYCLICAL CONSUMER",
+          "symbol": "NIFTY NONCYC CONS"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY OIL AND GAS",
+          "symbol": "NIFTY OIL AND GAS"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY QUALITY LOW VOLATILITY 30",
+          "symbol": "NIFTY QLTY LV 30"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY RAILWAYS PSU",
+          "symbol": "NIFTY RAILWAYS PSU"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY RURAL",
+          "symbol": "NIFTY RURAL"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY SHARIAH 25",
+          "symbol": "NIFTY SHARIAH 25"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NSE INDEX NIFTY SME EMERGE",
+          "symbol": "NIFTY SME EMERGE"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY SMALLCAP250 QUALITY 50",
+          "symbol": "NIFTY SML250 Q50"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY TATA 25 CAP",
+          "symbol": "NIFTY TATA 25 CAP"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY TMMQ 50",
+          "symbol": "NIFTY TMMQ 50"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY TOP 10 EQUAL WEIGHT",
+          "symbol": "NIFTY TOP 10 EW"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY TOP 15 EQUAL WEIGHT",
+          "symbol": "NIFTY TOP 15 EW"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY TOP 20 EQUAL WEIGHT",
+          "symbol": "NIFTY TOP 20 EW"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY TOTAL MKT",
+          "symbol": "NIFTY TOTAL MKT"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY TRANSPORTATION & LOGISTICS",
+          "symbol": "NIFTY TRANS LOGIS"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NSE INDEX NIFTY WAVES",
+          "symbol": "NIFTY WAVES"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY 100",
+          "symbol": "NIFTY100"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY100 ALPHA 30",
+          "symbol": "NIFTY100 ALPHA 30"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY100 ENHANCED ESG",
+          "symbol": "NIFTY100 ENHANCED ESG"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY100 ESG",
+          "symbol": "NIFTY100 ESG"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY100 EQL WGT",
+          "symbol": "NIFTY100EQLWGT"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY100ESGSECLDR",
+          "symbol": "NIFTY100ESGSECLDR"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY100 LIQ 15",
+          "symbol": "NIFTY100LIQ15"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY100 LOWVOL30",
+          "symbol": "NIFTY100LOWVOL30"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY100 QUALTY30",
+          "symbol": "NIFTY100QUALTY30"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY 200",
+          "symbol": "NIFTY200"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY200 ALPHA 30",
+          "symbol": "NIFTY200 ALPHA 30"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY200 VALUE 30",
+          "symbol": "NIFTY200 VALUE 30"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY200MOMENTM30",
+          "symbol": "NIFTY200MOMENTM30"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY200 QUALTY30",
+          "symbol": "NIFTY200QUALTY30"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY50 SHARIAH",
+          "symbol": "NIFTY50 SHARIAH"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NSE INDEX NIFTY50 USD",
+          "symbol": "NIFTY50 USD"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY 500",
+          "symbol": "NIFTY500"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY500 EQUAL WEIGHT",
+          "symbol": "NIFTY500 EQUAL WEIGHT"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY500 FLEXICAP",
+          "symbol": "NIFTY500 FLEXICAP"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY500 HEALTH",
+          "symbol": "NIFTY500 HEALTH"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY500 LARGEMIDSMALL EQUAL CAP WEIGHTED",
+          "symbol": "NIFTY500 LMS EQL"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NSE INDEX NIFTY500 LOWVOL50",
+          "symbol": "NIFTY500 LOWVOL50"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NSE INDEX NIFTY500 MQVLV50",
+          "symbol": "NIFTY500 MQVLV50"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY500 MULTICAP",
+          "symbol": "NIFTY500 MULTICAP"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NSE INDEX NIFTY500 QLTY50",
+          "symbol": "NIFTY500 QLTY50"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY500 SHARIAH",
+          "symbol": "NIFTY500 SHARIAH"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY500 VALUE 50",
+          "symbol": "NIFTY500 VALUE 50"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY500 MOMENTUM 50",
+          "symbol": "NIFTY500MOMENTM50"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY50 DIV POINT",
+          "symbol": "NIFTY50DIVPOINT"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY50 EQL WGT",
+          "symbol": "NIFTY50EQLWGT"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY50 PR 1X INV",
+          "symbol": "NIFTY50PR1XINV"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY50 PR 2X LEV",
+          "symbol": "NIFTY50PR2XLEV"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY50 TR 1X INV",
+          "symbol": "NIFTY50TR1XINV"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY50 TR 2X LEV",
+          "symbol": "NIFTY50TR2XLEV"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY50 VALUE 20",
+          "symbol": "NIFTY50VALUE20"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY ALPHA 50",
+          "symbol": "NIFTYALPHA50"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY AUTO",
+          "symbol": "NIFTYAUTO"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY COMMODITIES",
+          "symbol": "NIFTYCOMMODITIES"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTYCONGLOMERATE",
+          "symbol": "NIFTYCONGLOMERATE"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY CONSUMPTION",
+          "symbol": "NIFTYCONSUMPTION"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY CPSE",
+          "symbol": "NIFTYCPSE"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY DIV OPPS 50",
+          "symbol": "NIFTYDIVOPPS50"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY ENERGY",
+          "symbol": "NIFTYENERGY"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY FMCG",
+          "symbol": "NIFTYFMCG"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY GROWSECT 15",
+          "symbol": "NIFTYGROWSECT15"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY GS 10YR",
+          "symbol": "NIFTYGS10YR"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY GS 10YR CLN",
+          "symbol": "NIFTYGS10YRCLN"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY GS 11 15YR",
+          "symbol": "NIFTYGS1115YR"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY GS 15YRPLUS",
+          "symbol": "NIFTYGS15YRPLUS"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY GS 4 8YR",
+          "symbol": "NIFTYGS48YR"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY GS 8 13YR",
+          "symbol": "NIFTYGS813YR"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY GS COMPSITE",
+          "symbol": "NIFTYGSCOMPSITE"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY INFRA",
+          "symbol": "NIFTYINFRA"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY IT",
+          "symbol": "NIFTYIT"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTYM150MOMNTM50",
+          "symbol": "NIFTYM150MOMNTM50"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY MEDIA",
+          "symbol": "NIFTYMEDIA"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY METAL",
+          "symbol": "NIFTYMETAL"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY MIDCAP 100",
+          "symbol": "NIFTYMIDCAP100"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY MIDCAP 150",
+          "symbol": "NIFTYMIDCAP150"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY MIDCAP 50",
+          "symbol": "NIFTYMIDCAP50"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY MID LIQ 15",
+          "symbol": "NIFTYMIDLIQ15"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY MIDSML 400",
+          "symbol": "NIFTYMIDSML400"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY MNC",
+          "symbol": "NIFTYMNC"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY MIDSMALLCAP400 MOMENTUM QUALITY 100",
+          "symbol": "NIFTYMS400 MQ 100"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY NEXT 50",
+          "symbol": "NIFTYNXT50"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY PHARMA",
+          "symbol": "NIFTYPHARMA"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY PSE",
+          "symbol": "NIFTYPSE"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY PSU BANK",
+          "symbol": "NIFTYPSUBANK"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY PVT BANK",
+          "symbol": "NIFTYPVTBANK"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY REALTY",
+          "symbol": "NIFTYREALTY"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY SERV SECTOR",
+          "symbol": "NIFTYSERVSECTOR"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY SMALLCAP250 MOMENTUM QUALITY 100",
+          "symbol": "NIFTYSML250MQ 100"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY SMLCAP 100",
+          "symbol": "NIFTYSMLCAP100"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY SMLCAP 250",
+          "symbol": "NIFTYSMLCAP250"
+        },
+        {
+          "exchange": "NSE_INDEX",
+          "name": "NIFTY SMLCAP 50",
+          "symbol": "NIFTYSMLCAP50"
+        }
+      ],
+      "status": "success"
+    }
+  }
+}

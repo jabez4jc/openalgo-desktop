@@ -1,0 +1,41 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/symbol",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "symbol": "NIFTY06OCT2622400CE",
+      "exchange": "NFO"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "290",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": {
+        "brexchange": "NFO",
+        "brsymbol": "NIFTY26O0622400CE",
+        "exchange": "NFO",
+        "expiry": "06-OCT-26",
+        "freeze_qty": 1800,
+        "id": 63347,
+        "instrumenttype": "CE",
+        "lotsize": 65,
+        "name": "NIFTY",
+        "strike": 22400.0,
+        "symbol": "NIFTY06OCT2622400CE",
+        "tick_size": 0.05,
+        "token": "10415874::::40687"
+      },
+      "status": "success"
+    }
+  }
+}

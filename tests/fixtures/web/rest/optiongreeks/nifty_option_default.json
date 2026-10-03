@@ -1,0 +1,44 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/optiongreeks",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "symbol": "NIFTY06OCT2622400CE",
+      "exchange": "NFO"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "357",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "days_to_expiry": 3.2468,
+      "exchange": "NFO",
+      "expiry_date": "06-Oct-2026",
+      "greeks": {
+        "delta": 0.5686,
+        "gamma": 0.001219,
+        "rho": -0.013961,
+        "theta": -19.5213,
+        "vega": 8.3232
+      },
+      "implied_volatility": 15.23,
+      "interest_rate": 0,
+      "option_price": 156.95,
+      "option_type": "CE",
+      "spot_price": 22453.35,
+      "status": "success",
+      "strike": 22400.0,
+      "symbol": "NIFTY06OCT2622400CE",
+      "underlying": "NIFTY"
+    }
+  }
+}

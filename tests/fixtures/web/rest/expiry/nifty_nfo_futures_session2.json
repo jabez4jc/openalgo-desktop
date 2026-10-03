@@ -1,0 +1,33 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/expiry",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "symbol": "NIFTY",
+      "exchange": "NFO",
+      "instrumenttype": "futures"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "124",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": [
+        "27-OCT-26",
+        "23-NOV-26",
+        "29-DEC-26"
+      ],
+      "message": "Found 3 expiry dates for NIFTY futures in NFO",
+      "status": "success"
+    }
+  }
+}

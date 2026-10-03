@@ -1,0 +1,104 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v1/ticker/SBIN?apikey=<APIKEY>&interval=D&from=2026-09-20&to=2026-10-02",
+    "headers": {},
+    "body": null
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "983",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": [
+        {
+          "close": 1247.4,
+          "high": 1249.1,
+          "low": 1232.5,
+          "oi": 0,
+          "open": 1234.1,
+          "timestamp": 1789948800,
+          "volume": 10007218
+        },
+        {
+          "close": 1240.4,
+          "high": 1251.9,
+          "low": 1237.4,
+          "oi": 0,
+          "open": 1247.6,
+          "timestamp": 1790035200,
+          "volume": 10684376
+        },
+        {
+          "close": 1248.0,
+          "high": 1252.8,
+          "low": 1238.9,
+          "oi": 0,
+          "open": 1242.0,
+          "timestamp": 1790121600,
+          "volume": 8352048
+        },
+        {
+          "close": 1219.2,
+          "high": 1241.6,
+          "low": 1219.2,
+          "oi": 0,
+          "open": 1236.6,
+          "timestamp": 1790208000,
+          "volume": 13923795
+        },
+        {
+          "close": 1226.0,
+          "high": 1227.4,
+          "low": 1210.5,
+          "oi": 0,
+          "open": 1210.5,
+          "timestamp": 1790294400,
+          "volume": 13138735
+        },
+        {
+          "close": 1197.6,
+          "high": 1219.7,
+          "low": 1197.0,
+          "oi": 0,
+          "open": 1218.0,
+          "timestamp": 1790553600,
+          "volume": 13602349
+        },
+        {
+          "close": 1182.0,
+          "high": 1198.3,
+          "low": 1181.8,
+          "oi": 0,
+          "open": 1193.8,
+          "timestamp": 1790640000,
+          "volume": 24191416
+        },
+        {
+          "close": 1187.0,
+          "high": 1196.5,
+          "low": 1181.7,
+          "oi": 0,
+          "open": 1182.0,
+          "timestamp": 1790726400,
+          "volume": 16376789
+        },
+        {
+          "close": 1167.7,
+          "high": 1183.9,
+          "low": 1160.8,
+          "oi": 0,
+          "open": 1180.1,
+          "timestamp": 1790812800,
+          "volume": 16771221
+        }
+      ],
+      "status": "success"
+    }
+  },
+  "note": "no 'EXCH:' prefix -> server silently uses NSE:RELIANCE (see ticker.py)"
+}

@@ -1,0 +1,36 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/placegttorder",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "strategy": "fixtures",
+      "exchange": "NSE",
+      "symbol": "SBIN",
+      "action": "BUY",
+      "product": "CNC",
+      "quantity": 1,
+      "pricetype": "LIMIT",
+      "trigger_type": "TRIPLE",
+      "price": 900,
+      "triggerprice_sl": 900
+    }
+  },
+  "response": {
+    "status_code": 400,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "99",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "message": "{'trigger_type': [\"Must be 'SINGLE' or 'OCO'.\"]}",
+      "mode": "analyze",
+      "status": "error"
+    }
+  }
+}

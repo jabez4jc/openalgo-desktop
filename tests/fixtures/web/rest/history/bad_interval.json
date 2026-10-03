@@ -1,0 +1,34 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/history",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "symbol": "RELIANCE",
+      "exchange": "NSE",
+      "interval": "7m",
+      "start_date": "2026-09-01",
+      "end_date": "2026-10-02"
+    }
+  },
+  "response": {
+    "status_code": 400,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "157",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "message": {
+        "interval": [
+          "Must be one of: 1s, 5s, 10s, 15s, 30s, 45s, 1m, 2m, 3m, 5m, 10m, 15m, 20m, 30m, 1h, 2h, 3h, 4h, D, W, M, Q, Y."
+        ]
+      },
+      "status": "error"
+    }
+  }
+}

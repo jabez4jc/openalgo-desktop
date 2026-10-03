@@ -1,0 +1,61 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/splitorder",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "strategy": "fixtures",
+      "exchange": "NSE",
+      "symbol": "SBIN",
+      "action": "BUY",
+      "quantity": 10,
+      "splitsize": 3,
+      "pricetype": "MARKET",
+      "product": "MIS"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "385",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "mode": "analyze",
+      "results": [
+        {
+          "order_num": 1,
+          "orderid": "26100319045249",
+          "quantity": 3,
+          "status": "success"
+        },
+        {
+          "order_num": 2,
+          "orderid": "26100322216224",
+          "quantity": 3,
+          "status": "success"
+        },
+        {
+          "order_num": 3,
+          "orderid": "26100323761475",
+          "quantity": 3,
+          "status": "success"
+        },
+        {
+          "order_num": 4,
+          "orderid": "26100325112150",
+          "quantity": 1,
+          "status": "success"
+        }
+      ],
+      "split_size": 3,
+      "status": "success",
+      "total_quantity": 10
+    }
+  }
+}

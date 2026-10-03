@@ -1,0 +1,40 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/expiry",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "symbol": "CRUDEOIL",
+      "exchange": "MCX",
+      "instrumenttype": "futures"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "212",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": [
+        "19-OCT-26",
+        "19-NOV-26",
+        "18-DEC-26",
+        "19-JAN-27",
+        "19-FEB-27",
+        "19-MAR-27",
+        "21-JUN-27",
+        "20-SEP-27",
+        "17-DEC-27",
+        "20-MAR-28"
+      ],
+      "message": "Found 10 expiry dates for CRUDEOIL futures in MCX",
+      "status": "success"
+    }
+  }
+}

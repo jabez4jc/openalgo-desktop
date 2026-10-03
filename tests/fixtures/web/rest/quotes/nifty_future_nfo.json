@@ -1,0 +1,40 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/quotes",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "symbol": "NIFTY27OCT26FUT",
+      "exchange": "NFO"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "168",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": {
+        "ask": 0,
+        "ask_qty": 0,
+        "bid": 0,
+        "bid_qty": 0,
+        "high": 22702.4,
+        "low": 22321,
+        "ltp": 22520,
+        "oi": 19680440,
+        "open": 22630,
+        "prev_close": 22707.3,
+        "volume": 0
+      },
+      "status": "success"
+    }
+  },
+  "note": "symbol=NIFTY27OCT26FUT"
+}

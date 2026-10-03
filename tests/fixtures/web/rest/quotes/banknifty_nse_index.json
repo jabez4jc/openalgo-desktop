@@ -1,0 +1,39 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/quotes",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "symbol": "BANKNIFTY",
+      "exchange": "NSE_INDEX"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "171",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": {
+        "ask": 0,
+        "ask_qty": 0,
+        "bid": 0,
+        "bid_qty": 0,
+        "high": 55091.45,
+        "low": 54066.6,
+        "ltp": 54450.75,
+        "oi": 0,
+        "open": 54583.05,
+        "prev_close": 54633.05,
+        "volume": 0
+      },
+      "status": "success"
+    }
+  }
+}

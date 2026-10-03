@@ -1,0 +1,27 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/optiongreeks",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "symbol": "NIFTY01JAN2010000CE",
+      "exchange": "NFO"
+    }
+  },
+  "response": {
+    "status_code": 400,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "194",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "message": "Failed to fetch option price: Symbol 'NIFTY01JAN2010000CE' not found for exchange 'NFO'. Please verify the symbol name and ensure master contracts are downloaded.",
+      "status": "error"
+    }
+  }
+}

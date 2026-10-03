@@ -1,0 +1,41 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/symbol",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "symbol": "CRUDEOIL19OCT26FUT",
+      "exchange": "MCX"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "287",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": {
+        "brexchange": "MCX",
+        "brsymbol": "CRUDEOIL26OCTFUT",
+        "exchange": "MCX",
+        "expiry": "19-OCT-26",
+        "freeze_qty": 0,
+        "id": 26188,
+        "instrumenttype": "FUT",
+        "lotsize": 100,
+        "name": "CRUDEOIL",
+        "strike": 0.0,
+        "symbol": "CRUDEOIL19OCT26FUT",
+        "tick_size": 1.0,
+        "token": "145894407::::569900"
+      },
+      "status": "success"
+    }
+  }
+}

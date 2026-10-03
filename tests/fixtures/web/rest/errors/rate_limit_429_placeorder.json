@@ -1,0 +1,32 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/placeorder",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "strategy": "fixtures",
+      "exchange": "NSE",
+      "symbol": "SBIN",
+      "action": "buy",
+      "quantity": 1,
+      "pricetype": "MARKET",
+      "product": "MIS"
+    }
+  },
+  "response": {
+    "status_code": 429,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "31",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "message": "10 per 1 second"
+    }
+  },
+  "note": "ORDER_RATE_LIMIT 10/s hit by 13 rapid placeorder calls: 429 {message:'10 per 1 second'} -- no status field, no Retry-After/X-RateLimit headers"
+}

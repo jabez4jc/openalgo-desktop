@@ -1,0 +1,35 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/placesmartorder",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "strategy": "fixtures",
+      "exchange": "NSE",
+      "symbol": "INFY",
+      "product": "MIS",
+      "pricetype": "MARKET",
+      "action": "BUY",
+      "quantity": 0,
+      "position_size": 5
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "97",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "message": "No OpenPosition Found. Not placing Exit order.",
+      "mode": "analyze",
+      "status": "success"
+    }
+  },
+  "note": "position already matches"
+}

@@ -1,0 +1,241 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/positionbook",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "3423",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": [
+        {
+          "average_price": 954.1,
+          "exchange": "NSE",
+          "lot_size": 1.0,
+          "ltp": 954.1,
+          "pnl": 0.0,
+          "pnlpercent": 0.0,
+          "product": "CNC",
+          "quantity": 2,
+          "symbol": "SBIN",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        },
+        {
+          "average_price": 1167.7,
+          "exchange": "NSE",
+          "lot_size": 1.0,
+          "ltp": 1167.7,
+          "pnl": 0.0,
+          "pnlpercent": 0.0,
+          "product": "MIS",
+          "quantity": 5,
+          "symbol": "RELIANCE",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        },
+        {
+          "average_price": 954.1,
+          "exchange": "NSE",
+          "lot_size": 1.0,
+          "ltp": 954.1,
+          "pnl": 0.0,
+          "pnlpercent": 0.0,
+          "product": "MIS",
+          "quantity": 8,
+          "symbol": "SBIN",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        },
+        {
+          "average_price": 156.95,
+          "exchange": "NFO",
+          "lot_size": 1.0,
+          "ltp": 156.95,
+          "pnl": 0.0,
+          "pnlpercent": 0.0,
+          "product": "MIS",
+          "quantity": 65,
+          "symbol": "NIFTY06OCT2622400CE",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        },
+        {
+          "average_price": 1035.0,
+          "exchange": "NSE",
+          "lot_size": 1.0,
+          "ltp": 1035.0,
+          "pnl": 0.0,
+          "pnlpercent": 0.0,
+          "product": "MIS",
+          "quantity": -3,
+          "symbol": "INFY",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        },
+        {
+          "average_price": 2075.0,
+          "exchange": "NSE",
+          "lot_size": 1.0,
+          "ltp": 2075.0,
+          "pnl": 0.0,
+          "pnlpercent": 0.0,
+          "product": "MIS",
+          "quantity": 1,
+          "symbol": "TCS",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        },
+        {
+          "average_price": 721.2,
+          "exchange": "NSE",
+          "lot_size": 1.0,
+          "ltp": 721.2,
+          "pnl": 0.0,
+          "pnlpercent": 0.0,
+          "product": "MIS",
+          "quantity": -2,
+          "symbol": "HDFCBANK",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        },
+        {
+          "average_price": 255.9,
+          "exchange": "NSE",
+          "lot_size": 1.0,
+          "ltp": 255.9,
+          "pnl": 0.0,
+          "pnlpercent": 0.0,
+          "product": "MIS",
+          "quantity": 1,
+          "symbol": "ITC",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        },
+        {
+          "average_price": 22520.0,
+          "exchange": "NFO",
+          "lot_size": 1.0,
+          "ltp": 22520.0,
+          "pnl": 0.0,
+          "pnlpercent": 0.0,
+          "product": "NRML",
+          "quantity": 65,
+          "symbol": "NIFTY27OCT26FUT",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        },
+        {
+          "average_price": 156.95,
+          "exchange": "NFO",
+          "lot_size": 1.0,
+          "ltp": 156.95,
+          "pnl": 0.0,
+          "pnlpercent": 0.0,
+          "product": "NRML",
+          "quantity": 325,
+          "symbol": "NIFTY06OCT2622400CE",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        },
+        {
+          "average_price": 9008.0,
+          "exchange": "MCX",
+          "lot_size": 1.0,
+          "ltp": 9008.0,
+          "pnl": 0.0,
+          "pnlpercent": 0.0,
+          "product": "NRML",
+          "quantity": 100,
+          "symbol": "CRUDEOIL19OCT26FUT",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        },
+        {
+          "average_price": 151.6,
+          "exchange": "NFO",
+          "lot_size": 1.0,
+          "ltp": 151.6,
+          "pnl": 0.0,
+          "pnlpercent": 0.0,
+          "product": "NRML",
+          "quantity": 65,
+          "symbol": "NIFTY06OCT2622500PE",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        },
+        {
+          "average_price": 82.95,
+          "exchange": "NFO",
+          "lot_size": 1.0,
+          "ltp": 82.95,
+          "pnl": 0.0,
+          "pnlpercent": 0.0,
+          "product": "NRML",
+          "quantity": -65,
+          "symbol": "NIFTY06OCT2622550CE",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        },
+        {
+          "average_price": 104.05,
+          "exchange": "NFO",
+          "lot_size": 1.0,
+          "ltp": 104.05,
+          "pnl": 0.0,
+          "pnlpercent": 0.0,
+          "product": "NRML",
+          "quantity": -65,
+          "symbol": "NIFTY06OCT2622500CE",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        },
+        {
+          "average_price": 103.6,
+          "exchange": "NFO",
+          "lot_size": 1.0,
+          "ltp": 103.6,
+          "pnl": 0.0,
+          "pnlpercent": 0.0,
+          "product": "NRML",
+          "quantity": 65,
+          "symbol": "NIFTY06OCT2622400PE",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        }
+      ],
+      "mode": "analyze",
+      "status": "success",
+      "total_pnl": 0.0,
+      "total_pnl_today": 0.0,
+      "total_today_realized_pnl": 0.0,
+      "total_unrealized_pnl": 0.0
+    }
+  }
+}

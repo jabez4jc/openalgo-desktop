@@ -1,0 +1,48 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/expiry",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "symbol": "NIFTY",
+      "exchange": "NFO",
+      "instrumenttype": "options"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "305",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": [
+        "06-OCT-26",
+        "13-OCT-26",
+        "19-OCT-26",
+        "27-OCT-26",
+        "03-NOV-26",
+        "23-NOV-26",
+        "29-DEC-26",
+        "30-MAR-27",
+        "29-JUN-27",
+        "28-SEP-27",
+        "28-DEC-27",
+        "27-JUN-28",
+        "26-DEC-28",
+        "26-JUN-29",
+        "24-DEC-29",
+        "25-JUN-30",
+        "31-DEC-30",
+        "24-JUN-31"
+      ],
+      "message": "Found 18 expiry dates for NIFTY options in NFO",
+      "status": "success"
+    }
+  }
+}

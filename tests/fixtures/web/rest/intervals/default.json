@@ -1,0 +1,43 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/intervals",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "139",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": {
+        "days": [
+          "D"
+        ],
+        "hours": [
+          "1h"
+        ],
+        "minutes": [
+          "1m",
+          "3m",
+          "5m",
+          "10m",
+          "15m",
+          "30m"
+        ],
+        "months": [],
+        "seconds": [],
+        "weeks": []
+      },
+      "status": "success"
+    }
+  }
+}

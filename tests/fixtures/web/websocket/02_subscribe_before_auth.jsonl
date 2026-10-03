@@ -1,0 +1,11 @@
+{"ts": 1791000365.42, "iso": "2026-10-03T04:06:05Z", "direction": "note", "message": {"note": "connected; sending subscribe before authenticate"}}
+{"ts": 1791000365.42, "iso": "2026-10-03T04:06:05Z", "direction": "send", "message": {"action": "subscribe", "symbols": [{"symbol": "RELIANCE", "exchange": "NSE"}], "mode": 1, "request_id": "req-pre-auth"}}
+{"ts": 1791000365.428, "iso": "2026-10-03T04:06:05Z", "direction": "recv", "message": {"status": "error", "code": "NOT_AUTHENTICATED", "message": "You must authenticate first", "request_id": "req-pre-auth"}}
+{"ts": 1791000365.429, "iso": "2026-10-03T04:06:05Z", "direction": "send", "message": {"action": "unsubscribe_all"}}
+{"ts": 1791000365.435, "iso": "2026-10-03T04:06:05Z", "direction": "recv", "message": {"status": "error", "code": "NOT_AUTHENTICATED", "message": "You must authenticate first"}}
+{"ts": 1791000365.435, "iso": "2026-10-03T04:06:05Z", "direction": "send", "message": {"action": "subscribe_orders"}}
+{"ts": 1791000365.443, "iso": "2026-10-03T04:06:05Z", "direction": "recv", "message": {"status": "error", "code": "NOT_AUTHENTICATED", "message": "You must authenticate first"}}
+{"ts": 1791000365.443, "iso": "2026-10-03T04:06:05Z", "direction": "send", "message": {"action": "ping"}}
+{"ts": 1791000365.448, "iso": "2026-10-03T04:06:05Z", "direction": "recv", "message": {"type": "pong", "status": "success", "server_timestamp": 1791000365445}}
+{"ts": 1791000365.448, "iso": "2026-10-03T04:06:05Z", "direction": "send", "message": {"action": "get_broker_info"}}
+{"ts": 1791000365.455, "iso": "2026-10-03T04:06:05Z", "direction": "recv", "message": {"status": "error", "code": "NOT_AUTHENTICATED", "message": "You must authenticate first"}}

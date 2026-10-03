@@ -1,0 +1,36 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/expiry",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "symbol": "BANKNIFTY",
+      "exchange": "NFO",
+      "instrumenttype": "options"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "164",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": [
+        "27-OCT-26",
+        "23-NOV-26",
+        "29-DEC-26",
+        "30-MAR-27",
+        "29-JUN-27",
+        "28-SEP-27"
+      ],
+      "message": "Found 6 expiry dates for BANKNIFTY options in NFO",
+      "status": "success"
+    }
+  }
+}

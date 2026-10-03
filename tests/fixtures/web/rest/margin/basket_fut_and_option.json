@@ -1,0 +1,52 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/margin",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "positions": [
+        {
+          "symbol": "NIFTY27OCT26FUT",
+          "exchange": "NFO",
+          "action": "BUY",
+          "quantity": "65",
+          "product": "NRML",
+          "pricetype": "MARKET",
+          "price": "0",
+          "trigger_price": "0"
+        },
+        {
+          "symbol": "NIFTY06OCT2622400CE",
+          "exchange": "NFO",
+          "action": "SELL",
+          "quantity": "65",
+          "product": "NRML",
+          "pricetype": "MARKET",
+          "price": "0",
+          "trigger_price": "0"
+        }
+      ]
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "117",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": {
+        "exposure_margin": 58424.535,
+        "span_margin": 153198.25,
+        "total_margin_required": 201421.035
+      },
+      "status": "success"
+    }
+  },
+  "note": "lot size 65 from /search"
+}

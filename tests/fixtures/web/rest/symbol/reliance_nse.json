@@ -1,0 +1,41 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/symbol",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "symbol": "RELIANCE",
+      "exchange": "NSE"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "263",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": {
+        "brexchange": "NSE",
+        "brsymbol": "RELIANCE",
+        "exchange": "NSE",
+        "expiry": "",
+        "freeze_qty": 0,
+        "id": 97798,
+        "instrumenttype": "EQ",
+        "lotsize": 1,
+        "name": "RELIANCE INDUSTRIES",
+        "strike": 0.0,
+        "symbol": "RELIANCE",
+        "tick_size": 0.1,
+        "token": "738561::::2885"
+      },
+      "status": "success"
+    }
+  }
+}

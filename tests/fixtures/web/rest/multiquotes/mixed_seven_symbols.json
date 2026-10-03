@@ -1,0 +1,175 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/multiquotes",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "symbols": [
+        {
+          "symbol": "RELIANCE",
+          "exchange": "NSE"
+        },
+        {
+          "symbol": "SBIN",
+          "exchange": "NSE"
+        },
+        {
+          "symbol": "NIFTY",
+          "exchange": "NSE_INDEX"
+        },
+        {
+          "symbol": "BANKNIFTY",
+          "exchange": "NSE_INDEX"
+        },
+        {
+          "symbol": "NIFTY27OCT26FUT",
+          "exchange": "NFO"
+        },
+        {
+          "symbol": "NIFTY06OCT2622400CE",
+          "exchange": "NFO"
+        },
+        {
+          "symbol": "CRUDEOIL19OCT26FUT",
+          "exchange": "MCX"
+        }
+      ]
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "1336",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "results": [
+        {
+          "data": {
+            "ask": 0,
+            "ask_qty": 0,
+            "bid": 0,
+            "bid_qty": 0,
+            "high": 1183.9,
+            "low": 1160.8,
+            "ltp": 1167.7,
+            "oi": 0,
+            "open": 1180.1,
+            "prev_close": 1187,
+            "volume": 0
+          },
+          "exchange": "NSE",
+          "symbol": "RELIANCE"
+        },
+        {
+          "data": {
+            "ask": 0,
+            "ask_qty": 0,
+            "bid": 0,
+            "bid_qty": 0,
+            "high": 965.4,
+            "low": 945.8,
+            "ltp": 954.1,
+            "oi": 0,
+            "open": 953.1,
+            "prev_close": 959.5,
+            "volume": 0
+          },
+          "exchange": "NSE",
+          "symbol": "SBIN"
+        },
+        {
+          "data": {
+            "ask": 0,
+            "ask_qty": 0,
+            "bid": 0,
+            "bid_qty": 0,
+            "high": 22610.6,
+            "low": 22217.3,
+            "ltp": 22421.95,
+            "oi": 0,
+            "open": 22543.7,
+            "prev_close": 22620.45,
+            "volume": 0
+          },
+          "exchange": "NSE_INDEX",
+          "symbol": "NIFTY"
+        },
+        {
+          "data": {
+            "ask": 0,
+            "ask_qty": 0,
+            "bid": 0,
+            "bid_qty": 0,
+            "high": 55091.45,
+            "low": 54066.6,
+            "ltp": 54450.75,
+            "oi": 0,
+            "open": 54583.05,
+            "prev_close": 54633.05,
+            "volume": 0
+          },
+          "exchange": "NSE_INDEX",
+          "symbol": "BANKNIFTY"
+        },
+        {
+          "data": {
+            "ask": 0,
+            "ask_qty": 0,
+            "bid": 0,
+            "bid_qty": 0,
+            "high": 22702.4,
+            "low": 22321,
+            "ltp": 22520,
+            "oi": 19680440,
+            "open": 22630,
+            "prev_close": 22707.3,
+            "volume": 0
+          },
+          "exchange": "NFO",
+          "symbol": "NIFTY27OCT26FUT"
+        },
+        {
+          "data": {
+            "ask": 0,
+            "ask_qty": 0,
+            "bid": 0,
+            "bid_qty": 0,
+            "high": 282.6,
+            "low": 92.2,
+            "ltp": 156.95,
+            "oi": 3635255,
+            "open": 253,
+            "prev_close": 301.05,
+            "volume": 0
+          },
+          "exchange": "NFO",
+          "symbol": "NIFTY06OCT2622400CE"
+        },
+        {
+          "data": {
+            "ask": 0,
+            "ask_qty": 0,
+            "bid": 0,
+            "bid_qty": 0,
+            "high": 9027,
+            "low": 8533,
+            "ltp": 9008,
+            "oi": 11210,
+            "open": 8715,
+            "prev_close": 8734,
+            "volume": 0
+          },
+          "exchange": "MCX",
+          "symbol": "CRUDEOIL19OCT26FUT"
+        }
+      ],
+      "status": "success"
+    }
+  }
+}

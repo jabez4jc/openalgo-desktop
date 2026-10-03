@@ -1,0 +1,39 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/placegttorder",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "strategy": "fixtures",
+      "exchange": "NSE",
+      "symbol": "SBIN",
+      "action": "SELL",
+      "product": "CNC",
+      "quantity": 1,
+      "pricetype": "LIMIT",
+      "trigger_type": "OCO",
+      "price": 954.1,
+      "triggerprice_sl": 858.7,
+      "stoploss": 849.1,
+      "triggerprice_tg": 1049.5,
+      "target": 1059.1
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "73",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "mode": "analyze",
+      "status": "success",
+      "trigger_id": "GTT-261003-56ad1482"
+    }
+  }
+}

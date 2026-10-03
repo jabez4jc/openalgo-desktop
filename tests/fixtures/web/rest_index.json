@@ -1,0 +1,1841 @@
+[
+ {
+  "endpoint": "ping",
+  "case": "apikey_in_body",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "ping",
+  "case": "apikey_in_x_api_key_header",
+  "status": 400,
+  "note": "Header-only auth: server reads apikey from JSON body only (schema required=True)"
+ },
+ {
+  "endpoint": "ping",
+  "case": "apikey_in_header_and_body",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "ping",
+  "case": "extra_unknown_field",
+  "status": 400,
+  "note": ""
+ },
+ {
+  "endpoint": "funds",
+  "case": "apikey_in_body",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "funds",
+  "case": "apikey_in_x_api_key_header",
+  "status": 400,
+  "note": ""
+ },
+ {
+  "endpoint": "funds",
+  "case": "apikey_in_header_and_body",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "orderbook",
+  "case": "default",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "tradebook",
+  "case": "default",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "positionbook",
+  "case": "default",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "holdings",
+  "case": "default",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "gttorderbook",
+  "case": "default",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "openposition",
+  "case": "from_positionbook_or_default",
+  "status": 200,
+  "note": "symbol=RELIANCE exchange=NSE product=MIS"
+ },
+ {
+  "endpoint": "openposition",
+  "case": "no_position_symbol",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "orderstatus",
+  "case": "unknown_orderid",
+  "status": 404,
+  "note": "orderbook was empty -> unknown orderid error case"
+ },
+ {
+  "endpoint": "expiry",
+  "case": "nifty_nfo_futures",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "expiry",
+  "case": "nifty_nfo_options",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "expiry",
+  "case": "crudeoil_mcx_futures",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "expiry",
+  "case": "banknifty_nfo_options",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "optionsymbol",
+  "case": "nifty_atm_ce",
+  "status": 200,
+  "note": "expiry from /expiry is DD-MMM-YY; converted to DDMMMYY"
+ },
+ {
+  "endpoint": "optionsymbol",
+  "case": "nifty_otm2_pe",
+  "status": 200,
+  "note": "expiry from /expiry is DD-MMM-YY; converted to DDMMMYY"
+ },
+ {
+  "endpoint": "optionsymbol",
+  "case": "nifty_itm1_ce_with_strike_int",
+  "status": 200,
+  "note": "expiry from /expiry is DD-MMM-YY; converted to DDMMMYY"
+ },
+ {
+  "endpoint": "optionsymbol",
+  "case": "invalid_offset",
+  "status": 400,
+  "note": ""
+ },
+ {
+  "endpoint": "quotes",
+  "case": "reliance_nse",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "quotes",
+  "case": "reliance_nse_x_api_key_header",
+  "status": 400,
+  "note": ""
+ },
+ {
+  "endpoint": "quotes",
+  "case": "reliance_nse_header_and_body",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "quotes",
+  "case": "sbin_nse",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "quotes",
+  "case": "nifty_nse_index",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "quotes",
+  "case": "banknifty_nse_index",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "quotes",
+  "case": "nifty_future_nfo",
+  "status": 200,
+  "note": "symbol=NIFTY27OCT26FUT"
+ },
+ {
+  "endpoint": "quotes",
+  "case": "nifty_option_nfo",
+  "status": 200,
+  "note": "symbol=NIFTY06OCT2622400CE"
+ },
+ {
+  "endpoint": "quotes",
+  "case": "crudeoil_future_mcx",
+  "status": 200,
+  "note": "symbol=CRUDEOIL19OCT26FUT"
+ },
+ {
+  "endpoint": "quotes",
+  "case": "reliance_bse",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "multiquotes",
+  "case": "mixed_seven_symbols",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "multiquotes",
+  "case": "with_one_unknown_symbol",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "multiquotes",
+  "case": "empty_symbols_list",
+  "status": 400,
+  "note": ""
+ },
+ {
+  "endpoint": "depth",
+  "case": "reliance_nse",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "depth",
+  "case": "nifty_nse_index",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "depth",
+  "case": "nifty_future_nfo",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "depth",
+  "case": "nifty_option_nfo",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "history",
+  "case": "reliance_nse_1m",
+  "status": 200,
+  "note": "range 2026-09-29..2026-10-02 rows=1080 first_ts=1790653500 keys=['close', 'high', 'low', 'oi', 'open', 'timestamp', 'volume']"
+ },
+ {
+  "endpoint": "history",
+  "case": "reliance_nse_5m",
+  "status": 200,
+  "note": "range 2026-09-29..2026-10-02 rows=216 first_ts=1790653500 keys=['close', 'high', 'low', 'oi', 'open', 'timestamp', 'volume']"
+ },
+ {
+  "endpoint": "history",
+  "case": "reliance_nse_15m",
+  "status": 200,
+  "note": "range 2026-09-22..2026-10-02 rows=192 first_ts=1790048700 keys=['close', 'high', 'low', 'oi', 'open', 'timestamp', 'volume']"
+ },
+ {
+  "endpoint": "history",
+  "case": "reliance_nse_D",
+  "status": 200,
+  "note": "range 2026-08-01..2026-10-02 rows=43 first_ts=1785715200 keys=['close', 'high', 'low', 'oi', 'open', 'timestamp', 'volume']"
+ },
+ {
+  "endpoint": "history",
+  "case": "nifty_index_D",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "history",
+  "case": "nifty_future_5m",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "history",
+  "case": "reliance_nse_D_source_db",
+  "status": 404,
+  "note": ""
+ },
+ {
+  "endpoint": "history",
+  "case": "bad_date_format_ddmmyyyy",
+  "status": 400,
+  "note": "Date format must be YYYY-MM-DD"
+ },
+ {
+  "endpoint": "history",
+  "case": "bad_interval",
+  "status": 400,
+  "note": ""
+ },
+ {
+  "endpoint": "history",
+  "case": "end_before_start",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "intervals",
+  "case": "default",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "symbol",
+  "case": "reliance_nse",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "symbol",
+  "case": "nifty_future_nfo",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "symbol",
+  "case": "nifty_option_nfo",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "symbol",
+  "case": "nifty_nse_index",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "symbol",
+  "case": "unknown_symbol",
+  "status": 404,
+  "note": ""
+ },
+ {
+  "endpoint": "search",
+  "case": "reliance_nse",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "search",
+  "case": "nifty_no_exchange",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "search",
+  "case": "nifty_nfo",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "search",
+  "case": "no_results",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "optionchain",
+  "case": "nifty_nearest_expiry_5_strikes",
+  "status": 200,
+  "note": "expiry from /expiry is DD-MMM-YY; converted to DDMMMYY"
+ },
+ {
+  "endpoint": "optionchain",
+  "case": "nifty_nearest_expiry_3_strikes_with_greeks",
+  "status": 200,
+  "note": "expiry from /expiry is DD-MMM-YY; converted to DDMMMYY"
+ },
+ {
+  "endpoint": "optionchain",
+  "case": "bad_expiry",
+  "status": 404,
+  "note": ""
+ },
+ {
+  "endpoint": "optiongreeks",
+  "case": "nifty_option_default",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "optiongreeks",
+  "case": "nifty_option_with_rate_and_underlying",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "optiongreeks",
+  "case": "unknown_symbol",
+  "status": 400,
+  "note": ""
+ },
+ {
+  "endpoint": "multioptiongreeks",
+  "case": "nifty_ce_and_pe",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "syntheticfuture",
+  "case": "nifty_nearest_expiry",
+  "status": 200,
+  "note": "expiry from /expiry is DD-MMM-YY; converted to DDMMMYY"
+ },
+ {
+  "endpoint": "instruments",
+  "case": "nse_json",
+  "status": 200,
+  "note": "GET with query params; data truncated to 20 rows, _total_rows recorded"
+ },
+ {
+  "endpoint": "instruments",
+  "case": "nfo_json",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "instruments",
+  "case": "nse_csv",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "instruments",
+  "case": "all_exchanges_json",
+  "status": 400,
+  "note": ""
+ },
+ {
+  "endpoint": "instruments",
+  "case": "bad_exchange",
+  "status": 400,
+  "note": ""
+ },
+ {
+  "endpoint": "instruments",
+  "case": "post_not_allowed",
+  "status": 404,
+  "note": "instruments is GET-only"
+ },
+ {
+  "endpoint": "margin",
+  "case": "single_equity_mis",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "margin",
+  "case": "basket_fut_and_option",
+  "status": 200,
+  "note": "lot size 65 from /search"
+ },
+ {
+  "endpoint": "margin",
+  "case": "quantity_as_number_not_string",
+  "status": 400,
+  "note": "schema declares quantity/price as Str"
+ },
+ {
+  "endpoint": "margin",
+  "case": "empty_positions",
+  "status": 400,
+  "note": ""
+ },
+ {
+  "endpoint": "analyzer",
+  "case": "status",
+  "status": 200,
+  "note": "POST /analyzer returns mode status; /analyzer/toggle NOT called"
+ },
+ {
+  "endpoint": "market/holidays",
+  "case": "year_2026",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "market/holidays",
+  "case": "no_year",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "market/holidays",
+  "case": "year_out_of_range",
+  "status": 400,
+  "note": ""
+ },
+ {
+  "endpoint": "market/timings",
+  "case": "saturday_2026-10-03",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "market/timings",
+  "case": "weekday_2026-10-01",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "market/timings",
+  "case": "bad_date",
+  "status": 400,
+  "note": ""
+ },
+ {
+  "endpoint": "ticker",
+  "case": "nse_reliance_D_json",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "ticker",
+  "case": "nse_reliance_5m_json",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "ticker",
+  "case": "nse_reliance_D_txt",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "ticker",
+  "case": "nse_reliance_5m_txt",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "ticker",
+  "case": "nse_index_nifty_D_json",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "ticker",
+  "case": "no_exchange_prefix_defaults",
+  "status": 200,
+  "note": "no 'EXCH:' prefix -> server silently uses NSE:RELIANCE (see ticker.py)"
+ },
+ {
+  "endpoint": "ticker",
+  "case": "missing_from_to",
+  "status": 400,
+  "note": ""
+ },
+ {
+  "endpoint": "ticker",
+  "case": "invalid_apikey_txt",
+  "status": 500,
+  "note": ""
+ },
+ {
+  "endpoint": "ticker",
+  "case": "invalid_apikey_json",
+  "status": 403,
+  "note": ""
+ },
+ {
+  "endpoint": "pnl",
+  "case": "symbols_in_live_mode",
+  "status": 200,
+  "note": "only available in analyzer mode"
+ },
+ {
+  "endpoint": "chart",
+  "case": "get_preferences",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "chart",
+  "case": "get_missing_apikey",
+  "status": 400,
+  "note": ""
+ },
+ {
+  "endpoint": "strategy",
+  "case": "list",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "strategy",
+  "case": "status_unknown_id",
+  "status": 400,
+  "note": ""
+ },
+ {
+  "endpoint": "portfolio",
+  "case": "benchmarks",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "portfolio",
+  "case": "benchmarks_invalid_apikey",
+  "status": 403,
+  "note": ""
+ },
+ {
+  "endpoint": "errors",
+  "case": "invalid_apikey_funds",
+  "status": 403,
+  "note": ""
+ },
+ {
+  "endpoint": "errors",
+  "case": "invalid_apikey_quotes",
+  "status": 403,
+  "note": ""
+ },
+ {
+  "endpoint": "errors",
+  "case": "missing_apikey_funds",
+  "status": 400,
+  "note": ""
+ },
+ {
+  "endpoint": "errors",
+  "case": "missing_apikey_quotes",
+  "status": 400,
+  "note": ""
+ },
+ {
+  "endpoint": "errors",
+  "case": "empty_apikey_string",
+  "status": 400,
+  "note": ""
+ },
+ {
+  "endpoint": "errors",
+  "case": "missing_required_field_quotes_symbol",
+  "status": 400,
+  "note": ""
+ },
+ {
+  "endpoint": "errors",
+  "case": "missing_required_field_history_interval",
+  "status": 400,
+  "note": ""
+ },
+ {
+  "endpoint": "errors",
+  "case": "unknown_symbol_quotes",
+  "status": 400,
+  "note": ""
+ },
+ {
+  "endpoint": "errors",
+  "case": "unknown_symbol_depth",
+  "status": 400,
+  "note": ""
+ },
+ {
+  "endpoint": "errors",
+  "case": "bad_exchange_quotes",
+  "status": 400,
+  "note": ""
+ },
+ {
+  "endpoint": "errors",
+  "case": "lowercase_exchange_quotes",
+  "status": 400,
+  "note": ""
+ },
+ {
+  "endpoint": "errors",
+  "case": "malformed_json_quotes",
+  "status": 400,
+  "note": ""
+ },
+ {
+  "endpoint": "errors",
+  "case": "non_json_content_type",
+  "status": 500,
+  "note": ""
+ },
+ {
+  "endpoint": "errors",
+  "case": "empty_body_json_content_type",
+  "status": 400,
+  "note": ""
+ },
+ {
+  "endpoint": "errors",
+  "case": "json_array_body",
+  "status": 500,
+  "note": ""
+ },
+ {
+  "endpoint": "errors",
+  "case": "wrong_method_get_on_funds",
+  "status": 404,
+  "note": ""
+ },
+ {
+  "endpoint": "errors",
+  "case": "wrong_method_get_on_quotes",
+  "status": 404,
+  "note": ""
+ },
+ {
+  "endpoint": "errors",
+  "case": "wrong_method_put_on_ping",
+  "status": 404,
+  "note": ""
+ },
+ {
+  "endpoint": "errors",
+  "case": "unknown_route",
+  "status": 404,
+  "note": ""
+ },
+ {
+  "endpoint": "errors",
+  "case": "unknown_route_post",
+  "status": 404,
+  "note": ""
+ },
+ {
+  "endpoint": "errors",
+  "case": "unknown_route_outside_api",
+  "status": 404,
+  "note": ""
+ },
+ {
+  "endpoint": "errors",
+  "case": "trailing_slash_ping",
+  "status": 200,
+  "note": "strict_slashes=False"
+ },
+ {
+  "endpoint": "errors",
+  "case": "rate_limit_probe_no_429",
+  "status": 200,
+  "note": "burst of 103 pings in 2.618s produced no 429; counts={200: 103}"
+ },
+ {
+  "endpoint": "optionsymbol",
+  "case": "expiry_with_dashes_as_returned_by_expiry_api",
+  "status": 404,
+  "note": "passing the raw DD-MMM-YY value from /expiry is rejected"
+ },
+ {
+  "endpoint": "optionsymbol",
+  "case": "underlying_is_future_symbol",
+  "status": 200,
+  "note": "underlying as NIFTYddMMMyyFUT on NFO; expiry inferred"
+ },
+ {
+  "endpoint": "quotes",
+  "case": "symbol_with_dashed_expiry",
+  "status": 400,
+  "note": "symbol built with dashed expiry is not found"
+ },
+ {
+  "endpoint": "depth",
+  "case": "crudeoil_future_mcx",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "history",
+  "case": "crudeoil_future_15m",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "history",
+  "case": "nifty_option_5m",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "symbol",
+  "case": "crudeoil_future_mcx",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "optionchain",
+  "case": "banknifty_monthly_3_strikes",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "multioptiongreeks",
+  "case": "one_valid_one_unknown",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "syntheticfuture",
+  "case": "nifty_monthly_expiry",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "margin",
+  "case": "single_option_limit",
+  "status": 200,
+  "note": ""
+ },
+ {
+  "endpoint": "analyzer",
+  "case": "status_after_round_trip",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "analyzer",
+  "case": "status_before_mutations",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "analyzer",
+  "case": "status_final",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "analyzer",
+  "case": "status_while_live",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "analyzer",
+  "case": "toggle_back_to_analyze_true",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "analyzer",
+  "case": "toggle_error_invalid_mode",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "analyzer",
+  "case": "toggle_error_missing_mode",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "analyzer",
+  "case": "toggle_to_live_false",
+  "status": 200,
+  "note": "round trip for shape only; no orders placed while live",
+  "session": 2
+ },
+ {
+  "endpoint": "basketorder",
+  "case": "error_empty_orders",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "basketorder",
+  "case": "error_leg_bad_product",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "basketorder",
+  "case": "one_leg_unknown_symbol",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "basketorder",
+  "case": "three_legs_mixed",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "cancelallorder",
+  "case": "error_missing_strategy",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "cancelallorder",
+  "case": "final_cleanup",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "cancelallorder",
+  "case": "nothing_open",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "cancelallorder",
+  "case": "with_open_orders",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "cancelgttorder",
+  "case": "error_already_cancelled",
+  "status": 404,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "cancelgttorder",
+  "case": "error_missing_trigger_id",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "cancelgttorder",
+  "case": "error_unknown_trigger_id",
+  "status": 404,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "cancelgttorder",
+  "case": "oco",
+  "status": 500,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "cancelgttorder",
+  "case": "oco_retry",
+  "status": 500,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "cancelgttorder",
+  "case": "single",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "cancelorder",
+  "case": "error_already_cancelled",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "cancelorder",
+  "case": "error_completed_order",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "cancelorder",
+  "case": "error_missing_orderid",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "cancelorder",
+  "case": "error_unknown_orderid",
+  "status": 404,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "cancelorder",
+  "case": "open_limit",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "cancelorder",
+  "case": "trigger_pending_sl",
+  "status": 200,
+  "note": "cancelallorder skipped this trigger-pending order",
+  "session": 2
+ },
+ {
+  "endpoint": "cancelorder",
+  "case": "trigger_pending_slm",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "closeposition",
+  "case": "error_missing_strategy",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "closeposition",
+  "case": "final_cleanup",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "closeposition",
+  "case": "no_open_positions",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "closeposition",
+  "case": "with_open_positions",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "errors",
+  "case": "rate_limit_429_placeorder",
+  "status": 429,
+  "note": "ORDER_RATE_LIMIT 10/s hit by 13 rapid placeorder calls: 429 {message:'10 per 1 second'} -- no status field, no Retry-After/X-RateLimit headers",
+  "session": 2
+ },
+ {
+  "endpoint": "expiry",
+  "case": "crudeoil_mcx_futures_session2",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "expiry",
+  "case": "nifty_nfo_futures_session2",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "expiry",
+  "case": "nifty_nfo_options_session2",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "funds",
+  "case": "after_activity",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "funds",
+  "case": "after_cleanup",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "funds",
+  "case": "final",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "gttorderbook",
+  "case": "after_all_cancelled",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "gttorderbook",
+  "case": "after_cancel_all_statuses",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "gttorderbook",
+  "case": "after_modify",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "gttorderbook",
+  "case": "after_place",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "gttorderbook",
+  "case": "error_bad_status",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "gttorderbook",
+  "case": "final",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "gttorderbook",
+  "case": "status_active",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "gttorderbook",
+  "case": "status_cancelled",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "holdings",
+  "case": "after_cnc_buys",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "modifygttorder",
+  "case": "error_cancelled_trigger",
+  "status": 500,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "modifygttorder",
+  "case": "error_missing_trigger_id",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "modifygttorder",
+  "case": "error_unknown_trigger_id",
+  "status": 500,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "modifygttorder",
+  "case": "oco_change_target",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "modifygttorder",
+  "case": "single_change_trigger_and_qty",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "modifyorder",
+  "case": "error_cancelled_order",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "modifyorder",
+  "case": "error_completed_order",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "modifyorder",
+  "case": "error_missing_price",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "modifyorder",
+  "case": "error_negative_price",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "modifyorder",
+  "case": "error_unknown_orderid",
+  "status": 404,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "modifyorder",
+  "case": "open_limit_price_and_qty",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "modifyorder",
+  "case": "sl_order_trigger",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "openposition",
+  "case": "crudeoil_future_nrml",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "openposition",
+  "case": "infy_after_smart_open",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "openposition",
+  "case": "infy_after_smart_short",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "openposition",
+  "case": "nifty_future_nrml",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "openposition",
+  "case": "no_position_session2",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "openposition",
+  "case": "reliance_mis_long",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "openposition",
+  "case": "sbin_mis_short",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "optionsmultiorder",
+  "case": "bull_call_spread_2_legs",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "optionsmultiorder",
+  "case": "error_empty_legs",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "optionsmultiorder",
+  "case": "one_leg_bad_offset",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "optionsorder",
+  "case": "atm_ce_buy",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "optionsorder",
+  "case": "atm_ce_buy_with_splitsize",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "optionsorder",
+  "case": "error_bad_expiry",
+  "status": 404,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "optionsorder",
+  "case": "error_bad_offset",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "optionsorder",
+  "case": "error_qty_not_lot_multiple",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "optionsorder",
+  "case": "itm2_pe_buy",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "optionsorder",
+  "case": "otm3_ce_sell",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "optionsymbol",
+  "case": "nifty_atm_ce_session2",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "orderbook",
+  "case": "after_cleanup",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "orderbook",
+  "case": "populated",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "orderstatus",
+  "case": "after_cancel",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "orderstatus",
+  "case": "after_modify",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "orderstatus",
+  "case": "limit_buy_cnc_sbin_far_below",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "orderstatus",
+  "case": "market_buy_mis_reliance",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "orderstatus",
+  "case": "market_buy_nrml_nifty_option",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "orderstatus",
+  "case": "sl_buy_mis_reliance",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "orderstatus",
+  "case": "slm_sell_mis_sbin",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "orderstatus",
+  "case": "unknown_orderid_session2",
+  "status": 404,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placegttorder",
+  "case": "error_bad_trigger_type",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placegttorder",
+  "case": "error_mis_product",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placegttorder",
+  "case": "error_oco_missing_legs",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placegttorder",
+  "case": "error_unknown_symbol",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placegttorder",
+  "case": "oco_sell_cnc",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placegttorder",
+  "case": "single_buy_cnc_trigger_below",
+  "status": 200,
+  "note": "SINGLE: one trigger",
+  "session": 2
+ },
+ {
+  "endpoint": "placeorder",
+  "case": "error_bad_action",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placeorder",
+  "case": "error_bad_exchange",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placeorder",
+  "case": "error_bad_pricetype",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placeorder",
+  "case": "error_bad_product",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placeorder",
+  "case": "error_invalid_apikey",
+  "status": 403,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placeorder",
+  "case": "error_limit_price_zero",
+  "status": 400,
+  "note": "LIMIT with price 0",
+  "session": 2
+ },
+ {
+  "endpoint": "placeorder",
+  "case": "error_missing_strategy",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placeorder",
+  "case": "error_missing_symbol",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placeorder",
+  "case": "error_negative_price",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placeorder",
+  "case": "error_option_qty_not_lot_multiple",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placeorder",
+  "case": "error_quantity_fractional_nse",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placeorder",
+  "case": "error_quantity_negative",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placeorder",
+  "case": "error_quantity_zero",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placeorder",
+  "case": "error_sl_without_trigger",
+  "status": 400,
+  "note": "SL with trigger_price 0",
+  "session": 2
+ },
+ {
+  "endpoint": "placeorder",
+  "case": "error_unknown_symbol",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placeorder",
+  "case": "limit_buy_cnc_sbin_far_below",
+  "status": 200,
+  "note": "LIMIT far below LTP -> stays open",
+  "session": 2
+ },
+ {
+  "endpoint": "placeorder",
+  "case": "limit_buy_mis_reliance_far_below",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placeorder",
+  "case": "limit_sell_mis_reliance_far_above",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placeorder",
+  "case": "lowercase_action_buy",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placeorder",
+  "case": "market_buy_cnc_sbin",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placeorder",
+  "case": "market_buy_mis_nifty_option",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placeorder",
+  "case": "market_buy_mis_reliance",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placeorder",
+  "case": "market_buy_nrml_crudeoil_future_mcx",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placeorder",
+  "case": "market_buy_nrml_nifty_future",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placeorder",
+  "case": "market_buy_nrml_nifty_option",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placeorder",
+  "case": "market_sell_mis_sbin",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placeorder",
+  "case": "sl_buy_mis_reliance",
+  "status": 200,
+  "note": "SL BUY: trigger above LTP",
+  "session": 2
+ },
+ {
+  "endpoint": "placeorder",
+  "case": "slm_sell_mis_sbin",
+  "status": 200,
+  "note": "SL-M SELL: trigger below LTP",
+  "session": 2
+ },
+ {
+  "endpoint": "placesmartorder",
+  "case": "error_missing_position_size",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placesmartorder",
+  "case": "error_unknown_symbol",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "placesmartorder",
+  "case": "flat_to_short_minus_3",
+  "status": 200,
+  "note": "0 -> -3",
+  "session": 2
+ },
+ {
+  "endpoint": "placesmartorder",
+  "case": "no_action_already_at_5",
+  "status": 200,
+  "note": "position already matches",
+  "session": 2
+ },
+ {
+  "endpoint": "placesmartorder",
+  "case": "no_action_qty_nonzero_position_matches",
+  "status": 200,
+  "note": "position already -3, asked -3 with qty 3",
+  "session": 2
+ },
+ {
+  "endpoint": "placesmartorder",
+  "case": "open_from_flat_to_10",
+  "status": 200,
+  "note": "flat -> +10 (BUY 10)",
+  "session": 2
+ },
+ {
+  "endpoint": "placesmartorder",
+  "case": "raise_10_to_15",
+  "status": 200,
+  "note": "+10 -> +15",
+  "session": 2
+ },
+ {
+  "endpoint": "placesmartorder",
+  "case": "reduce_15_to_5",
+  "status": 200,
+  "note": "+15 -> +5",
+  "session": 2
+ },
+ {
+  "endpoint": "placesmartorder",
+  "case": "to_zero",
+  "status": 200,
+  "note": "+5 -> 0",
+  "session": 2
+ },
+ {
+  "endpoint": "pnl",
+  "case": "symbols_after_cleanup",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "pnl",
+  "case": "symbols_populated",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "positionbook",
+  "case": "after_closeposition",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "positionbook",
+  "case": "final",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "positionbook",
+  "case": "populated",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "quotes",
+  "case": "reliance_session2",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "quotes",
+  "case": "sbin_session2",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "splitorder",
+  "case": "error_missing_splitsize",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "splitorder",
+  "case": "error_splitsize_zero",
+  "status": 400,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "splitorder",
+  "case": "sbin_10_split_3",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "symbol",
+  "case": "crudeoil_future_session2",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "symbol",
+  "case": "nifty_future_session2",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "tradebook",
+  "case": "after_cleanup",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "tradebook",
+  "case": "populated",
+  "status": 200,
+  "note": "",
+  "session": 2
+ },
+ {
+  "endpoint": "gttorderbook",
+  "case": "status_all",
+  "status": 200,
+  "note": "",
+  "session": 2
+ }
+]

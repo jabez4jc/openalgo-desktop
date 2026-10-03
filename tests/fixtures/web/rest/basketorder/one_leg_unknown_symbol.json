@@ -1,0 +1,60 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/basketorder",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "strategy": "fixtures",
+      "orders": [
+        {
+          "exchange": "NSE",
+          "symbol": "ITC",
+          "action": "BUY",
+          "quantity": 1,
+          "pricetype": "MARKET",
+          "product": "MIS"
+        },
+        {
+          "exchange": "NSE",
+          "symbol": "NOTASYMBOL",
+          "action": "BUY",
+          "quantity": 1,
+          "pricetype": "MARKET",
+          "product": "MIS"
+        }
+      ]
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "275",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "mode": "analyze",
+      "results": [
+        {
+          "batch_order": true,
+          "exchange": "NSE",
+          "is_last_order": false,
+          "orderid": "26100330880794",
+          "product": "MIS",
+          "status": "success",
+          "symbol": "ITC"
+        },
+        {
+          "message": "Symbol NOTASYMBOL not found on NSE",
+          "status": "error",
+          "symbol": "NOTASYMBOL"
+        }
+      ],
+      "status": "success"
+    }
+  }
+}

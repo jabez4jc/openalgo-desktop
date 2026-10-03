@@ -1,0 +1,71 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/optionsmultiorder",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "strategy": "fixtures",
+      "underlying": "NIFTY",
+      "exchange": "NSE_INDEX",
+      "expiry_date": "06OCT26",
+      "legs": [
+        {
+          "offset": "ATM",
+          "option_type": "PE",
+          "action": "BUY",
+          "quantity": 65,
+          "product": "NRML"
+        },
+        {
+          "offset": "BAD",
+          "option_type": "PE",
+          "action": "SELL",
+          "quantity": 65,
+          "product": "NRML"
+        }
+      ]
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "480",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "mode": "analyze",
+      "results": [
+        {
+          "action": "BUY",
+          "exchange": "NFO",
+          "leg": 1,
+          "mode": "analyze",
+          "offset": "ATM",
+          "option_type": "PE",
+          "orderid": "26100378391337",
+          "product": "NRML",
+          "status": "success",
+          "strike": null,
+          "symbol": "NIFTY06OCT2622400PE"
+        },
+        {
+          "action": "SELL",
+          "leg": 2,
+          "message": "Offset BAD is out of range for available strikes. Please use a smaller offset.",
+          "offset": "BAD",
+          "option_type": "PE",
+          "status": "error",
+          "strike": null
+        }
+      ],
+      "status": "success",
+      "underlying": "NIFTY",
+      "underlying_ltp": 22421.95
+    }
+  }
+}

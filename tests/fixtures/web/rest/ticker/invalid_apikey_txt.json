@@ -1,0 +1,20 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v1/ticker/NSE:RELIANCE?apikey=invalid-key&interval=D&from=2026-09-01&to=2026-10-02&format=txt",
+    "headers": {},
+    "body": null
+  },
+  "response": {
+    "status_code": 500,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "37",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "message": "Internal Server Error"
+    }
+  }
+}

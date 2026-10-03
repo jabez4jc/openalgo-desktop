@@ -1,0 +1,38 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/modifyorder",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "strategy": "fixtures",
+      "exchange": "NSE",
+      "symbol": "RELIANCE",
+      "orderid": "26100341808353",
+      "action": "BUY",
+      "product": "MIS",
+      "pricetype": "LIMIT",
+      "price": 957.5,
+      "quantity": 2,
+      "disclosed_quantity": 0,
+      "trigger_price": 0
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "105",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "message": "Order modified successfully",
+      "mode": "analyze",
+      "orderid": "26100341808353",
+      "status": "success"
+    }
+  }
+}

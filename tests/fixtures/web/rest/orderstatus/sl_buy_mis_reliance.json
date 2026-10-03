@@ -1,0 +1,44 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/orderstatus",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "strategy": "fixtures",
+      "orderid": "26100356024725"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "361",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": {
+        "action": "BUY",
+        "average_price": 0.0,
+        "exchange": "NSE",
+        "filled_quantity": 0,
+        "order_status": "trigger pending",
+        "orderid": "26100356024725",
+        "pending_quantity": 1,
+        "price": 1237.8,
+        "price_type": "SL",
+        "product": "MIS",
+        "quantity": 1,
+        "strategy": "fixtures",
+        "symbol": "RELIANCE",
+        "timestamp": "2026-10-03 09:42:29",
+        "trigger_price": 1226.1
+      },
+      "mode": "analyze",
+      "status": "success"
+    }
+  }
+}

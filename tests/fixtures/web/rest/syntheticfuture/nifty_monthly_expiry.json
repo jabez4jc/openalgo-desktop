@@ -1,0 +1,32 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/syntheticfuture",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "underlying": "NIFTY",
+      "exchange": "NSE_INDEX",
+      "expiry_date": "27OCT26"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "142",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "atm_strike": 22400.0,
+      "expiry": "27OCT26",
+      "status": "success",
+      "synthetic_future_price": 22530.15,
+      "underlying": "NIFTY",
+      "underlying_ltp": 22421.95
+    }
+  }
+}

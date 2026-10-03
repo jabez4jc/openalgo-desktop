@@ -1,0 +1,301 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/optionchain",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "underlying": "BANKNIFTY",
+      "exchange": "NSE_INDEX",
+      "expiry_date": "27OCT26",
+      "strike_count": 3
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "4032",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "status": "success",
+      "underlying": "BANKNIFTY",
+      "underlying_symbol": "BANKNIFTY",
+      "underlying_exchange": "NSE_INDEX",
+      "underlying_ltp": 54450.75,
+      "underlying_prev_close": 54633.05,
+      "expiry_date": "27OCT26",
+      "expiry_ts": 1793095200,
+      "server_ts": 1791000274,
+      "atm_strike": 54500.0,
+      "quotes_included": true,
+      "greeks_included": false,
+      "forward_price": null,
+      "chain": [
+        {
+          "strike": 54200.0,
+          "ce": {
+            "symbol": "BANKNIFTY27OCT2654200CE",
+            "label": "ITM3",
+            "ltp": 1236.9,
+            "bid": 0,
+            "ask": 0,
+            "bid_qty": 0,
+            "ask_qty": 0,
+            "open": 1330,
+            "high": 1585.55,
+            "low": 1046.2,
+            "prev_close": 1325.85,
+            "volume": 0,
+            "oi": 80100,
+            "lotsize": 30,
+            "tick_size": 0.05
+          },
+          "pe": {
+            "symbol": "BANKNIFTY27OCT2654200PE",
+            "label": "OTM3",
+            "ltp": 662.5,
+            "bid": 0,
+            "ask": 0,
+            "bid_qty": 0,
+            "ask_qty": 0,
+            "open": 618.8,
+            "high": 942.55,
+            "low": 441.7,
+            "prev_close": 553.1,
+            "volume": 0,
+            "oi": 120210,
+            "lotsize": 30,
+            "tick_size": 0.05
+          }
+        },
+        {
+          "strike": 54300.0,
+          "ce": {
+            "symbol": "BANKNIFTY27OCT2654300CE",
+            "label": "ITM2",
+            "ltp": 1180.7,
+            "bid": 0,
+            "ask": 0,
+            "bid_qty": 0,
+            "ask_qty": 0,
+            "open": 1237.15,
+            "high": 1504,
+            "low": 993.25,
+            "prev_close": 1260.25,
+            "volume": 0,
+            "oi": 44400,
+            "lotsize": 30,
+            "tick_size": 0.05
+          },
+          "pe": {
+            "symbol": "BANKNIFTY27OCT2654300PE",
+            "label": "OTM2",
+            "ltp": 699.2,
+            "bid": 0,
+            "ask": 0,
+            "bid_qty": 0,
+            "ask_qty": 0,
+            "open": 650.15,
+            "high": 982.8,
+            "low": 465.95,
+            "prev_close": 585.3,
+            "volume": 0,
+            "oi": 80460,
+            "lotsize": 30,
+            "tick_size": 0.05
+          }
+        },
+        {
+          "strike": 54400.0,
+          "ce": {
+            "symbol": "BANKNIFTY27OCT2654400CE",
+            "label": "ITM1",
+            "ltp": 1115.5,
+            "bid": 0,
+            "ask": 0,
+            "bid_qty": 0,
+            "ask_qty": 0,
+            "open": 1133.15,
+            "high": 1439.35,
+            "low": 940.1,
+            "prev_close": 1196.95,
+            "volume": 0,
+            "oi": 45210,
+            "lotsize": 30,
+            "tick_size": 0.05
+          },
+          "pe": {
+            "symbol": "BANKNIFTY27OCT2654400PE",
+            "label": "OTM1",
+            "ltp": 737.9,
+            "bid": 0,
+            "ask": 0,
+            "bid_qty": 0,
+            "ask_qty": 0,
+            "open": 695.1,
+            "high": 1025,
+            "low": 494.9,
+            "prev_close": 621.55,
+            "volume": 0,
+            "oi": 78630,
+            "lotsize": 30,
+            "tick_size": 0.05
+          }
+        },
+        {
+          "strike": 54500.0,
+          "ce": {
+            "symbol": "BANKNIFTY27OCT2654500CE",
+            "label": "ATM",
+            "ltp": 1056.65,
+            "bid": 0,
+            "ask": 0,
+            "bid_qty": 0,
+            "ask_qty": 0,
+            "open": 1100,
+            "high": 1368,
+            "low": 888.7,
+            "prev_close": 1128.8,
+            "volume": 0,
+            "oi": 381870,
+            "lotsize": 30,
+            "tick_size": 0.05
+          },
+          "pe": {
+            "symbol": "BANKNIFTY27OCT2654500PE",
+            "label": "ATM",
+            "ltp": 777.3,
+            "bid": 0,
+            "ask": 0,
+            "bid_qty": 0,
+            "ask_qty": 0,
+            "open": 718.35,
+            "high": 1074.1,
+            "low": 525.15,
+            "prev_close": 655.3,
+            "volume": 0,
+            "oi": 446670,
+            "lotsize": 30,
+            "tick_size": 0.05
+          }
+        },
+        {
+          "strike": 54600.0,
+          "ce": {
+            "symbol": "BANKNIFTY27OCT2654600CE",
+            "label": "OTM1",
+            "ltp": 1000.45,
+            "bid": 0,
+            "ask": 0,
+            "bid_qty": 0,
+            "ask_qty": 0,
+            "open": 1065.5,
+            "high": 1303.3,
+            "low": 840.8,
+            "prev_close": 1066.5,
+            "volume": 0,
+            "oi": 65100,
+            "lotsize": 30,
+            "tick_size": 0.05
+          },
+          "pe": {
+            "symbol": "BANKNIFTY27OCT2654600PE",
+            "label": "ITM1",
+            "ltp": 816,
+            "bid": 0,
+            "ask": 0,
+            "bid_qty": 0,
+            "ask_qty": 0,
+            "open": 735,
+            "high": 1127.55,
+            "low": 554.8,
+            "prev_close": 695.6,
+            "volume": 0,
+            "oi": 73980,
+            "lotsize": 30,
+            "tick_size": 0.05
+          }
+        },
+        {
+          "strike": 54700.0,
+          "ce": {
+            "symbol": "BANKNIFTY27OCT2654700CE",
+            "label": "OTM2",
+            "ltp": 943,
+            "bid": 0,
+            "ask": 0,
+            "bid_qty": 0,
+            "ask_qty": 0,
+            "open": 1000,
+            "high": 1234.85,
+            "low": 791.05,
+            "prev_close": 1005.6,
+            "volume": 0,
+            "oi": 83820,
+            "lotsize": 30,
+            "tick_size": 0.05
+          },
+          "pe": {
+            "symbol": "BANKNIFTY27OCT2654700PE",
+            "label": "ITM2",
+            "ltp": 857.5,
+            "bid": 0,
+            "ask": 0,
+            "bid_qty": 0,
+            "ask_qty": 0,
+            "open": 769.35,
+            "high": 1179,
+            "low": 587.6,
+            "prev_close": 734.4,
+            "volume": 0,
+            "oi": 107100,
+            "lotsize": 30,
+            "tick_size": 0.05
+          }
+        },
+        {
+          "strike": 54800.0,
+          "ce": {
+            "symbol": "BANKNIFTY27OCT2654800CE",
+            "label": "OTM3",
+            "ltp": 882.2,
+            "bid": 0,
+            "ask": 0,
+            "bid_qty": 0,
+            "ask_qty": 0,
+            "open": 945,
+            "high": 1168.75,
+            "low": 747.7,
+            "prev_close": 951.85,
+            "volume": 0,
+            "oi": 135060,
+            "lotsize": 30,
+            "tick_size": 0.05
+          },
+          "pe": {
+            "symbol": "BANKNIFTY27OCT2654800PE",
+            "label": "ITM3",
+            "ltp": 909.5,
+            "bid": 0,
+            "ask": 0,
+            "bid_qty": 0,
+            "ask_qty": 0,
+            "open": 819.9,
+            "high": 1227.1,
+            "low": 621.8,
+            "prev_close": 771.8,
+            "volume": 0,
+            "oi": 98700,
+            "lotsize": 30,
+            "tick_size": 0.05
+          }
+        }
+      ]
+    }
+  }
+}

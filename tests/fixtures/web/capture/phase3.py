@@ -1,0 +1,36 @@
+from mut import *
+import json
+C = json.load(open(os.path.join(HERE, "..", "ctx.json")))
+ids = json.load(open(os.path.join(HERE, "..", "ids.json")))
+S = "fixtures"
+guard()
+base = dict(strategy=S, exchange="NSE", symbol="SBIN", action="BUY", quantity=1, pricetype="MARKET", product="MIS")
+def err(case, note="", drop=None, **over):
+    b = dict(base); b.update(over)
+    if drop: b.pop(drop)
+    P("placeorder", case, k(**b), note=note)
+err("error_unknown_symbol", symbol="NOTASYMBOL")
+err("error_quantity_zero", quantity=0)
+err("error_quantity_negative", quantity=-5)
+err("error_quantity_fractional_nse", quantity=1.5)
+err("error_negative_price", pricetype="LIMIT", price=-10)
+err("error_bad_product", product="INTRADAY")
+err("error_bad_pricetype", pricetype="STOPLIMIT")
+err("error_bad_action", action="HOLD")
+err("error_bad_exchange", exchange="NASDAQ")
+err("error_missing_symbol", drop="symbol")
+err("error_missing_strategy", drop="strategy")
+err("error_limit_price_zero", note="LIMIT with price 0", pricetype="LIMIT", price=0)
+err("error_sl_without_trigger", note="SL with trigger_price 0", pricetype="SL", price=900, trigger_price=0)
+err("error_option_qty_not_lot_multiple", exchange="NFO", symbol=C["opt"], quantity=10, product="NRML")
+P("placeorder", "error_invalid_apikey", dict(base, apikey="invalidkey123"))
+# orderstatus / openposition
+guard()
+for case in ["market_buy_mis_reliance", "limit_buy_cnc_sbin_far_below", "sl_buy_mis_reliance", "slm_sell_mis_sbin", "market_buy_nrml_nifty_option"]:
+    P("orderstatus", case, k(strategy=S, orderid=ids[case]))
+P("orderstatus", "unknown_orderid_session2", k(strategy=S, orderid="99999999999999"))
+P("openposition", "reliance_mis_long", k(strategy=S, symbol="RELIANCE", exchange="NSE", product="MIS"))
+P("openposition", "sbin_mis_short", k(strategy=S, symbol="SBIN", exchange="NSE", product="MIS"))
+P("openposition", "nifty_future_nrml", k(strategy=S, symbol=C["nfut"], exchange="NFO", product="NRML"))
+P("openposition", "crudeoil_future_nrml", k(strategy=S, symbol=C["cfut"], exchange="MCX", product="NRML"))
+P("openposition", "no_position_session2", k(strategy=S, symbol="INFY", exchange="NSE", product="MIS"))

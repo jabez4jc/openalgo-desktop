@@ -1,0 +1,36 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/placeorder",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "strategy": "fixtures",
+      "exchange": "NSE",
+      "symbol": "RELIANCE",
+      "action": "BUY",
+      "quantity": 1,
+      "pricetype": "SL",
+      "product": "MIS",
+      "price": 1237.8,
+      "trigger_price": 1226.1
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "65",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "mode": "analyze",
+      "orderid": "26100356024725",
+      "status": "success"
+    }
+  },
+  "note": "SL BUY: trigger above LTP"
+}

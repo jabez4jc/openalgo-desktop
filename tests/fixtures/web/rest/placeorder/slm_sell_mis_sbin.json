@@ -1,0 +1,35 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/placeorder",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "strategy": "fixtures",
+      "exchange": "NSE",
+      "symbol": "SBIN",
+      "action": "SELL",
+      "quantity": 1,
+      "pricetype": "SL-M",
+      "product": "MIS",
+      "trigger_price": 906.4
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "65",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "mode": "analyze",
+      "orderid": "26100363343152",
+      "status": "success"
+    }
+  },
+  "note": "SL-M SELL: trigger below LTP"
+}

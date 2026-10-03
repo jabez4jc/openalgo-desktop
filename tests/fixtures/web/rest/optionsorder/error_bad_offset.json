@@ -1,0 +1,35 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/optionsorder",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "strategy": "fixtures",
+      "underlying": "NIFTY",
+      "exchange": "NSE_INDEX",
+      "expiry_date": "06OCT26",
+      "action": "BUY",
+      "quantity": 65,
+      "pricetype": "MARKET",
+      "product": "NRML",
+      "offset": "ATM99X",
+      "option_type": "CE"
+    }
+  },
+  "response": {
+    "status_code": 400,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "113",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "message": "Offset ATM99X is out of range for available strikes. Please use a smaller offset.",
+      "status": "error"
+    }
+  }
+}

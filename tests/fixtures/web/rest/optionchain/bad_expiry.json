@@ -1,0 +1,29 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/optionchain",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "underlying": "NIFTY",
+      "exchange": "NSE_INDEX",
+      "expiry_date": "01JAN20",
+      "strike_count": 3
+    }
+  },
+  "response": {
+    "status_code": 404,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "131",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "status": "error",
+      "message": "No strikes found for NIFTY expiring 01JAN20. Please check expiry date or update master contract."
+    }
+  }
+}

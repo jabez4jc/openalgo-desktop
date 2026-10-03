@@ -1,0 +1,72 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/market/timings",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "date": "2026-10-01"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "672",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": [
+        {
+          "end_time": 1790848800000,
+          "exchange": "NSE",
+          "start_time": 1790826300000
+        },
+        {
+          "end_time": 1790848800000,
+          "exchange": "BSE",
+          "start_time": 1790826300000
+        },
+        {
+          "end_time": 1790849400000,
+          "exchange": "NFO",
+          "start_time": 1790826300000
+        },
+        {
+          "end_time": 1790849400000,
+          "exchange": "BFO",
+          "start_time": 1790826300000
+        },
+        {
+          "end_time": 1790879100000,
+          "exchange": "MCX",
+          "start_time": 1790825400000
+        },
+        {
+          "end_time": 1790854200000,
+          "exchange": "BCD",
+          "start_time": 1790825400000
+        },
+        {
+          "end_time": 1790854200000,
+          "exchange": "CDS",
+          "start_time": 1790825400000
+        },
+        {
+          "end_time": 1790879100000,
+          "exchange": "NCO",
+          "start_time": 1790825400000
+        },
+        {
+          "end_time": 1790879399000,
+          "exchange": "CRYPTO",
+          "start_time": 1790793000000
+        }
+      ],
+      "status": "success"
+    }
+  }
+}

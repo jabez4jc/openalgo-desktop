@@ -1,0 +1,220 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v1/ticker/NSE_INDEX:NIFTY?apikey=<APIKEY>&interval=D&from=2026-09-01&to=2026-10-02",
+    "headers": {},
+    "body": null
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "2334",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": [
+        {
+          "close": 24055.8,
+          "high": 24143.15,
+          "low": 23952.55,
+          "oi": 0,
+          "open": 24077.55,
+          "timestamp": 1788220800,
+          "volume": 0
+        },
+        {
+          "close": 23914.45,
+          "high": 23914.45,
+          "low": 23786.8,
+          "oi": 0,
+          "open": 23858.0,
+          "timestamp": 1788307200,
+          "volume": 0
+        },
+        {
+          "close": 23873.45,
+          "high": 24025.4,
+          "low": 23873.45,
+          "oi": 0,
+          "open": 23997.95,
+          "timestamp": 1788393600,
+          "volume": 0
+        },
+        {
+          "close": 23897.7,
+          "high": 24005.75,
+          "low": 23895.85,
+          "oi": 0,
+          "open": 23910.9,
+          "timestamp": 1788480000,
+          "volume": 0
+        },
+        {
+          "close": 23779.15,
+          "high": 23890.0,
+          "low": 23737.9,
+          "oi": 0,
+          "open": 23883.15,
+          "timestamp": 1788739200,
+          "volume": 0
+        },
+        {
+          "close": 23635.1,
+          "high": 23758.95,
+          "low": 23623.1,
+          "oi": 0,
+          "open": 23743.1,
+          "timestamp": 1788825600,
+          "volume": 0
+        },
+        {
+          "close": 23431.5,
+          "high": 23571.55,
+          "low": 23431.5,
+          "oi": 0,
+          "open": 23522.05,
+          "timestamp": 1788912000,
+          "volume": 0
+        },
+        {
+          "close": 23477.8,
+          "high": 23494.95,
+          "low": 23380.1,
+          "oi": 0,
+          "open": 23446.6,
+          "timestamp": 1788998400,
+          "volume": 0
+        },
+        {
+          "close": 23398.1,
+          "high": 23448.1,
+          "low": 23231.4,
+          "oi": 0,
+          "open": 23270.3,
+          "timestamp": 1789084800,
+          "volume": 0
+        },
+        {
+          "close": 23118.6,
+          "high": 23592.85,
+          "low": 23118.6,
+          "oi": 0,
+          "open": 23576.15,
+          "timestamp": 1789430400,
+          "volume": 0
+        },
+        {
+          "close": 23217.6,
+          "high": 23284.75,
+          "low": 23116.1,
+          "oi": 0,
+          "open": 23201.6,
+          "timestamp": 1789516800,
+          "volume": 0
+        },
+        {
+          "close": 23270.6,
+          "high": 23363.55,
+          "low": 23193.65,
+          "oi": 0,
+          "open": 23195.25,
+          "timestamp": 1789603200,
+          "volume": 0
+        },
+        {
+          "close": 23346.4,
+          "high": 23389.15,
+          "low": 23286.6,
+          "oi": 0,
+          "open": 23334.7,
+          "timestamp": 1789689600,
+          "volume": 0
+        },
+        {
+          "close": 23414.3,
+          "high": 23466.8,
+          "low": 23314.8,
+          "oi": 0,
+          "open": 23330.2,
+          "timestamp": 1789948800,
+          "volume": 0
+        },
+        {
+          "close": 23329.0,
+          "high": 23489.0,
+          "low": 23285.75,
+          "oi": 0,
+          "open": 23454.05,
+          "timestamp": 1790035200,
+          "volume": 0
+        },
+        {
+          "close": 23446.8,
+          "high": 23466.9,
+          "low": 23349.55,
+          "oi": 0,
+          "open": 23352.15,
+          "timestamp": 1790121600,
+          "volume": 0
+        },
+        {
+          "close": 23063.1,
+          "high": 23281.95,
+          "low": 23046.15,
+          "oi": 0,
+          "open": 23221.8,
+          "timestamp": 1790208000,
+          "volume": 0
+        },
+        {
+          "close": 23140.5,
+          "high": 23162.7,
+          "low": 23020.95,
+          "oi": 0,
+          "open": 23035.0,
+          "timestamp": 1790294400,
+          "volume": 0
+        },
+        {
+          "close": 22780.25,
+          "high": 23080.25,
+          "low": 22762.2,
+          "oi": 0,
+          "open": 23064.9,
+          "timestamp": 1790553600,
+          "volume": 0
+        },
+        {
+          "close": 22716.2,
+          "high": 22753.25,
+          "low": 22569.65,
+          "oi": 0,
+          "open": 22732.45,
+          "timestamp": 1790640000,
+          "volume": 0
+        },
+        {
+          "close": 22620.45,
+          "high": 22809.35,
+          "low": 22595.2,
+          "oi": 0,
+          "open": 22665.0,
+          "timestamp": 1790726400,
+          "volume": 0
+        },
+        {
+          "close": 22421.95,
+          "high": 22610.6,
+          "low": 22217.3,
+          "oi": 0,
+          "open": 22543.7,
+          "timestamp": 1790812800,
+          "volume": 0
+        }
+      ],
+      "status": "success"
+    }
+  }
+}

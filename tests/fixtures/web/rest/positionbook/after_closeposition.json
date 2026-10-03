@@ -1,0 +1,30 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/positionbook",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "144",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": [],
+      "mode": "analyze",
+      "status": "success",
+      "total_pnl": 0.0,
+      "total_pnl_today": 0.0,
+      "total_today_realized_pnl": 0.0,
+      "total_unrealized_pnl": 0.0
+    }
+  }
+}

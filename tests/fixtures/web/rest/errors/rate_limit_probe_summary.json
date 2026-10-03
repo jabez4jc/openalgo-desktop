@@ -1,0 +1,8 @@
+{
+  "requests_sent": 103,
+  "wall_seconds": 2.618,
+  "status_counts": {
+    "200": 103
+  },
+  "limit_config": "API_RATE_LIMIT=100 per second (flask-limiter, moving-window, memory://, key=remote address)"
+}

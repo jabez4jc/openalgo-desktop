@@ -1,0 +1,44 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/orderstatus",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "strategy": "fixtures",
+      "orderid": "26100376733573"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "358",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": {
+        "action": "BUY",
+        "average_price": 1167.7,
+        "exchange": "NSE",
+        "filled_quantity": 5,
+        "order_status": "complete",
+        "orderid": "26100376733573",
+        "pending_quantity": 0,
+        "price": 1167.7,
+        "price_type": "MARKET",
+        "product": "MIS",
+        "quantity": 5,
+        "strategy": "fixtures",
+        "symbol": "RELIANCE",
+        "timestamp": "2026-10-03 09:42:28",
+        "trigger_price": 0.0
+      },
+      "mode": "analyze",
+      "status": "success"
+    }
+  }
+}

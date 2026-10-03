@@ -1,0 +1,30 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/openposition",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "strategy": "fixtures",
+      "symbol": "CRUDEOIL19OCT26FUT",
+      "exchange": "MCX",
+      "product": "NRML"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "53",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "mode": "analyze",
+      "quantity": 100,
+      "status": "success"
+    }
+  }
+}

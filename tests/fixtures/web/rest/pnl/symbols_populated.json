@@ -1,0 +1,181 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/pnl/symbols",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "2415",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": [
+        {
+          "exchange": "NSE",
+          "pnl": 0.0,
+          "product": "CNC",
+          "quantity": 2,
+          "symbol": "SBIN",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        },
+        {
+          "exchange": "NSE",
+          "pnl": 0.0,
+          "product": "MIS",
+          "quantity": 5,
+          "symbol": "RELIANCE",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        },
+        {
+          "exchange": "NSE",
+          "pnl": 0.0,
+          "product": "MIS",
+          "quantity": 8,
+          "symbol": "SBIN",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        },
+        {
+          "exchange": "NFO",
+          "pnl": 0.0,
+          "product": "MIS",
+          "quantity": 65,
+          "symbol": "NIFTY06OCT2622400CE",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        },
+        {
+          "exchange": "NSE",
+          "pnl": 0.0,
+          "product": "MIS",
+          "quantity": -3,
+          "symbol": "INFY",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        },
+        {
+          "exchange": "NSE",
+          "pnl": 0.0,
+          "product": "MIS",
+          "quantity": 1,
+          "symbol": "TCS",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        },
+        {
+          "exchange": "NSE",
+          "pnl": 0.0,
+          "product": "MIS",
+          "quantity": -2,
+          "symbol": "HDFCBANK",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        },
+        {
+          "exchange": "NSE",
+          "pnl": 0.0,
+          "product": "MIS",
+          "quantity": 1,
+          "symbol": "ITC",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        },
+        {
+          "exchange": "NFO",
+          "pnl": 0.0,
+          "product": "NRML",
+          "quantity": 65,
+          "symbol": "NIFTY27OCT26FUT",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        },
+        {
+          "exchange": "NFO",
+          "pnl": 0.0,
+          "product": "NRML",
+          "quantity": 325,
+          "symbol": "NIFTY06OCT2622400CE",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        },
+        {
+          "exchange": "MCX",
+          "pnl": 0.0,
+          "product": "NRML",
+          "quantity": 100,
+          "symbol": "CRUDEOIL19OCT26FUT",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        },
+        {
+          "exchange": "NFO",
+          "pnl": 0.0,
+          "product": "NRML",
+          "quantity": 65,
+          "symbol": "NIFTY06OCT2622500PE",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        },
+        {
+          "exchange": "NFO",
+          "pnl": 0.0,
+          "product": "NRML",
+          "quantity": -65,
+          "symbol": "NIFTY06OCT2622550CE",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        },
+        {
+          "exchange": "NFO",
+          "pnl": 0.0,
+          "product": "NRML",
+          "quantity": -65,
+          "symbol": "NIFTY06OCT2622500CE",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        },
+        {
+          "exchange": "NFO",
+          "pnl": 0.0,
+          "product": "NRML",
+          "quantity": 65,
+          "symbol": "NIFTY06OCT2622400PE",
+          "today_realized_pnl": 0.0,
+          "total_pnl_today": 0.0,
+          "unrealized_pnl": 0.0
+        }
+      ],
+      "mode": "analyze",
+      "status": "success",
+      "total_pnl": 0.0,
+      "total_pnl_today": 0.0,
+      "total_today_realized_pnl": 0.0,
+      "total_unrealized_pnl": 0.0
+    }
+  }
+}

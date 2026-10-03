@@ -1,0 +1,36 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/modifygttorder",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "strategy": "fixtures",
+      "exchange": "NSE",
+      "symbol": "SBIN",
+      "action": "BUY",
+      "product": "CNC",
+      "quantity": 2,
+      "pricetype": "LIMIT",
+      "trigger_id": "GTT-000000-deadbeef",
+      "trigger_type": "SINGLE",
+      "price": 900,
+      "triggerprice_sl": 900
+    }
+  },
+  "response": {
+    "status_code": 500,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "60",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "message": "An unexpected error occurred",
+      "status": "error"
+    }
+  }
+}

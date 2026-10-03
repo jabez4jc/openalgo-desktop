@@ -1,0 +1,127 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/search",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "query": "RELIANCE",
+      "exchange": "NSE"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "1655",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": [
+        {
+          "brexchange": "NSE",
+          "brsymbol": "RELIANCE",
+          "exchange": "NSE",
+          "expiry": "",
+          "freeze_qty": 0,
+          "instrumenttype": "EQ",
+          "lotsize": 1,
+          "name": "RELIANCE INDUSTRIES",
+          "strike": 0.0,
+          "symbol": "RELIANCE",
+          "tick_size": 0.1,
+          "token": "738561::::2885"
+        },
+        {
+          "brexchange": "NSE",
+          "brsymbol": "RIIL",
+          "exchange": "NSE",
+          "expiry": "",
+          "freeze_qty": 0,
+          "instrumenttype": "EQ",
+          "lotsize": 1,
+          "name": "RELIANCE INDUSTRIAL INFRA",
+          "strike": 0.0,
+          "symbol": "RIIL",
+          "tick_size": 0.05,
+          "token": "745473::::2912"
+        },
+        {
+          "brexchange": "NSE",
+          "brsymbol": "RPOWER",
+          "exchange": "NSE",
+          "expiry": "",
+          "freeze_qty": 0,
+          "instrumenttype": "EQ",
+          "lotsize": 1,
+          "name": "RELIANCE POWER",
+          "strike": 0.0,
+          "symbol": "RPOWER",
+          "tick_size": 0.01,
+          "token": "3906305::::15259"
+        },
+        {
+          "brexchange": "NSE",
+          "brsymbol": "RCOM-BE",
+          "exchange": "NSE",
+          "expiry": "",
+          "freeze_qty": 0,
+          "instrumenttype": "EQ",
+          "lotsize": 1,
+          "name": "RELIANCE COMMUNICATIONS L",
+          "strike": 0.0,
+          "symbol": "RCOM-BE",
+          "tick_size": 0.01,
+          "token": "3376129::::13188"
+        },
+        {
+          "brexchange": "NSE",
+          "brsymbol": "RHFL-BZ",
+          "exchange": "NSE",
+          "expiry": "",
+          "freeze_qty": 0,
+          "instrumenttype": "EQ",
+          "lotsize": 1,
+          "name": "RELIANCE HOME FINANCE",
+          "strike": 0.0,
+          "symbol": "RHFL-BZ",
+          "tick_size": 0.01,
+          "token": "194356225::::759204"
+        },
+        {
+          "brexchange": "NSE",
+          "brsymbol": "RELCHEMQ",
+          "exchange": "NSE",
+          "expiry": "",
+          "freeze_qty": 0,
+          "instrumenttype": "EQ",
+          "lotsize": 1,
+          "name": "RELIANCE CHEMOTEX IND",
+          "strike": 0.0,
+          "symbol": "RELCHEMQ",
+          "tick_size": 0.01,
+          "token": "2470913::::9652"
+        },
+        {
+          "brexchange": "NSE",
+          "brsymbol": "RELINFRA-BE",
+          "exchange": "NSE",
+          "expiry": "",
+          "freeze_qty": 0,
+          "instrumenttype": "EQ",
+          "lotsize": 1,
+          "name": "RELIANCE INFRASTRUCTU",
+          "strike": 0.0,
+          "symbol": "RELINFRA-BE",
+          "tick_size": 0.01,
+          "token": "1226497::::4791"
+        }
+      ],
+      "message": "Found 7 matching symbols",
+      "status": "success"
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/cancelgttorder",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "strategy": "fixtures",
+      "trigger_id": "GTT-261003-56ad1482"
+    }
+  },
+  "response": {
+    "status_code": 500,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "220",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "message": "Could not release 1106.80 margin (Cannot release ₹1106.80: more than the reserved margin). The GTT is unchanged - retry the cancel.",
+      "mode": "analyze",
+      "status": "error",
+      "trigger_id": "GTT-261003-56ad1482"
+    }
+  }
+}

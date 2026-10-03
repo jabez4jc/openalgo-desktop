@@ -1,0 +1,82 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/depth",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "symbol": "CRUDEOIL19OCT26FUT",
+      "exchange": "MCX"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "425",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": {
+        "asks": [
+          {
+            "price": 0,
+            "quantity": 0
+          },
+          {
+            "price": 0,
+            "quantity": 0
+          },
+          {
+            "price": 0,
+            "quantity": 0
+          },
+          {
+            "price": 0,
+            "quantity": 0
+          },
+          {
+            "price": 0,
+            "quantity": 0
+          }
+        ],
+        "bids": [
+          {
+            "price": 0,
+            "quantity": 0
+          },
+          {
+            "price": 0,
+            "quantity": 0
+          },
+          {
+            "price": 0,
+            "quantity": 0
+          },
+          {
+            "price": 0,
+            "quantity": 0
+          },
+          {
+            "price": 0,
+            "quantity": 0
+          }
+        ],
+        "high": 9027,
+        "low": 8533,
+        "ltp": 9008,
+        "ltq": 0,
+        "oi": 11210,
+        "open": 8715,
+        "prev_close": 8734,
+        "totalbuyqty": 0,
+        "totalsellqty": 0,
+        "volume": 0
+      },
+      "status": "success"
+    }
+  }
+}

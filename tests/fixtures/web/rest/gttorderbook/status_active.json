@@ -1,0 +1,89 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/gttorderbook",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "status": "active"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "1049",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": [
+        {
+          "created_at": "2026-10-03T09:44:03.824776",
+          "exchange": "NSE",
+          "expires_at": "2027-10-03T09:44:03.823976",
+          "last_price": 954.1,
+          "legs": [
+            {
+              "action": "SELL",
+              "price": 849.1,
+              "pricetype": "LIMIT",
+              "product": "CNC",
+              "quantity": 1,
+              "triggered_order_id": null
+            },
+            {
+              "action": "SELL",
+              "price": 1059.1,
+              "pricetype": "LIMIT",
+              "product": "CNC",
+              "quantity": 1,
+              "triggered_order_id": null
+            }
+          ],
+          "margin_blocked": 1059.1,
+          "status": "active",
+          "strategy": "fixtures",
+          "symbol": "SBIN",
+          "trigger_id": "GTT-261003-56ad1482",
+          "trigger_prices": [
+            858.7,
+            1049.5
+          ],
+          "trigger_type": "two-leg",
+          "updated_at": "2026-10-03T09:44:03.824786"
+        },
+        {
+          "created_at": "2026-10-03T09:44:03.485996",
+          "exchange": "NSE",
+          "expires_at": "2027-10-03T09:44:03.484560",
+          "last_price": 954.1,
+          "legs": [
+            {
+              "action": "BUY",
+              "price": 858.7,
+              "pricetype": "LIMIT",
+              "product": "CNC",
+              "quantity": 1,
+              "triggered_order_id": null
+            }
+          ],
+          "margin_blocked": 858.7,
+          "status": "active",
+          "strategy": "fixtures",
+          "symbol": "SBIN",
+          "trigger_id": "GTT-261003-12a093ec",
+          "trigger_prices": [
+            858.7
+          ],
+          "trigger_type": "single",
+          "updated_at": "2026-10-03T09:44:03.486007"
+        }
+      ],
+      "mode": "analyze",
+      "status": "success"
+    }
+  }
+}

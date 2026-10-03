@@ -1,0 +1,27 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/quotes",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "symbol": "FOOBARBAZ",
+      "exchange": "NSE"
+    }
+  },
+  "response": {
+    "status_code": 400,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "154",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "message": "Symbol 'FOOBARBAZ' not found for exchange 'NSE'. Please verify the symbol name and ensure master contracts are downloaded.",
+      "status": "error"
+    }
+  }
+}

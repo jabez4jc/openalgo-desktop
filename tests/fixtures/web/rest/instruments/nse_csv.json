@@ -1,0 +1,44 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v1/instruments?apikey=<APIKEY>&exchange=NSE&format=csv",
+    "headers": {},
+    "body": null
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "text/csv",
+      "Content-Length": "828866",
+      "Content-Disposition": "attachment; filename=instruments_NSE.csv",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "_csv_first_lines": [
+        "symbol,brsymbol,name,exchange,brexchange,token,expiry,strike,lotsize,instrumenttype,tick_size",
+        "GOLDSTAR-SM,GOLDSTAR-SM,GOLDSTAR POWER,NSE,NSE,257::::1,,0.0,11250,EQ,0.05",
+        "21STCENMGM,21STCENMGM,21ST CENTURY MGMT SERVICE,NSE,NSE,1025::::4,,0.0,1,EQ,0.01",
+        "AARTIIND,AARTIIND,AARTI INDUSTRIES,NSE,NSE,1793::::7,,0.0,1,EQ,0.05",
+        "ABB,ABB,ABB INDIA,NSE,NSE,3329::::13,,0.0,1,EQ,0.5",
+        "656KA30-SG,656KA30-SG,SDL KA 6.56% 2030,NSE,NSE,3585::::14,,0.0,100,EQ,0.01",
+        "66RJ30-SG,66RJ30-SG,SDL RJ 6.6% 2030,NSE,NSE,4609::::18,,0.0,100,EQ,0.01",
+        "STYRENIX,STYRENIX,STYRENIX PERFORMANCE,NSE,NSE,4865::::19,,0.0,1,EQ,0.1",
+        "66GA30A-SG,66GA30A-SG,SDL GA 6.6% 2030,NSE,NSE,5121::::20,,0.0,100,EQ,0.01",
+        "664UP30-SG,664UP30-SG,SDL UP 6.64% 2030,NSE,NSE,5377::::21,,0.0,100,EQ,0.01",
+        "ACC,ACC,ACC,NSE,NSE,5633::::22,,0.0,1,EQ,0.1",
+        "67JK30-SG,67JK30-SG,SDL JK 6.7% 2030,NSE,NSE,5889::::23,,0.0,100,EQ,0.01",
+        "ADANIENT,ADANIENT,ADANI ENTERPRISES,NSE,NSE,6401::::25,,0.0,1,EQ,0.1",
+        "67HR30-SG,67HR30-SG,SDL HR 6.7% 2030,NSE,NSE,6657::::26,,0.0,100,EQ,0.01",
+        "GATECHDVR-BE,GATECHDVR-BE,GACM TECHNOLOGIES,NSE,NSE,6913::::27,,0.0,1,EQ,0.01",
+        "667MH31-SG,667MH31-SG,SDL MH 6.67% 2031,NSE,NSE,7425::::29,,0.0,100,EQ,0.01",
+        "679MP33-SG,679MP33-SG,SDL MP 6.79% 2033,NSE,NSE,8193::::32,,0.0,100,EQ,0.01",
+        "ADOR,ADOR,ADOR WELDING,NSE,NSE,8705::::34,,0.0,1,EQ,0.1",
+        "677KA34-SG,677KA34-SG,SDL KA 6.77% 2034,NSE,NSE,8961::::35,,0.0,100,EQ,0.01",
+        "685AP36-SG,685AP36-SG,SDL AP 6.85% 2036,NSE,NSE,9729::::38,,0.0,100,EQ,0.01",
+        "AEGISLOG,AEGISLOG,AEGIS LOGISTICS,NSE,NSE,10241::::40,,0.0,1,EQ,0.1"
+      ],
+      "_total_lines": 10197
+    }
+  }
+}

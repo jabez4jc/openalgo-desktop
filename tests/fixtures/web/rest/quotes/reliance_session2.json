@@ -1,0 +1,39 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/quotes",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "symbol": "RELIANCE",
+      "exchange": "NSE"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "160",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": {
+        "ask": 0,
+        "ask_qty": 0,
+        "bid": 0,
+        "bid_qty": 0,
+        "high": 1183.9,
+        "low": 1160.8,
+        "ltp": 1167.7,
+        "oi": 0,
+        "open": 1180.1,
+        "prev_close": 1187,
+        "volume": 0
+      },
+      "status": "success"
+    }
+  }
+}

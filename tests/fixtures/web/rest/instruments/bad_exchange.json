@@ -1,0 +1,25 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/api/v1/instruments?apikey=<APIKEY>&exchange=XXX",
+    "headers": {},
+    "body": null
+  },
+  "response": {
+    "status_code": 400,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "164",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "message": {
+        "exchange": [
+          "Must be one of: NSE, NFO, CDS, BSE, BFO, BCD, MCX, NCDEX, NCO, NSE_INDEX, BSE_INDEX, MCX_INDEX, GLOBAL_INDEX, CRYPTO."
+        ]
+      },
+      "status": "error"
+    }
+  }
+}

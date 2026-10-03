@@ -1,0 +1,82 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/depth",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "symbol": "NIFTY06OCT2622400CE",
+      "exchange": "NFO"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "431",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": {
+        "asks": [
+          {
+            "price": 0,
+            "quantity": 0
+          },
+          {
+            "price": 0,
+            "quantity": 0
+          },
+          {
+            "price": 0,
+            "quantity": 0
+          },
+          {
+            "price": 0,
+            "quantity": 0
+          },
+          {
+            "price": 0,
+            "quantity": 0
+          }
+        ],
+        "bids": [
+          {
+            "price": 0,
+            "quantity": 0
+          },
+          {
+            "price": 0,
+            "quantity": 0
+          },
+          {
+            "price": 0,
+            "quantity": 0
+          },
+          {
+            "price": 0,
+            "quantity": 0
+          },
+          {
+            "price": 0,
+            "quantity": 0
+          }
+        ],
+        "high": 282.6,
+        "low": 92.2,
+        "ltp": 156.95,
+        "ltq": 0,
+        "oi": 3635255,
+        "open": 253,
+        "prev_close": 301.05,
+        "totalbuyqty": 0,
+        "totalsellqty": 0,
+        "volume": 0
+      },
+      "status": "success"
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/symbol",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "symbol": "NIFTY",
+      "exchange": "NSE_INDEX"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "255",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": {
+        "brexchange": "NSE",
+        "brsymbol": "NIFTY 50",
+        "exchange": "NSE_INDEX",
+        "expiry": "",
+        "freeze_qty": 0,
+        "id": 25917,
+        "instrumenttype": "EQ",
+        "lotsize": 0,
+        "name": "NIFTY 50",
+        "strike": 0.0,
+        "symbol": "NIFTY",
+        "tick_size": 0.0,
+        "token": "256265::::1001"
+      },
+      "status": "success"
+    }
+  }
+}

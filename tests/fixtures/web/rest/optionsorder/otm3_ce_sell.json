@@ -1,0 +1,42 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/optionsorder",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "strategy": "fixtures",
+      "underlying": "NIFTY",
+      "exchange": "NSE_INDEX",
+      "expiry_date": "06OCT26",
+      "action": "SELL",
+      "quantity": 65,
+      "pricetype": "MARKET",
+      "product": "NRML",
+      "offset": "OTM3",
+      "option_type": "CE"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "195",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "exchange": "NFO",
+      "mode": "analyze",
+      "offset": "OTM3",
+      "option_type": "CE",
+      "orderid": "26100399133028",
+      "status": "success",
+      "symbol": "NIFTY06OCT2622550CE",
+      "underlying": "NIFTY",
+      "underlying_ltp": 22421.95
+    }
+  }
+}

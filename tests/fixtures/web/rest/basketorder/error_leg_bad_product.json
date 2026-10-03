@@ -1,0 +1,36 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/basketorder",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "strategy": "fixtures",
+      "orders": [
+        {
+          "exchange": "NSE",
+          "symbol": "ITC",
+          "action": "BUY",
+          "quantity": 1,
+          "product": "BAD"
+        }
+      ]
+    }
+  },
+  "response": {
+    "status_code": 400,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "114",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "message": "{'orders': {0: {'product': ['Must be one of: MIS, NRML, CNC.']}}}",
+      "mode": "analyze",
+      "status": "error"
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/modifyorder",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "strategy": "fixtures",
+      "exchange": "NSE",
+      "symbol": "RELIANCE",
+      "orderid": "26100376733573",
+      "action": "BUY",
+      "product": "MIS",
+      "pricetype": "MARKET",
+      "price": 0,
+      "quantity": 5,
+      "disclosed_quantity": 0,
+      "trigger_price": 0
+    }
+  },
+  "response": {
+    "status_code": 400,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "87",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "message": "Cannot modify order in complete status",
+      "mode": "analyze",
+      "status": "error"
+    }
+  }
+}

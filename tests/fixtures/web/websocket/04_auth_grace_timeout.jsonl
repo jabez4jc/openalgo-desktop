@@ -1,0 +1,2 @@
+{"ts": 1791000371.691, "iso": "2026-10-03T04:06:11Z", "direction": "note", "message": {"note": "connected; sending nothing, waiting for server to enforce WS_AUTH_GRACE_SECONDS (default 15)"}}
+{"ts": 1791000386.791, "iso": "2026-10-03T04:06:26Z", "direction": "note", "message": {"note": "server closed connection after 15.2s"}, "close_code": 4401, "close_reason": "auth timeout"}

@@ -1,0 +1,10 @@
+{"ts": 1791000365.486, "iso": "2026-10-03T04:06:05Z", "direction": "send", "message": {"action": "authenticate", "api_key": "invalid-key-0000"}}
+{"ts": 1791000365.605, "iso": "2026-10-03T04:06:05Z", "direction": "recv", "message": {"status": "error", "code": "AUTHENTICATION_ERROR", "message": "Invalid API key"}}
+{"ts": 1791000365.608, "iso": "2026-10-03T04:06:05Z", "direction": "send", "message": {"action": "authenticate"}}
+{"ts": 1791000365.613, "iso": "2026-10-03T04:06:05Z", "direction": "recv", "message": {"status": "error", "code": "AUTHENTICATION_ERROR", "message": "API key is required"}}
+{"ts": 1791000365.613, "iso": "2026-10-03T04:06:05Z", "direction": "send", "message": {"action": "auth", "apikey": "invalid-key-0000"}}
+{"ts": 1791000365.659, "iso": "2026-10-03T04:06:05Z", "direction": "recv", "message": {"status": "error", "code": "AUTHENTICATION_ERROR", "message": "Invalid API key"}}
+{"ts": 1791000365.659, "iso": "2026-10-03T04:06:05Z", "direction": "note", "message": {"note": "checking whether the connection is still open after invalid auth"}}
+{"ts": 1791000365.66, "iso": "2026-10-03T04:06:05Z", "direction": "send", "message": {"action": "ping"}}
+{"ts": 1791000365.666, "iso": "2026-10-03T04:06:05Z", "direction": "recv", "message": {"type": "pong", "status": "success", "server_timestamp": 1791000365664}}
+{"ts": 1791000365.667, "iso": "2026-10-03T04:06:05Z", "direction": "note", "message": {"note": "connection still open after invalid auth (server does not close)"}}

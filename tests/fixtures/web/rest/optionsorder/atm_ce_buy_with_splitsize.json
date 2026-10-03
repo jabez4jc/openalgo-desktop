@@ -1,0 +1,58 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/optionsorder",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "strategy": "fixtures",
+      "underlying": "NIFTY",
+      "exchange": "NSE_INDEX",
+      "expiry_date": "06OCT26",
+      "action": "BUY",
+      "quantity": 130,
+      "pricetype": "MARKET",
+      "product": "NRML",
+      "offset": "ATM",
+      "option_type": "CE",
+      "splitsize": 65
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "368",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "exchange": "NFO",
+      "mode": "analyze",
+      "offset": "ATM",
+      "option_type": "CE",
+      "results": [
+        {
+          "order_num": 1,
+          "orderid": "26100341149649",
+          "quantity": 65,
+          "status": "success"
+        },
+        {
+          "order_num": 2,
+          "orderid": "26100359455808",
+          "quantity": 65,
+          "status": "success"
+        }
+      ],
+      "split_size": 65,
+      "status": "success",
+      "symbol": "NIFTY06OCT2622400CE",
+      "total_quantity": 130,
+      "underlying": "NIFTY",
+      "underlying_ltp": 22421.95
+    }
+  }
+}

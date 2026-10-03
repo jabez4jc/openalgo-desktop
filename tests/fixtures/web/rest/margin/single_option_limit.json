@@ -1,0 +1,41 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/margin",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "positions": [
+        {
+          "symbol": "NIFTY06OCT2622400CE",
+          "exchange": "NFO",
+          "action": "BUY",
+          "quantity": "65",
+          "product": "NRML",
+          "pricetype": "LIMIT",
+          "price": "100",
+          "trigger_price": "0"
+        }
+      ]
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "95",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": {
+        "exposure_margin": 0,
+        "span_margin": 0,
+        "total_margin_required": 6500
+      },
+      "status": "success"
+    }
+  }
+}

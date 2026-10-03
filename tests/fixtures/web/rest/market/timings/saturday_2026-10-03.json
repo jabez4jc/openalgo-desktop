@@ -1,0 +1,32 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/market/timings",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "date": "2026-10-03"
+    }
+  },
+  "response": {
+    "status_code": 200,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "104",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "data": [
+        {
+          "end_time": 1791052199000,
+          "exchange": "CRYPTO",
+          "start_time": 1790965800000
+        }
+      ],
+      "status": "success"
+    }
+  }
+}

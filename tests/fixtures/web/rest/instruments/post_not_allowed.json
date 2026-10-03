@@ -1,0 +1,28 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/api/v1/instruments",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "apikey": "<APIKEY>",
+      "exchange": "NSE"
+    }
+  },
+  "response": {
+    "status_code": 404,
+    "headers": {
+      "Server": "Werkzeug/3.1.8 Python/3.12.12",
+      "Content-Type": "application/json",
+      "Content-Length": "70",
+      "Access-Control-Allow-Origin": "http://127.0.0.1:5000"
+    },
+    "body": {
+      "message": "Not found",
+      "path": "/api/v1/instruments",
+      "status": "error"
+    }
+  },
+  "note": "instruments is GET-only"
+}
