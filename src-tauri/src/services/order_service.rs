@@ -51,6 +51,15 @@ pub fn semi_auto_refusal(ctx: &AppState) -> Option<Reply> {
     }
 }
 
+/// Fractional quantities pass the web schema on CRYPTO, but the order
+/// paths here carry whole units; refuse instead of truncating.
+pub const FRACTIONAL_REFUSED: &str =
+    "Fractional quantities are not supported in OpenAlgo Desktop yet. Use a whole-number quantity.";
+
+pub fn fractional_refusal(req: &Value) -> Option<Reply> {
+    (f(req, "quantity").fract() != 0.0).then(|| Reply::error(400, FRACTIONAL_REFUSED))
+}
+
 fn semi_auto(ctx: &AppState) -> bool {
     matches!(
         super::apikey_service::ApiKeyService::order_mode(ctx).as_deref(),
@@ -173,7 +182,7 @@ pub async fn place_order(ctx: &AppState, req: &Value, route: Route) -> Reply {
 /// `placeorder`, optionally without the `order.placed` / `order.failed`
 /// event (split legs of an options order report one completion event).
 pub async fn place_order_with(ctx: &AppState, req: &Value, route: Route, emit: bool) -> Reply {
-    if let Some(r) = semi_auto_refusal(ctx) {
+    if let Some(r) = semi_auto_refusal(ctx).or_else(|| fractional_refusal(req)) {
         return r;
     }
     if route.analyze(ctx) {
@@ -285,7 +294,7 @@ fn no_action_event(mode: Mode, req: &Value, request: Value, reply: &Reply) -> Ev
 
 /// `placesmartorder`.
 pub async fn place_smart_order(ctx: &AppState, req: &Value, route: Route) -> Reply {
-    if let Some(r) = semi_auto_refusal(ctx) {
+    if let Some(r) = semi_auto_refusal(ctx).or_else(|| fractional_refusal(req)) {
         return r;
     }
     let target = f(req, "position_size").trunc() as i64;
@@ -726,6 +735,13 @@ mod tests {
         let a = stripe("NSE:SBIN:MIS") as *const _;
         let b = stripe("NSE:SBIN:MIS") as *const _;
         assert_eq!(a, b);
+    }
+
+    #[test]
+    fn fractional_quantities_are_refused_not_truncated() {
+        let r = fractional_refusal(&serde_json::json!({"quantity": 0.5})).unwrap();
+        assert_eq!((r.status, r.message().as_str()), (400, FRACTIONAL_REFUSED));
+        assert!(fractional_refusal(&serde_json::json!({"quantity": 2})).is_none());
     }
 
     #[test]

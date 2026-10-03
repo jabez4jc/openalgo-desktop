@@ -10,7 +10,9 @@ use super::core::{
     analyzer_error, analyzer_request, broker_handle, i, meta, order_failed, publish, s,
     safe_request, BrokerHandle, Reply,
 };
-use super::order_service::{place_live, sandbox_order, semi_auto_refusal, Route};
+use super::order_service::{
+    fractional_refusal, place_live, sandbox_order, semi_auto_refusal, Route, FRACTIONAL_REFUSED,
+};
 use crate::brokers::types::QuoteKey;
 use crate::events::{Event, Mode};
 use crate::sandbox::Quote;
@@ -85,6 +87,9 @@ async fn sandbox_place(
     leg: &Value,
     quote: Option<Quote>,
 ) -> Result<String, String> {
+    if fractional_refusal(leg).is_some() {
+        return Err(FRACTIONAL_REFUSED.to_string());
+    }
     let r = match quote {
         Some(q) => {
             ctx.sandbox
@@ -171,7 +176,10 @@ pub async fn basket_order(ctx: &AppState, req: &Value, route: Route) -> Reply {
 }
 
 async fn live_leg(h: &BrokerHandle, ctx: &AppState, leg: &Value) -> Value {
-    let r = place_live(h, ctx, leg).await;
+    let r = match fractional_refusal(leg) {
+        Some(r) => r,
+        None => place_live(h, ctx, leg).await,
+    };
     if r.is_success() {
         json!({
             "symbol": s(leg, "symbol"), "exchange": s(leg, "exchange"),
@@ -215,7 +223,7 @@ fn split_event(mode: Mode, request: Value, reply: &Reply, req: &Value) -> Event 
 
 /// `splitorder`.
 pub async fn split_order(ctx: &AppState, req: &Value, route: Route) -> Reply {
-    if let Some(r) = semi_auto_refusal(ctx) {
+    if let Some(r) = semi_auto_refusal(ctx).or_else(|| fractional_refusal(req)) {
         return r;
     }
     let analyze = route.analyze(ctx);
