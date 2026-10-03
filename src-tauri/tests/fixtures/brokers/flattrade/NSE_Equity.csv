@@ -1,0 +1,6 @@
+Exchange,Token,Lotsize,Symbol,Tradingsymbol,Instrument,Expiry,Strike,Optiontype
+NSE,3045,1,SBIN,SBIN-EQ,EQ,,,
+NSE,26000,,NIFTY,Nifty 50,INDEX,,,
+NSE,26009,,BANKNIFTY,Nifty Bank,INDEX,,,
+NSE,26074,,MIDCPNIFTY,NIFTY MID SELECT,INDEX,,,
+NSE,7777,,,,EQ,,,

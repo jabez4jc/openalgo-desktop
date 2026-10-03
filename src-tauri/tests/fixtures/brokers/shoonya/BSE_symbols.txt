@@ -1,0 +1,3 @@
+Exchange,Token,LotSize,Symbol,TradingSymbol,Instrument,TickSize,
+BSE,500112,1,SBIN,SBIN,A,5,
+BSE,500325,1,RELIANCE,RELIANCE,A,5,
