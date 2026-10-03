@@ -1,0 +1,40 @@
+{
+  "status": "SUCCESS",
+  "payload": {
+    "order_list": [
+      {
+        "groww_order_id": "GLTFO25100600001",
+        "trading_symbol": "NIFTY25OCT24500CE",
+        "order_status": "COMPLETED",
+        "quantity": 75,
+        "price": 0,
+        "trigger_price": 0,
+        "filled_quantity": 75,
+        "remaining_quantity": 0,
+        "average_fill_price": 112.4,
+        "validity": "DAY",
+        "exchange": "NSE",
+        "order_type": "MARKET",
+        "transaction_type": "BUY",
+        "segment": "FNO",
+        "product": "NRML",
+        "created_at": "2025-10-06T10:00:00"
+      },
+      {
+        "groww_order_id": "GLTFO25100600002",
+        "trading_symbol": "SENSEX25OCT82000CE",
+        "order_status": "CANCELLED",
+        "quantity": 20,
+        "price": 150,
+        "filled_quantity": 0,
+        "validity": "DAY",
+        "exchange": "BSE",
+        "order_type": "LIMIT",
+        "transaction_type": "SELL",
+        "segment": "FNO",
+        "product": "MARGIN",
+        "created_at": "2025-10-06T10:05:00"
+      }
+    ]
+  }
+}

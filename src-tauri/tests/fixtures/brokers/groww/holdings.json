@@ -1,0 +1,29 @@
+{
+  "status": "SUCCESS",
+  "payload": {
+    "holdings": [
+      {
+        "isin": "INE062A01020",
+        "trading_symbol": "SBIN",
+        "quantity": 20,
+        "average_price": 650.5,
+        "pledge_quantity": 0,
+        "demat_locked_quantity": 0,
+        "groww_locked_quantity": 0,
+        "repledge_quantity": 0,
+        "t1_quantity": 2,
+        "demat_free_quantity": 18,
+        "corporate_action_additional_quantity": 0,
+        "active_demat_transfer_quantity": 0
+      },
+      {
+        "isin": "INF204KB14I2",
+        "trading_symbol": "NIFTYBEES",
+        "quantity": "100",
+        "average_price": "245.1",
+        "t1_quantity": null,
+        "demat_free_quantity": 100
+      }
+    ]
+  }
+}

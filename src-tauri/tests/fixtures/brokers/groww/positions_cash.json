@@ -1,0 +1,38 @@
+{
+  "status": "SUCCESS",
+  "payload": {
+    "positions": [
+      {
+        "trading_symbol": "SBIN",
+        "credit_quantity": 10,
+        "credit_price": 81235,
+        "debit_quantity": 0,
+        "debit_price": 0,
+        "carry_forward_credit_quantity": 5,
+        "carry_forward_credit_price": 80000,
+        "carry_forward_debit_quantity": 0,
+        "carry_forward_debit_price": 0,
+        "exchange": "NSE",
+        "symbol_isin": "INE062A01020",
+        "quantity": 15,
+        "product": "CNC",
+        "net_carry_forward_quantity": 5,
+        "net_price": 808.23,
+        "net_carry_forward_price": 800,
+        "segment": "CASH"
+      },
+      {
+        "trading_symbol": "RELIANCE",
+        "credit_quantity": 4,
+        "credit_price": 140000,
+        "debit_quantity": 4,
+        "debit_price": 141000,
+        "exchange": "BSE",
+        "symbol_isin": "INE002A01018",
+        "product": "MIS",
+        "net_price": 140500,
+        "segment": "CASH"
+      }
+    ]
+  }
+}

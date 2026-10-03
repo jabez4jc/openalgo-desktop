@@ -10,6 +10,7 @@ pub mod angel;
 pub mod catalog;
 pub mod common;
 pub mod fyers;
+pub mod groww;
 #[cfg(any(test, feature = "test-support"))]
 pub mod mock;
 pub mod types;
@@ -304,6 +305,7 @@ impl BrokerRegistry {
             Arc::new(zerodha::ZerodhaBroker::new(symbols.clone())),
             Arc::new(fyers::FyersBroker::new(symbols.clone())),
             Arc::new(upstox::UpstoxBroker::new(symbols.clone())),
+            Arc::new(groww::GrowwBroker::new(symbols.clone())),
         ];
         Self::with_symbols(symbols, brokers)
     }
@@ -367,7 +369,7 @@ mod tests {
     #[test]
     fn registry_shares_one_symbol_master() {
         let reg = BrokerRegistry::new();
-        assert_eq!(reg.ids(), ["angel", "fyers", "upstox", "zerodha"]);
+        assert_eq!(reg.ids(), ["angel", "fyers", "groww", "upstox", "zerodha"]);
         let s = reg.symbols();
         s.load(vec![common::symbols::tests::row(
             "SBIN", "SBIN-EQ", "NSE", "1",

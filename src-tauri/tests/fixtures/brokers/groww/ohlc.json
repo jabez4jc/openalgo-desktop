@@ -1,0 +1,8 @@
+{
+  "status": "SUCCESS",
+  "payload": {
+    "NSE_SBIN": "{open: 809.00,high: 815.50,low: 806.25,close: 812.35}",
+    "BSE_RELIANCE": {"open": 1398.0, "high": 1412.0, "low": 1390.5, "close": 1405.1},
+    "NSE_NIFTY": 24890.15
+  }
+}
