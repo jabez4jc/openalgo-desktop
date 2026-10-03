@@ -290,7 +290,7 @@ impl Registry {
                 continue;
             };
             for mode in Mode::ALL.iter().rev().copied() {
-                if mode > update.mode {
+                if mode > update.mode || (update.exact_mode && mode != update.mode) {
                     continue;
                 }
                 let Some(depth) = slots.get(mode) else {

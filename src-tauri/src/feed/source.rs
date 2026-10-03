@@ -142,6 +142,10 @@ pub struct MarketUpdate {
     pub timestamp: i64,
     pub quote: Option<QuoteFields>,
     pub depth: Option<DepthBook>,
+    /// Deliver only to holders of exactly `mode` (a broker that sends the
+    /// depth snapshot apart from its tick has already served the lower
+    /// modes with the tick).
+    pub exact_mode: bool,
 }
 
 impl MarketUpdate {
@@ -155,6 +159,7 @@ impl MarketUpdate {
             timestamp: ts_ms,
             quote: None,
             depth: None,
+            exact_mode: false,
         }
     }
 }

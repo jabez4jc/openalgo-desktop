@@ -232,6 +232,7 @@ fn update_from(frame: &Value) -> MarketUpdate {
         timestamp: ts,
         quote,
         depth,
+        exact_mode: false,
     }
 }
 

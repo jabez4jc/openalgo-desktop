@@ -9,7 +9,7 @@
 //!
 //! * [`source`]: the boundary consumed ([`source::MarketDataSource`]) and the
 //!   normalized update types; [`source::FakeSource`] for tests.
-//! * [`bridge`]: the production source, fed by the broker streaming layer.
+//! * [`bridge`]: the production source over `websocket::WebSocketManager`.
 //! * [`server`]: listener, connection lifecycle and protocol handling.
 //! * [`registry`]: per-client subscriptions and source reference counts.
 //! * [`outbox`]: per-client bounded queue (latest-per-symbol for slow
@@ -71,7 +71,7 @@ impl FeedService {
     pub fn new(ctx: Arc<AppState>) -> Arc<Self> {
         let relay = orders::OrderRelay::register(&ctx.bus);
         Arc::new(Self {
-            bridge: bridge::BrokerBridge::new(ctx.clone()),
+            bridge: bridge::BrokerBridge::new(ctx.websocket.clone(), ctx.symbols.clone()),
             ctx,
             relay,
             handle: tokio::sync::Mutex::new(None),
@@ -140,8 +140,10 @@ impl FeedService {
         st
     }
 
-    /// Start the listener (no-op when running) and the settings watcher.
+    /// Start the bridge, the listener (no-op when running) and the
+    /// settings watcher.
     pub async fn start(self: &Arc<Self>) -> ServerStatus {
+        self.bridge.start();
         let st = {
             let mut slot = self.handle.lock().await;
             if slot.is_some() {
@@ -210,7 +212,7 @@ impl FeedService {
         if let Some((h, _)) = self.handle.lock().await.take() {
             h.stop().await;
         }
-        self.bridge.clear();
+        self.bridge.stop().await;
         *self.status.write() = ServerStatus::Starting;
     }
 }

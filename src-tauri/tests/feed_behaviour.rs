@@ -43,6 +43,7 @@ fn depth_update(key: InstrumentKey, ltp: f64, levels: usize) -> MarketUpdate {
             buy: (0..levels).map(|i| lv(ltp - i as f64 * 0.05)).collect(),
             sell: (0..levels).map(|i| lv(ltp + i as f64 * 0.05)).collect(),
         }),
+        exact_mode: false,
     }
 }
 
