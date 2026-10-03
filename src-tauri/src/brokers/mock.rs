@@ -1,31 +1,135 @@
-//! Scriptable broker for service and HTTP tests.
+//! Scriptable broker for service, HTTP and integration tests.
+//!
+//! Every trait method returns a scripted value (or a scripted error) and
+//! records the call, so a test can assert what a service sent. Available to
+//! other test crates through the `test-support` feature.
 
+use super::common::mapping::{Exchange, Product};
+use super::common::streaming::{BrokerFeed, FeedEvent, FeedSubscription, Message, WsRequest};
+use super::common::symbols::SymbolResolver;
 use super::types::*;
 use super::{AuthResponse, Broker, BrokerCredentials};
 use crate::error::{AppError, Result};
 use async_trait::async_trait;
 use parking_lot::Mutex;
+use std::collections::{HashMap, VecDeque};
+
+/// A scripted outcome: a value, or a broker error carrying this message.
+pub type Scripted<T> = std::result::Result<T, String>;
+
+fn out<T: Clone>(slot: &Mutex<Option<Scripted<T>>>, default: impl FnOnce() -> T) -> Result<T> {
+    match slot.lock().clone() {
+        Some(Ok(v)) => Ok(v),
+        Some(Err(m)) => Err(AppError::Broker(m)),
+        None => Ok(default()),
+    }
+}
+
+/// Every call the mock received, in order.
+#[derive(Debug, Clone, PartialEq)]
+pub enum MockCall {
+    Authenticate,
+    PlaceOrder(ResolvedOrder),
+    ModifyOrder(ResolvedModify),
+    CancelOrder(String),
+    CancelAll,
+    CloseAll,
+    OpenPosition(String, Exchange, Product),
+    OrderBook,
+    TradeBook,
+    Positions,
+    Holdings,
+    Funds,
+    Margin(usize),
+    Quote(QuoteKey),
+    MultiQuotes(Vec<QuoteKey>),
+    Depth(QuoteKey),
+    History(HistoryRequest),
+    PlaceGtt,
+    ModifyGtt(String),
+    CancelGtt(String),
+    GttBook,
+    MasterContract,
+}
 
 pub struct MockBroker {
     pub id: &'static str,
+    pub symbols: SymbolResolver,
+    /// Back-compat switch: when false, `get_funds` fails like an expired token.
     pub funds_ok: Mutex<bool>,
     /// Credentials passed to the last `authenticate` call.
     pub last_auth: Mutex<Option<BrokerCredentials>>,
     pub funds_calls: Mutex<u32>,
+    pub calls: Mutex<Vec<MockCall>>,
+    /// Order ids handed out by `place_order`, front first (then `MOCK-<n>`).
+    pub order_ids: Mutex<VecDeque<Scripted<String>>>,
+    pub modify: Mutex<Option<Scripted<OrderResponse>>>,
+    pub cancel: Mutex<Option<Scripted<OrderResponse>>>,
+    pub order_book: Mutex<Option<Scripted<Vec<Order>>>>,
+    pub trade_book: Mutex<Option<Scripted<Vec<Trade>>>>,
+    pub positions: Mutex<Option<Scripted<Vec<Position>>>>,
+    pub holdings: Mutex<Option<Scripted<Vec<Holding>>>>,
+    pub funds: Mutex<Option<Scripted<Funds>>>,
+    pub margin: Mutex<Option<Scripted<MarginResult>>>,
+    /// Quotes keyed by `EXCHANGE:SYMBOL`.
+    pub quotes: Mutex<HashMap<String, Quote>>,
+    pub depth: Mutex<Option<Scripted<MarketDepth>>>,
+    pub history: Mutex<Option<Scripted<Vec<Candle>>>>,
+    pub gtt: Mutex<Option<Scripted<GttResponse>>>,
+    pub gtt_book: Mutex<Option<Scripted<Vec<GttOrder>>>>,
+    pub master: Mutex<Option<Scripted<Vec<SymbolData>>>>,
+    /// Address of a fake feed server; when set, `create_feed` returns a
+    /// `MockFeed` pointed at it.
+    pub feed_url: Mutex<Option<String>>,
+    next_id: Mutex<u64>,
 }
 
 impl MockBroker {
     pub fn new(id: &'static str) -> Self {
+        Self::with_symbols(id, SymbolResolver::new())
+    }
+
+    pub fn with_symbols(id: &'static str, symbols: SymbolResolver) -> Self {
         Self {
             id,
+            symbols,
             funds_ok: Mutex::new(true),
             last_auth: Mutex::new(None),
             funds_calls: Mutex::new(0),
+            calls: Mutex::new(Vec::new()),
+            order_ids: Mutex::new(VecDeque::new()),
+            modify: Mutex::new(None),
+            cancel: Mutex::new(None),
+            order_book: Mutex::new(None),
+            trade_book: Mutex::new(None),
+            positions: Mutex::new(None),
+            holdings: Mutex::new(None),
+            funds: Mutex::new(None),
+            margin: Mutex::new(None),
+            quotes: Mutex::new(HashMap::new()),
+            depth: Mutex::new(None),
+            history: Mutex::new(None),
+            gtt: Mutex::new(None),
+            gtt_book: Mutex::new(None),
+            master: Mutex::new(None),
+            feed_url: Mutex::new(None),
+            next_id: Mutex::new(0),
         }
     }
 
-    fn unsupported<T>() -> Result<T> {
-        Err(AppError::Broker("not supported by the mock".into()))
+    fn record(&self, c: MockCall) {
+        self.calls.lock().push(c);
+    }
+
+    /// Calls received so far.
+    pub fn calls(&self) -> Vec<MockCall> {
+        self.calls.lock().clone()
+    }
+
+    pub fn set_quote(&self, q: Quote) {
+        self.quotes
+            .lock()
+            .insert(format!("{}:{}", q.exchange, q.symbol), q);
     }
 }
 
@@ -40,11 +144,34 @@ impl Broker for MockBroker {
     fn logo(&self) -> &'static str {
         ""
     }
-    fn requires_totp(&self) -> bool {
-        false
+    fn login_kind(&self) -> LoginKind {
+        LoginKind::Redirect {
+            param: "request_token",
+        }
+    }
+    fn supported_exchanges(&self) -> &'static [Exchange] {
+        Exchange::ALL
+    }
+    fn capabilities(&self) -> Capabilities {
+        Capabilities {
+            history: true,
+            multiquotes_batch: false,
+            margin: true,
+            gtt: true,
+            streaming: true,
+            order_feed: false,
+            depth_levels: &[5],
+        }
+    }
+    fn timeframe_map(&self) -> &'static [(&'static str, &'static str)] {
+        &[("1m", "1m"), ("5m", "5m"), ("D", "D")]
+    }
+    fn symbols(&self) -> Option<&SymbolResolver> {
+        Some(&self.symbols)
     }
 
     async fn authenticate(&self, credentials: BrokerCredentials) -> Result<AuthResponse> {
+        self.record(MockCall::Authenticate);
         let ok = credentials.request_token.is_some() || credentials.totp.is_some();
         *self.last_auth.lock() = Some(credentials);
         if !ok {
@@ -58,53 +185,302 @@ impl Broker for MockBroker {
         })
     }
 
-    async fn place_order(&self, _: &str, _: OrderRequest) -> Result<OrderResponse> {
-        Self::unsupported()
+    async fn place_order(&self, _: &AuthToken, order: &ResolvedOrder) -> Result<OrderResponse> {
+        self.record(MockCall::PlaceOrder(order.clone()));
+        let scripted = self.order_ids.lock().pop_front();
+        match scripted {
+            Some(Ok(id)) => Ok(OrderResponse {
+                order_id: id,
+                message: None,
+            }),
+            Some(Err(m)) => Err(AppError::Broker(m)),
+            None => {
+                let mut n = self.next_id.lock();
+                *n += 1;
+                Ok(OrderResponse {
+                    order_id: format!("MOCK-{}", *n),
+                    message: None,
+                })
+            }
+        }
     }
-    async fn modify_order(&self, _: &str, _: &str, _: ModifyOrderRequest) -> Result<OrderResponse> {
-        Self::unsupported()
+
+    async fn modify_order(&self, _: &AuthToken, order: &ResolvedModify) -> Result<OrderResponse> {
+        self.record(MockCall::ModifyOrder(order.clone()));
+        out(&self.modify, || OrderResponse {
+            order_id: order.order_id.clone(),
+            message: None,
+        })
     }
-    async fn cancel_order(&self, _: &str, _: &str, _: Option<&str>) -> Result<()> {
-        Self::unsupported()
+
+    async fn cancel_order(&self, _: &AuthToken, order_id: &str) -> Result<OrderResponse> {
+        self.record(MockCall::CancelOrder(order_id.to_string()));
+        out(&self.cancel, || OrderResponse {
+            order_id: order_id.to_string(),
+            message: None,
+        })
     }
-    async fn get_order_book(&self, _: &str) -> Result<Vec<Order>> {
-        Ok(vec![])
+
+    async fn cancel_all_orders(&self, auth: &AuthToken) -> Result<CancelAllResult> {
+        self.record(MockCall::CancelAll);
+        // Exercise the trait's default path through the scripted book.
+        let book = self.get_order_book(auth).await?;
+        let mut r = CancelAllResult::default();
+        for o in book {
+            if o.status == "open" || o.status == "trigger pending" {
+                match self.cancel_order(auth, &o.order_id).await {
+                    Ok(_) => r.cancelled.push(o.order_id),
+                    Err(_) => r.failed.push(o.order_id),
+                }
+            }
+        }
+        Ok(r)
     }
-    async fn get_trade_book(&self, _: &str) -> Result<Vec<Order>> {
-        Ok(vec![])
+
+    async fn close_all_positions(&self, auth: &AuthToken) -> Result<CloseAllResult> {
+        self.record(MockCall::CloseAll);
+        let positions = self.get_positions(auth).await?;
+        let mut r = CloseAllResult::default();
+        for p in positions.into_iter().filter(|p| p.quantity != 0) {
+            let req = OrderRequest {
+                symbol: p.symbol.clone(),
+                exchange: p.exchange.clone(),
+                side: if p.quantity > 0 { "SELL" } else { "BUY" }.into(),
+                quantity: p.quantity.abs(),
+                price: 0.0,
+                order_type: "MARKET".into(),
+                product: p.product.clone(),
+                validity: "DAY".into(),
+                trigger_price: None,
+                disclosed_quantity: None,
+                amo: false,
+            };
+            let placed = match ResolvedOrder::resolve(&req, &self.symbols) {
+                Ok(o) => self.place_order(auth, &o).await,
+                Err(e) => Err(e),
+            };
+            match placed {
+                Ok(o) => r.placed.push(o.order_id),
+                Err(e) => r.failed.push(format!(
+                    "{} ({}): {}",
+                    p.symbol,
+                    p.exchange,
+                    e.client_message()
+                )),
+            }
+        }
+        Ok(r)
     }
-    async fn get_positions(&self, _: &str) -> Result<Vec<Position>> {
-        Ok(vec![])
+
+    async fn get_open_position(
+        &self,
+        auth: &AuthToken,
+        symbol: &str,
+        exchange: Exchange,
+        product: Product,
+    ) -> Result<i64> {
+        self.record(MockCall::OpenPosition(
+            symbol.to_string(),
+            exchange,
+            product,
+        ));
+        let positions = self.get_positions(auth).await?;
+        Ok(positions
+            .iter()
+            .find(|p| {
+                p.symbol == symbol
+                    && p.exchange == exchange.as_str()
+                    && p.product == product.as_str()
+            })
+            .map(|p| i64::from(p.quantity))
+            .unwrap_or(0))
     }
-    async fn get_holdings(&self, _: &str) -> Result<Vec<Holding>> {
-        Ok(vec![])
+
+    async fn get_order_book(&self, _: &AuthToken) -> Result<Vec<Order>> {
+        self.record(MockCall::OrderBook);
+        out(&self.order_book, Vec::new)
     }
-    async fn get_funds(&self, auth_token: &str) -> Result<Funds> {
+    async fn get_trade_book(&self, _: &AuthToken) -> Result<Vec<Trade>> {
+        self.record(MockCall::TradeBook);
+        out(&self.trade_book, Vec::new)
+    }
+    async fn get_positions(&self, _: &AuthToken) -> Result<Vec<Position>> {
+        self.record(MockCall::Positions);
+        out(&self.positions, Vec::new)
+    }
+    async fn get_holdings(&self, _: &AuthToken) -> Result<Vec<Holding>> {
+        self.record(MockCall::Holdings);
+        out(&self.holdings, Vec::new)
+    }
+
+    async fn get_funds(&self, auth: &AuthToken) -> Result<Funds> {
+        self.record(MockCall::Funds);
         *self.funds_calls.lock() += 1;
-        if !*self.funds_ok.lock() || auth_token != "mock-access-token" {
+        if !*self.funds_ok.lock() || auth.raw() != "mock-access-token" {
             return Err(AppError::Broker(
                 "Incorrect `api_key` or `access_token`.".into(),
             ));
         }
-        Ok(Funds {
+        out(&self.funds, || Funds {
             available_cash: 125000.5,
             used_margin: 2500.25,
             total_margin: 127500.75,
             opening_balance: 127500.75,
-            payin: 0.0,
-            payout: 0.0,
-            span: 0.0,
-            exposure: 0.0,
             collateral: 1000.0,
+            utilised_debits: 2500.25,
+            ..Default::default()
         })
     }
-    async fn get_quote(&self, _: &str, _: Vec<(String, String)>) -> Result<Vec<Quote>> {
-        Self::unsupported()
+
+    async fn calculate_margin(&self, _: &AuthToken, legs: &[MarginLeg]) -> Result<MarginResult> {
+        self.record(MockCall::Margin(legs.len()));
+        out(&self.margin, MarginResult::default)
     }
-    async fn get_market_depth(&self, _: &str, _: &str, _: &str) -> Result<MarketDepth> {
-        Self::unsupported()
+
+    async fn get_quote(&self, _: &AuthToken, key: &QuoteKey) -> Result<Quote> {
+        self.record(MockCall::Quote(key.clone()));
+        self.quotes
+            .lock()
+            .get(&format!("{}:{}", key.exchange, key.symbol))
+            .cloned()
+            .ok_or_else(|| {
+                AppError::Broker(format!("No quote for {} {}", key.exchange, key.symbol))
+            })
     }
-    async fn download_master_contract(&self, _: &str) -> Result<Vec<SymbolData>> {
-        Ok(vec![])
+
+    async fn get_multiquotes(&self, _: &AuthToken, keys: &[QuoteKey]) -> Result<Vec<QuoteResult>> {
+        self.record(MockCall::MultiQuotes(keys.to_vec()));
+        let q = self.quotes.lock();
+        Ok(keys
+            .iter()
+            .map(|k| {
+                let hit = q.get(&format!("{}:{}", k.exchange, k.symbol)).cloned();
+                QuoteResult {
+                    symbol: k.symbol.clone(),
+                    exchange: k.exchange.clone(),
+                    error: hit.is_none().then(|| "No quote data available".to_string()),
+                    data: hit,
+                }
+            })
+            .collect())
+    }
+
+    async fn get_market_depth(&self, _: &AuthToken, key: &QuoteKey) -> Result<MarketDepth> {
+        self.record(MockCall::Depth(key.clone()));
+        out(&self.depth, || MarketDepth {
+            symbol: key.symbol.clone(),
+            exchange: key.exchange.clone(),
+            bids: vec![DepthLevel::default(); 5],
+            asks: vec![DepthLevel::default(); 5],
+            ..Default::default()
+        })
+    }
+
+    async fn get_history(&self, _: &AuthToken, req: &HistoryRequest) -> Result<Vec<Candle>> {
+        self.record(MockCall::History(req.clone()));
+        out(&self.history, Vec::new)
+    }
+
+    async fn place_gtt(&self, _: &AuthToken, _: &GttRequest) -> Result<GttResponse> {
+        self.record(MockCall::PlaceGtt);
+        out(&self.gtt, || GttResponse {
+            trigger_id: "GTT-1".into(),
+        })
+    }
+
+    async fn modify_gtt(&self, _: &AuthToken, id: &str, _: &GttRequest) -> Result<GttResponse> {
+        self.record(MockCall::ModifyGtt(id.to_string()));
+        out(&self.gtt, || GttResponse {
+            trigger_id: id.to_string(),
+        })
+    }
+
+    async fn cancel_gtt(&self, _: &AuthToken, id: &str) -> Result<GttResponse> {
+        self.record(MockCall::CancelGtt(id.to_string()));
+        out(&self.gtt, || GttResponse {
+            trigger_id: id.to_string(),
+        })
+    }
+
+    async fn get_gtt_book(&self, _: &AuthToken, _: bool) -> Result<Vec<GttOrder>> {
+        self.record(MockCall::GttBook);
+        out(&self.gtt_book, Vec::new)
+    }
+
+    async fn download_master_contract(&self, _: &AuthToken) -> Result<Vec<SymbolData>> {
+        self.record(MockCall::MasterContract);
+        out(&self.master, Vec::new)
+    }
+
+    fn create_feed(&self, _: &AuthToken) -> Result<Box<dyn BrokerFeed>> {
+        match self.feed_url.lock().clone() {
+            Some(url) => Ok(Box::new(MockFeed::new(url))),
+            None => Err(AppError::Unsupported("streaming")),
+        }
+    }
+}
+
+/// A JSON-text feed for manager tests: subscribe frames are
+/// `{"sub":[..]}`, ticks arrive as `{"t":"SYMBOL","x":"EXCH","p":123.4}`.
+pub struct MockFeed {
+    url: String,
+}
+
+impl MockFeed {
+    pub fn new(url: impl Into<String>) -> Self {
+        Self { url: url.into() }
+    }
+}
+
+impl BrokerFeed for MockFeed {
+    fn broker(&self) -> &'static str {
+        "mock"
+    }
+
+    fn ws_request(&self) -> Result<WsRequest> {
+        use tokio_tungstenite::tungstenite::client::IntoClientRequest;
+        self.url
+            .as_str()
+            .into_client_request()
+            .map_err(|_| AppError::Internal("bad mock feed url".into()))
+    }
+
+    fn subscribe_frames(&mut self, subs: &[FeedSubscription]) -> Vec<Message> {
+        let v: Vec<String> = subs
+            .iter()
+            .map(|s| format!("{}:{}:{}", s.exchange, s.symbol, s.mode.code()))
+            .collect();
+        vec![Message::Text(serde_json::json!({ "sub": v }).to_string())]
+    }
+
+    fn unsubscribe_frames(&mut self, subs: &[FeedSubscription]) -> Vec<Message> {
+        let v: Vec<String> = subs
+            .iter()
+            .map(|s| format!("{}:{}:{}", s.exchange, s.symbol, s.mode.code()))
+            .collect();
+        vec![Message::Text(serde_json::json!({ "unsub": v }).to_string())]
+    }
+
+    fn parse(&mut self, msg: &Message) -> Vec<FeedEvent> {
+        let Message::Text(t) = msg else {
+            return Vec::new();
+        };
+        let Ok(v) = serde_json::from_str::<serde_json::Value>(t) else {
+            return Vec::new();
+        };
+        match (v.get("t"), v.get("x"), v.get("p")) {
+            (Some(s), Some(x), Some(p)) => vec![FeedEvent::Tick(super::common::NormalizedTick {
+                symbol: s.as_str().unwrap_or_default().to_string(),
+                exchange: x.as_str().unwrap_or_default().to_string(),
+                mode: 1,
+                ltp: p.as_f64().unwrap_or(0.0),
+                timestamp_ms: super::common::streaming::now_ms(),
+                ..Default::default()
+            })],
+            _ if v.get("auth") == Some(&serde_json::json!("denied")) => {
+                vec![FeedEvent::AuthFailed("denied".into())]
+            }
+            _ => Vec::new(),
+        }
     }
 }

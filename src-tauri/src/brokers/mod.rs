@@ -1,88 +1,253 @@
-//! Broker adapters module
+//! Broker adapters.
+//!
+//! Every adapter implements `Broker`: translation between the broker's
+//! shapes and OpenAlgo's. Inputs are resolved OpenAlgo requests; outputs
+//! (books, quotes, ticks) carry OpenAlgo symbols and exchanges. Optional
+//! capabilities (margin, GTT, streaming) default to `AppError::Unsupported`.
+//! The trait is object safe: the registry hands out `Arc<dyn Broker>`.
 
 pub mod angel;
 pub mod catalog;
+pub mod common;
 pub mod fyers;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-support"))]
 pub mod mock;
 pub mod types;
 pub mod zerodha;
 
-use crate::error::Result;
+use crate::error::{AppError, Result};
 use async_trait::async_trait;
+use common::mapping::{Exchange, OrderStatus, PriceType, Product};
+use common::streaming::BrokerFeed;
+use common::symbols::SymbolResolver;
 use std::collections::HashMap;
 use std::sync::Arc;
 use types::*;
 
-/// Broker trait that all broker implementations must implement
+/// The broker module contract (web `.claude/skills/broker-integration`).
 #[async_trait]
 pub trait Broker: Send + Sync {
-    /// Broker ID (e.g., "angel", "zerodha", "fyers")
+    // ---- identity and capabilities ----
+
+    /// Broker id, e.g. `zerodha`.
     fn id(&self) -> &'static str;
-
-    /// Broker display name
+    /// Display name.
     fn name(&self) -> &'static str;
-
-    /// Broker logo path
+    /// Logo path served by the UI.
     fn logo(&self) -> &'static str;
+    /// How the trader signs in.
+    fn login_kind(&self) -> LoginKind;
+    /// Exchanges the broker trades (web `plugin.json` `supported_exchanges`).
+    fn supported_exchanges(&self) -> &'static [Exchange];
+    /// Optional capabilities implemented by this adapter.
+    fn capabilities(&self) -> Capabilities;
+    /// OpenAlgo interval -> broker interval, in the order `/intervals` lists them.
+    fn timeframe_map(&self) -> &'static [(&'static str, &'static str)];
 
-    /// Whether this broker requires TOTP for login
-    fn requires_totp(&self) -> bool;
+    /// Whether this broker needs TOTP on its login form.
+    fn requires_totp(&self) -> bool {
+        matches!(self.login_kind(), LoginKind::DirectTotp { fields } if fields.contains(&"totp"))
+    }
 
-    /// Authenticate with broker
+    /// The symbol master this adapter resolves against, when it has one.
+    /// Used by the default `close_all_positions`.
+    fn symbols(&self) -> Option<&SymbolResolver> {
+        None
+    }
+
+    // ---- auth ----
+
+    /// Exchange login credentials (or an OAuth code) for a session token.
     async fn authenticate(&self, credentials: BrokerCredentials) -> Result<AuthResponse>;
 
-    /// Place a new order
-    async fn place_order(&self, auth_token: &str, order: OrderRequest) -> Result<OrderResponse>;
+    // ---- orders ----
 
-    /// Modify an existing order
-    async fn modify_order(
+    async fn place_order(&self, auth: &AuthToken, order: &ResolvedOrder) -> Result<OrderResponse>;
+
+    async fn modify_order(&self, auth: &AuthToken, order: &ResolvedModify)
+        -> Result<OrderResponse>;
+
+    async fn cancel_order(&self, auth: &AuthToken, order_id: &str) -> Result<OrderResponse>;
+
+    /// Cancel every `open` / `trigger pending` order (web
+    /// `cancel_all_orders_api`). Default: order book, then one cancel each.
+    async fn cancel_all_orders(&self, auth: &AuthToken) -> Result<CancelAllResult> {
+        let book = self.get_order_book(auth).await?;
+        let mut result = CancelAllResult::default();
+        for o in book {
+            let pending = o
+                .status
+                .parse::<OrderStatus>()
+                .map(OrderStatus::is_pending)
+                .unwrap_or(false);
+            if !pending {
+                continue;
+            }
+            match self.cancel_order(auth, &o.order_id).await {
+                Ok(_) => result.cancelled.push(o.order_id),
+                Err(e) => {
+                    tracing::warn!("Cancel of order {} failed: {}", o.order_id, e.code());
+                    result.failed.push(o.order_id)
+                }
+            }
+        }
+        Ok(result)
+    }
+
+    /// Square off every open position with a MARKET order (web
+    /// `close_all_positions`). Default: position book, one exit order each,
+    /// resolved through `symbols()`.
+    async fn close_all_positions(&self, auth: &AuthToken) -> Result<CloseAllResult> {
+        let symbols = self
+            .symbols()
+            .ok_or(AppError::Unsupported("close_all"))?
+            .clone();
+        let positions = self.get_positions(auth).await?;
+        let mut result = CloseAllResult::default();
+        for p in positions.into_iter().filter(|p| p.quantity != 0) {
+            let label = format!("{} ({})", p.symbol, p.exchange);
+            let req = OrderRequest {
+                symbol: p.symbol.clone(),
+                exchange: p.exchange.clone(),
+                side: if p.quantity > 0 { "SELL" } else { "BUY" }.to_string(),
+                quantity: p.quantity.abs(),
+                price: 0.0,
+                order_type: PriceType::Market.as_str().to_string(),
+                product: p.product.clone(),
+                validity: "DAY".to_string(),
+                trigger_price: None,
+                disclosed_quantity: None,
+                amo: false,
+            };
+            let outcome = match ResolvedOrder::resolve(&req, &symbols) {
+                Ok(order) => self.place_order(auth, &order).await,
+                Err(e) => Err(e),
+            };
+            match outcome {
+                Ok(r) if !r.order_id.is_empty() => result.placed.push(r.order_id),
+                Ok(_) => result.failed.push(format!("{}: order was refused", label)),
+                Err(e) => result
+                    .failed
+                    .push(format!("{}: {}", label, e.client_message())),
+            }
+        }
+        Ok(result)
+    }
+
+    /// Net quantity of one OpenAlgo symbol/exchange/product (web
+    /// `get_open_position`), 0 when flat. Default: scan the position book.
+    async fn get_open_position(
         &self,
-        auth_token: &str,
-        order_id: &str,
-        order: ModifyOrderRequest,
-    ) -> Result<OrderResponse>;
-
-    /// Cancel an order
-    async fn cancel_order(
-        &self,
-        auth_token: &str,
-        order_id: &str,
-        variety: Option<&str>,
-    ) -> Result<()>;
-
-    /// Get order book
-    async fn get_order_book(&self, auth_token: &str) -> Result<Vec<Order>>;
-
-    /// Get trade book
-    async fn get_trade_book(&self, auth_token: &str) -> Result<Vec<Order>>;
-
-    /// Get positions
-    async fn get_positions(&self, auth_token: &str) -> Result<Vec<Position>>;
-
-    /// Get holdings
-    async fn get_holdings(&self, auth_token: &str) -> Result<Vec<Holding>>;
-
-    /// Get funds/margin
-    async fn get_funds(&self, auth_token: &str) -> Result<Funds>;
-
-    /// Get quote for symbols
-    async fn get_quote(
-        &self,
-        auth_token: &str,
-        symbols: Vec<(String, String)>,
-    ) -> Result<Vec<Quote>>;
-
-    /// Get market depth
-    async fn get_market_depth(
-        &self,
-        auth_token: &str,
-        exchange: &str,
+        auth: &AuthToken,
         symbol: &str,
-    ) -> Result<MarketDepth>;
+        exchange: Exchange,
+        product: Product,
+    ) -> Result<i64> {
+        let positions = self.get_positions(auth).await?;
+        Ok(positions
+            .iter()
+            .find(|p| {
+                p.symbol == symbol
+                    && p.exchange == exchange.as_str()
+                    && p.product == product.as_str()
+            })
+            .map(|p| i64::from(p.quantity))
+            .unwrap_or(0))
+    }
 
-    /// Download master contract
-    async fn download_master_contract(&self, auth_token: &str) -> Result<Vec<SymbolData>>;
+    // ---- books (OpenAlgo symbols, lowercase statuses) ----
+
+    async fn get_order_book(&self, auth: &AuthToken) -> Result<Vec<Order>>;
+    async fn get_trade_book(&self, auth: &AuthToken) -> Result<Vec<Trade>>;
+    async fn get_positions(&self, auth: &AuthToken) -> Result<Vec<Position>>;
+    async fn get_holdings(&self, auth: &AuthToken) -> Result<Vec<Holding>>;
+    async fn get_funds(&self, auth: &AuthToken) -> Result<Funds>;
+
+    /// Margin for a basket of legs (web `calculate_margin_api`).
+    async fn calculate_margin(
+        &self,
+        _auth: &AuthToken,
+        _legs: &[MarginLeg],
+    ) -> Result<MarginResult> {
+        Err(AppError::Unsupported("margin"))
+    }
+
+    // ---- market data ----
+
+    async fn get_quote(&self, auth: &AuthToken, key: &QuoteKey) -> Result<Quote>;
+
+    /// Quotes for many instruments, one entry per key in request order.
+    /// Default: one `get_quote` per key; adapters with a batch endpoint
+    /// override it.
+    async fn get_multiquotes(
+        &self,
+        auth: &AuthToken,
+        keys: &[QuoteKey],
+    ) -> Result<Vec<QuoteResult>> {
+        let mut out = Vec::with_capacity(keys.len());
+        for k in keys {
+            match self.get_quote(auth, k).await {
+                Ok(q) => out.push(QuoteResult {
+                    symbol: k.symbol.clone(),
+                    exchange: k.exchange.clone(),
+                    data: Some(q),
+                    error: None,
+                }),
+                Err(e) => out.push(QuoteResult {
+                    symbol: k.symbol.clone(),
+                    exchange: k.exchange.clone(),
+                    data: None,
+                    error: Some(e.client_message()),
+                }),
+            }
+        }
+        Ok(out)
+    }
+
+    /// Five-level depth (padded with zero levels).
+    async fn get_market_depth(&self, auth: &AuthToken, key: &QuoteKey) -> Result<MarketDepth>;
+
+    /// Candles for `req`, epoch seconds, oldest first, with OI.
+    async fn get_history(&self, auth: &AuthToken, req: &HistoryRequest) -> Result<Vec<Candle>>;
+
+    // ---- GTT (optional) ----
+
+    async fn place_gtt(&self, _auth: &AuthToken, _req: &GttRequest) -> Result<GttResponse> {
+        Err(AppError::Unsupported("gtt"))
+    }
+
+    async fn modify_gtt(
+        &self,
+        _auth: &AuthToken,
+        _trigger_id: &str,
+        _req: &GttRequest,
+    ) -> Result<GttResponse> {
+        Err(AppError::Unsupported("gtt"))
+    }
+
+    async fn cancel_gtt(&self, _auth: &AuthToken, _trigger_id: &str) -> Result<GttResponse> {
+        Err(AppError::Unsupported("gtt"))
+    }
+
+    async fn get_gtt_book(
+        &self,
+        _auth: &AuthToken,
+        _include_history: bool,
+    ) -> Result<Vec<GttOrder>> {
+        Err(AppError::Unsupported("gtt"))
+    }
+
+    // ---- master contract ----
+
+    /// Download and normalise the broker's instrument list.
+    async fn download_master_contract(&self, auth: &AuthToken) -> Result<Vec<SymbolData>>;
+
+    // ---- streaming ----
+
+    /// A streaming adapter for the market-data feed.
+    fn create_feed(&self, _auth: &AuthToken) -> Result<Box<dyn BrokerFeed>> {
+        Err(AppError::Unsupported("streaming"))
+    }
 }
 
 /// Broker credentials for authentication. `Debug` is redacted.
@@ -123,35 +288,43 @@ impl std::fmt::Debug for AuthResponse {
     }
 }
 
-/// Broker registry for managing multiple brokers
+/// The adapters compiled into this build, sharing one symbol master.
 pub struct BrokerRegistry {
     brokers: HashMap<String, Arc<dyn Broker>>,
+    symbols: SymbolResolver,
 }
 
 impl BrokerRegistry {
-    /// Create new broker registry with all supported brokers
+    /// Every production adapter, sharing a fresh symbol master.
     pub fn new() -> Self {
-        let mut brokers: HashMap<String, Arc<dyn Broker>> = HashMap::new();
-
-        // Register brokers
-        brokers.insert("angel".to_string(), Arc::new(angel::AngelBroker::new()));
-        brokers.insert(
-            "zerodha".to_string(),
-            Arc::new(zerodha::ZerodhaBroker::new()),
-        );
-        brokers.insert("fyers".to_string(), Arc::new(fyers::FyersBroker::new()));
-
-        Self { brokers }
+        let symbols = SymbolResolver::new();
+        let brokers: Vec<Arc<dyn Broker>> = vec![
+            Arc::new(angel::AngelBroker::new(symbols.clone())),
+            Arc::new(zerodha::ZerodhaBroker::new(symbols.clone())),
+            Arc::new(fyers::FyersBroker::new(symbols.clone())),
+        ];
+        Self::with_symbols(symbols, brokers)
     }
 
     /// Registry with exactly these adapters (tests use a mock broker).
     pub fn with(brokers: Vec<Arc<dyn Broker>>) -> Self {
+        Self::with_symbols(SymbolResolver::new(), brokers)
+    }
+
+    /// Registry whose adapters were built against `symbols`.
+    pub fn with_symbols(symbols: SymbolResolver, brokers: Vec<Arc<dyn Broker>>) -> Self {
         Self {
             brokers: brokers
                 .into_iter()
                 .map(|b| (b.id().to_string(), b))
                 .collect(),
+            symbols,
         }
+    }
+
+    /// The shared symbol master (the app context holds the same handle).
+    pub fn symbols(&self) -> SymbolResolver {
+        self.symbols.clone()
     }
 
     /// IDs of the adapters compiled into this build.
@@ -175,5 +348,31 @@ impl BrokerRegistry {
 impl Default for BrokerRegistry {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Lowercase a broker status the way the web does for unknown values.
+pub(crate) fn lower_status(s: &str) -> String {
+    s.trim().to_ascii_lowercase()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assert_object_safe(_: &dyn Broker) {}
+
+    #[test]
+    fn registry_shares_one_symbol_master() {
+        let reg = BrokerRegistry::new();
+        assert_eq!(reg.ids(), ["angel", "fyers", "zerodha"]);
+        let s = reg.symbols();
+        s.load(vec![common::symbols::tests::row(
+            "SBIN", "SBIN-EQ", "NSE", "1",
+        )]);
+        let z = reg.get("zerodha").unwrap();
+        assert_object_safe(z.as_ref());
+        assert_eq!(z.symbols().unwrap().len(), 1);
+        assert_eq!(reg.get("angel").unwrap().symbols().unwrap().len(), 1);
     }
 }
