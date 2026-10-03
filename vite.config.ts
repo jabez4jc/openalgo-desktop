@@ -3,6 +3,10 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
 
+// Desktop: in development the Rust server runs on the maintainer's dev port
+// (5500, next to OpenAlgo web on 5000), so the dev server proxies there.
+const BACKEND = process.env.OPENALGO_DEV_BACKEND || 'http://127.0.0.1:5500'
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
@@ -27,25 +31,37 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  // Desktop: keep Rust compiler output visible under `tauri dev`.
+  clearScreen: false,
   server: {
     port: 5173,
+    // Desktop: Tauri's devUrl is fixed to 5173, so fail rather than move ports.
+    strictPort: true,
+    watch: {
+      ignored: ['**/src-tauri/**'],
+    },
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: BACKEND,
         changeOrigin: true,
       },
       '/socket.io': {
-        target: 'http://localhost:5000',
+        target: BACKEND,
         ws: true,
       },
       '/auth': {
-        target: 'http://localhost:5000',
+        target: BACKEND,
         changeOrigin: true,
       },
       // User indicator modules are served by Flask from strategies/indicators,
       // never bundled, so the dev server has to pass them through too.
       '/custom-indicators': {
-        target: 'http://localhost:5000',
+        target: BACKEND,
+        changeOrigin: true,
+      },
+      // Desktop: the in-app Server Settings page's endpoint.
+      '/settings/api': {
+        target: BACKEND,
         changeOrigin: true,
       },
     },

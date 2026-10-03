@@ -393,9 +393,9 @@ export default function RemoteMcp() {
                   Remote MCP settings
                 </CardTitle>
                 <CardDescription>
-                  Toggle Remote MCP on or off and adjust its OAuth posture. Changes are written to
-                  <code className="mx-1">.env</code>; the openalgo service must be restarted before
-                  they take effect.
+                  {/* Desktop: settings are stored in-app; a restart means quitting the app. */}
+                  Toggle Remote MCP on or off and adjust its OAuth posture. Changes take effect
+                  after you quit OpenAlgo Desktop and open it again.
                 </CardDescription>
               </div>
               <Badge variant={mcpEnabled ? 'default' : 'secondary'}>
@@ -537,10 +537,8 @@ export default function RemoteMcp() {
           <AlertTriangle className="h-4 w-4 text-amber-600" />
           <AlertTitle>Restart required to apply changes</AlertTitle>
           <AlertDescription>
-            Settings saved to <code>.env</code>. Run the following on your server to load them:
-            <pre className="mt-2 rounded bg-muted px-3 py-2 text-xs font-mono">
-              sudo systemctl restart openalgo
-            </pre>
+            {/* Desktop: no .env or service; a restart means quitting the app. */}
+            Settings saved. Quit OpenAlgo Desktop and open it again to apply them.
             <span className="block mt-2 text-xs">
               This banner clears automatically once the running service reflects the new values.
             </span>
@@ -555,7 +553,7 @@ export default function RemoteMcp() {
           <AlertTitle>Remote MCP is currently disabled</AlertTitle>
           <AlertDescription>
             Hosted AI clients can't reach <code>/mcp</code> right now. Enable it from the settings
-            card above, then restart the service. Local stdio MCP (Claude Desktop / Cursor /
+            card above, then restart OpenAlgo Desktop. Local stdio MCP (Claude Desktop / Cursor /
             Windsurf) is unaffected and works regardless.
           </AlertDescription>
         </Alert>

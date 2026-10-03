@@ -65,7 +65,8 @@ export default function ServerError() {
           <AlertDescription>
             Please check if your <strong>API Key</strong> or <strong>API Secret</strong> is valid.
             <br />
-            If you updated the <strong>.env</strong> file while logged in,{' '}
+            {/* Desktop: credentials are changed in Profile, not in a .env file. */}
+            If you changed your broker credentials in your Profile while logged in,{' '}
             <span className="text-red-600 font-bold">logout</span> and{' '}
             <span className="text-green-600 font-bold">login again</span> to refresh credentials.
           </AlertDescription>

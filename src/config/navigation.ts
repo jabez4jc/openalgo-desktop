@@ -25,6 +25,7 @@ import {
   Wrench,
   Zap,
 } from 'lucide-react'
+import { desktopProfileMenuItems } from '@/lib/desktop'
 
 export interface NavItem {
   href: string
@@ -85,6 +86,8 @@ export const profileMenuItems: NavItem[] = [
   { href: '/search/token', label: 'Search', icon: Search },
   { href: '/sandbox', label: 'Sandbox', icon: FlaskConical },
   { href: '/leverage', label: 'Leverage', icon: Gauge },
+  // Desktop: desktop-only entries (Server Settings) sit just before Admin.
+  ...desktopProfileMenuItems,
   { href: '/admin', label: 'Admin', icon: Settings },
 ]
 

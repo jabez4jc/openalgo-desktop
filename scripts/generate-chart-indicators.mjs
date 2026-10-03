@@ -35,7 +35,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 const HERE = dirname(fileURLToPath(import.meta.url))
 
 /** Where the committed catalogue lives. */
-export const OUT = resolve(HERE, '..', '..', 'docs', 'prompt', 'indicators', 'chart-indicators.md')
+// Desktop: the frontend sits at the repository root, so docs/ is one level up, not two.
+export const OUT = resolve(HERE, '..', 'docs', 'prompt', 'indicators', 'chart-indicators.md')
 
 /** Read the registry the chart itself uses, after the built-ins register. */
 export async function catalogue() {

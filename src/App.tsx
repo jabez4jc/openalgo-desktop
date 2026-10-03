@@ -138,6 +138,8 @@ const SecurityDashboard = lazy(() => import('@/pages/monitoring/SecurityDashboar
 const TrafficDashboard = lazy(() => import('@/pages/monitoring/TrafficDashboard'))
 const LatencyDashboard = lazy(() => import('@/pages/monitoring/LatencyDashboard'))
 const HealthMonitor = lazy(() => import('@/pages/HealthMonitor'))
+// Desktop: in-app server settings (ports, LAN access) replace the web's .env.
+const ServerSettings = lazy(() => import('@/pages/settings/ServerSettings'))
 
 function PageTitleUpdater() {
   usePageTitle()
@@ -265,6 +267,8 @@ function App() {
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/master-contract" element={<MasterContract />} />
                 <Route path="/action-center" element={<ActionCenter />} />
+                {/* Desktop: server settings page, served by the Rust SPA fallback too. */}
+                <Route path="/settings/server" element={<ServerSettings />} />
               </Route>
 
               {/* Full-width protected routes */}

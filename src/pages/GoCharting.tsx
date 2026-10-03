@@ -160,27 +160,30 @@ export default function GoCharting() {
     setShowResults(false)
   }
 
-  const generateJson = useCallback((showError = true) => {
-    if (!symbol || !exchange) {
-      if (showError) {
-        showToast.error('Please select a symbol and exchange', 'system')
+  const generateJson = useCallback(
+    (showError = true) => {
+      if (!symbol || !exchange) {
+        if (showError) {
+          showToast.error('Please select a symbol and exchange', 'system')
+        }
+        return
       }
-      return
-    }
 
-    const json = {
-      apikey: apiKey || 'YOUR_API_KEY',
-      strategy: 'GoCharting Alert',
-      symbol: symbol,
-      exchange: exchange,
-      action: action,
-      product: product,
-      pricetype: 'MARKET',
-      quantity: quantity,
-    }
+      const json = {
+        apikey: apiKey || 'YOUR_API_KEY',
+        strategy: 'GoCharting Alert',
+        symbol: symbol,
+        exchange: exchange,
+        action: action,
+        product: product,
+        pricetype: 'MARKET',
+        quantity: quantity,
+      }
 
-    setGeneratedJson(JSON.stringify(json, null, 2))
-  }, [symbol, exchange, apiKey, action, product, quantity])
+      setGeneratedJson(JSON.stringify(json, null, 2))
+    },
+    [symbol, exchange, apiKey, action, product, quantity]
+  )
 
   // Auto-generate JSON when values change
   useEffect(() => {
@@ -207,6 +210,7 @@ export default function GoCharting() {
       </div>
 
       {/* Localhost Warning - only show if HOST_SERVER is not configured to external URL */}
+      {/* Desktop: no .env; the external URL is the Host Server URL in Profile. */}
       {hostConfig?.is_localhost && (
         <Alert variant="destructive" className="mb-8">
           <AlertTriangle className="h-5 w-5" />
@@ -214,8 +218,8 @@ export default function GoCharting() {
             <strong>Webhook URL not accessible!</strong> GoCharting cannot send alerts to localhost.
             Use <strong>ngrok</strong>, <strong>Cloudflare Tunnel</strong>,{' '}
             <strong>VS Code Dev Tunnel</strong>, or a <strong>custom domain</strong> to expose your
-            OpenAlgo instance to the internet. Update <code>HOST_SERVER</code> in your{' '}
-            <code>.env</code> file with your external URL.
+            OpenAlgo Desktop to the internet, then enter that address as the Host Server URL on the
+            Broker tab of your Profile.
           </AlertDescription>
         </Alert>
       )}

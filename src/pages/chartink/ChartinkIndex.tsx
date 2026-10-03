@@ -123,6 +123,7 @@ export default function ChartinkIndex() {
       </div>
 
       {/* Localhost Warning - only show if HOST_SERVER is not configured to external URL */}
+      {/* Desktop: no .env; the external URL is the Host Server URL in Profile. */}
       {hostConfig?.is_localhost && (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
@@ -130,8 +131,8 @@ export default function ChartinkIndex() {
           <AlertDescription>
             Chartink cannot send alerts to localhost. Use <strong>ngrok</strong>,{' '}
             <strong>Cloudflare Tunnel</strong>, <strong>VS Code Dev Tunnel</strong>, or a{' '}
-            <strong>custom domain</strong> to expose your OpenAlgo instance to the internet. Update{' '}
-            <code>HOST_SERVER</code> in your <code>.env</code> file with your external URL.
+            <strong>custom domain</strong> to expose OpenAlgo Desktop to the internet, then enter
+            that address as the Host Server URL on the Broker tab of your Profile.
           </AlertDescription>
         </Alert>
       )}

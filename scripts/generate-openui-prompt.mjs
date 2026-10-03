@@ -34,7 +34,8 @@ import {
 } from '../src/lib/agent/openuiLibrary.ts'
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
-const repoRoot = resolve(scriptDir, '..', '..')
+// Desktop: the frontend sits at the repository root, so the root is one level up.
+const repoRoot = resolve(scriptDir, '..')
 const target = join(repoRoot, AGENT_UI_PROMPT_PATH)
 
 const missing = missingAgentUiComponents()

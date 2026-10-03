@@ -65,6 +65,8 @@ const PAGE_TITLES: Record<string, string> = {
   '/profile': 'Profile',
   '/master-contract': 'Master Contract',
   '/action-center': 'Action Center',
+  // Desktop: in-app server settings page.
+  '/settings/server': 'Server Settings',
   '/playground': 'Playground',
   '/historify': 'Historify',
   '/historify/charts': 'Historify Charts',

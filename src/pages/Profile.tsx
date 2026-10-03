@@ -1911,11 +1911,10 @@ export default function ProfilePage() {
               </div>
               <div>
                 <p className="font-medium text-foreground">Sensitive Files</p>
+                {/* Desktop: there is no .env file; secrets live in the OS keychain. */}
                 <p>
-                  Files marked as sensitive (like{' '}
-                  <code className="bg-muted px-1 rounded">.env</code> and{' '}
-                  <code className="bg-muted px-1 rounded">keys/</code>) should have restricted
-                  permissions (600 or 700) to prevent unauthorized access.
+                  Files marked as sensitive should have restricted permissions (600 or 700) to
+                  prevent unauthorized access.
                 </p>
               </div>
               <div>
@@ -2355,14 +2354,9 @@ export default function ProfilePage() {
               Restart Required
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-3">
-              <p>
-                Your configuration has been saved to the{' '}
-                <code className="bg-muted px-1 rounded">.env</code> file.
-              </p>
-              <p>
-                To apply these changes, please restart the OpenAlgo application using your usual
-                method (terminal, service manager, or container orchestrator).
-              </p>
+              {/* Desktop: settings are stored in-app; a restart means quitting the app. */}
+              <p>Your configuration has been saved.</p>
+              <p>To apply these changes, quit OpenAlgo Desktop and open it again.</p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

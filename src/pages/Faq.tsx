@@ -46,12 +46,14 @@ const faqData = [
       {
         question: 'What are the system requirements?',
         answer:
-          'OpenAlgo requires Python 3.12 or higher and Node.js 20+ for the frontend. It runs on Windows, macOS, and Linux. For optimal performance, we recommend at least 4GB RAM and a stable internet connection. The application uses SQLite by default, making it lightweight and easy to deploy.',
+          // Desktop: the app is installed, not deployed; no Python or Node.js is needed.
+          'OpenAlgo Desktop runs on Windows 10/11, macOS (Intel and Apple Silicon), Linux and Raspberry Pi (64-bit). Install it like any other app; there is nothing else to set up. We recommend at least 4GB RAM and a stable internet connection.',
       },
       {
-        question: 'Where can I host OpenAlgo?',
+        question: 'Where does OpenAlgo Desktop run?',
         answer:
-          'OpenAlgo can be hosted locally on your personal computer, on a VPS (Virtual Private Server), or in the cloud. Popular options include AWS, Google Cloud, DigitalOcean, or any Linux VPS provider. For Indian traders, hosting on an Indian VPS ensures low latency connections to broker servers.',
+          // Desktop: single-user app on the trader's own computer.
+          'OpenAlgo Desktop runs on your own computer, for one user. Every setting and credential is entered inside the app. To run OpenAlgo on a VPS or in the cloud for round-the-clock access, use OpenAlgo web instead.',
       },
     ],
   },

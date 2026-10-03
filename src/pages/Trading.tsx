@@ -38,6 +38,8 @@ const WatchlistPanel = lazy(() =>
   import('@/components/trading/WatchlistPanel').then((m) => ({ default: m.WatchlistPanel }))
 )
 
+import type { MagnetMode } from 'openalgo-charts/draw'
+import { BacktestPanel } from '@/components/trading/BacktestPanel'
 import {
   BOTTOM_BAR_PX,
   type BottomBarControl,
@@ -46,10 +48,9 @@ import {
 import { ChartPane } from '@/components/trading/ChartPane'
 import { DrawingRail } from '@/components/trading/DrawingRail'
 import {
-  type ChartOrderBridgeRef,
   ChartOrderBridgeContext,
+  type ChartOrderBridgeRef,
 } from '@/components/trading/dock/chartOrderBridge'
-import { GridDividers } from '@/components/trading/GridDividers'
 import { DOCK_ID } from '@/components/trading/dock/DockShell'
 import {
   type DockTab,
@@ -58,11 +59,10 @@ import {
   writeDockTab,
 } from '@/components/trading/dock/dockState'
 import { TradingDock } from '@/components/trading/dock/TradingDock'
+import { GridDividers } from '@/components/trading/GridDividers'
 import { IndicatorTemplates } from '@/components/trading/IndicatorTemplates'
 import { ObjectsPanel } from '@/components/trading/ObjectsPanel'
 import { isPanelId, type PanelId, RightRail } from '@/components/trading/RightRail'
-import { idForScript } from '@/lib/trading/openscriptFiles'
-import { BacktestPanel } from '@/components/trading/BacktestPanel'
 import { TickBox } from '@/components/trading/TickBox'
 import { Tip } from '@/components/trading/Tip'
 import { WorkspaceGrid } from '@/components/trading/WorkspaceGrid'
@@ -81,10 +81,11 @@ import { useWorkspaceAutosave } from '@/hooks/useWorkspaceAutosave'
 import { useWorkspaceGridTransition } from '@/hooks/useWorkspaceGridTransition'
 import type { AgentChartCommand } from '@/lib/agent/stream'
 import { LAYOUTS, LayoutIcon, type LayoutPreset } from '@/lib/chart/layouts'
+import { DEFAULT_WEBSOCKET_URL } from '@/lib/desktop'
 import { clearLog, fetchLog, type LoggedFire } from '@/lib/trading/alertLog'
+import { alertRuntimeKey, removeWorkspaceAlertRuntime } from '@/lib/trading/alertRuntime'
 import { historyChord } from '@/lib/trading/chartHistory'
 import { chartMayTakeKey } from '@/lib/trading/drawingKeys'
-import { alertRuntimeKey, removeWorkspaceAlertRuntime } from '@/lib/trading/alertRuntime'
 import {
   type GridWeights,
   parseAreas,
@@ -93,8 +94,8 @@ import {
   tracksTemplate,
   writeGridWeights,
 } from '@/lib/trading/gridSizes'
+import { idForScript } from '@/lib/trading/openscriptFiles'
 import type { PreparedChartGrid } from '@/lib/trading/preparedGrid'
-import type { MagnetMode } from 'openalgo-charts/draw'
 import type {
   AlertFire,
   AlertsView,
@@ -878,7 +879,8 @@ function TradingWorkspace({ account }: { account: string | null }) {
           return
         }
         setApiKey(keyRes.api_key)
-        setWsUrl(cfgRes.websocket_url || 'ws://127.0.0.1:8765')
+        // Desktop: fallback follows the dev/shipped feed port (8766/8765).
+        setWsUrl(cfgRes.websocket_url || DEFAULT_WEBSOCKET_URL)
       } catch {
         if (alive) setNoApiKey(true)
       }

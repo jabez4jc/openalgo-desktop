@@ -66,7 +66,8 @@ const platformDesks = [
   {
     icon: Server,
     title: 'Self-hosted algo trading',
-    desc: 'A unified broker API and execution engine on your own server, driven from TradingView, Amibroker, ChartInk, Excel, Python or MCP.',
+    // Desktop: runs on the trader's own computer rather than a server.
+    desc: 'A unified broker API and execution engine on your own computer, driven from TradingView, Amibroker, ChartInk, Excel, Python or MCP.',
   },
   {
     icon: CandlestickChart,
@@ -326,8 +327,8 @@ export default function Home() {
               <span className="block text-muted-foreground">A complete trading desk.</span>
             </h2>
             <p className="text-base sm:text-lg text-muted-foreground">
-              Execution is only the starting point. Charting, no-code strategy building, options
-              analytics, scalping and sandbox testing all run inside the same self-hosted stack.
+              Execution is only the starting point. Charting, strategy building, options analytics,
+              scalping and sandbox testing all run inside the same app.
             </p>
           </div>
 
