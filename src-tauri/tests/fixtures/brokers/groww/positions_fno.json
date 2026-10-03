@@ -1,0 +1,22 @@
+{
+  "status": "SUCCESS",
+  "payload": {
+    "positions": [
+      {
+        "trading_symbol": "NIFTY25OCT24500CE",
+        "credit_quantity": 75,
+        "credit_price": 11240,
+        "debit_quantity": 0,
+        "debit_price": 0,
+        "carry_forward_credit_quantity": 0,
+        "carry_forward_debit_quantity": 0,
+        "exchange": "NSE",
+        "symbol_isin": "",
+        "quantity": 75,
+        "product": "NRML",
+        "net_price": 112.4,
+        "segment": "FNO"
+      }
+    ]
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "status": "SUCCESS",
+  "payload": {
+    "bid_price": null,
+    "offer_price": null,
+    "ohlc": {"open": 105.0, "high": 120.5, "low": 98.0, "close": 101.2},
+    "depth": {
+      "buy": [
+        {"price": 112.35, "quantity": 1500},
+        {"price": 0, "quantity": 0}
+      ],
+      "sell": [
+        {"price": 112.5, "quantity": 2250}
+      ]
+    },
+    "last_price": 112.4,
+    "last_trade_quantity": 75,
+    "open_interest": 4567800,
+    "total_buy_quantity": 900000,
+    "total_sell_quantity": 870000,
+    "total_volume": 12345675
+  }
+}

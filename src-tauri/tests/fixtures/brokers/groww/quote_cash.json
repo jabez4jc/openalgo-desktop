@@ -1,0 +1,42 @@
+{
+  "status": "SUCCESS",
+  "payload": {
+    "average_price": 811.2,
+    "bid_quantity": 120,
+    "bid_price": 812.3,
+    "day_change": 4.35,
+    "day_change_perc": 0.54,
+    "upper_circuit_limit": 889.6,
+    "lower_circuit_limit": 727.9,
+    "ohlc": "{open: 809.00,high: 815.50,low: 806.25,close: 808.00}",
+    "depth": {
+      "buy": [
+        {"price": 812.3, "quantity": 120},
+        {"price": 812.25, "quantity": 300},
+        {"price": 812.2, "quantity": 45}
+      ],
+      "sell": [
+        {"price": 812.4, "quantity": 80},
+        {"price": 812.45, "quantity": 500}
+      ]
+    },
+    "high_trade_range": null,
+    "implied_volatility": null,
+    "last_trade_quantity": 7,
+    "last_trade_time": 1759722011000,
+    "low_trade_range": null,
+    "last_price": 812.35,
+    "market_cap": null,
+    "offer_price": 812.4,
+    "offer_quantity": 80,
+    "oi_day_change": 0,
+    "oi_day_change_percentage": 0,
+    "open_interest": null,
+    "previous_open_interest": null,
+    "total_buy_quantity": 245000,
+    "total_sell_quantity": 198000,
+    "volume": 5123400,
+    "week_52_high": 912.1,
+    "week_52_low": 680.0
+  }
+}

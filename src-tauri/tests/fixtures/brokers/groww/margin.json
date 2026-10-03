@@ -1,0 +1,12 @@
+{
+  "status": "SUCCESS",
+  "payload": {
+    "exposure_required": 23000.5,
+    "span_required": 98000.25,
+    "option_buy_premium": 0,
+    "brokerage_and_charges": {"brokerage": 40},
+    "total_requirement": 121000.75,
+    "cash_cnc_margin_required": 0,
+    "physical_delivery_margin_requirement": 0
+  }
+}

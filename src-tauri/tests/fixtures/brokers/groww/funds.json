@@ -1,0 +1,27 @@
+{
+  "status": "SUCCESS",
+  "payload": {
+    "clear_cash": 125000.5,
+    "net_margin_used": 23500.25,
+    "brokerage_and_charges": 40.5,
+    "collateral_used": 0,
+    "collateral_available": 15000,
+    "adhoc_margin": 0,
+    "fno_margin_details": {
+      "net_fno_margin_used": 20000,
+      "span_margin_used": 15000,
+      "exposure_margin_used": 5000,
+      "future_balance_available": 101500,
+      "option_buy_balance_available": 101500,
+      "option_sell_balance_available": 101500
+    },
+    "equity_margin_details": {
+      "net_equity_margin_used": 3500.25,
+      "cnc_margin_used": 3000,
+      "mis_margin_used": 500.25,
+      "cnc_balance_available": 101500,
+      "mis_balance_available": 101500
+    },
+    "commodity_margin_details": {}
+  }
+}

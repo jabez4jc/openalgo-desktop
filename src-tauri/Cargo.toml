@@ -62,6 +62,13 @@ futures-util = "0.3"
 
 # Binary parsing
 byteorder = "1.5"
+# Protobuf market-data feeds (Upstox V3, Groww); message types are checked
+# in (no protoc at build time).
+prost = "0.14"
+# Gzip master contracts (Upstox).
+flate2 = "1"
+# NATS nkey signatures for the Groww feed.
+ed25519-dalek = "2"
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }

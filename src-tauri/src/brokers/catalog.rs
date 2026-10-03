@@ -84,13 +84,53 @@ pub fn authorize_url(
             enc(redirect_url),
             enc(state)
         )),
-        "upstox" => Some(format!(
+        "upstox" => {
+            // The code exchange must repeat this redirect byte for byte.
+            crate::brokers::upstox::remember_redirect_uri(redirect_url);
+            Some(format!(
             "https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id={}&redirect_uri={}&state={}",
             enc(api_key),
             enc(redirect_url),
             enc(state)
-        )),
+        ))
+        }
         _ => None,
+    }
+}
+
+/// One field of a broker's in-app login form.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+pub struct LoginField {
+    /// Form field name posted to `/<broker>/callback`.
+    pub name: &'static str,
+    /// Label shown to the trader.
+    pub label: &'static str,
+    /// Masked input; never echoed back.
+    pub secret: bool,
+    pub required: bool,
+}
+
+/// Extra fields a broker's login form shows (beyond the stored API key and
+/// secret). Empty for brokers that sign in by redirect or need nothing.
+pub fn login_fields(broker: &str) -> &'static [LoginField] {
+    match broker {
+        // Groww: TOTP for a TOTP API key, or a pasted access token; with
+        // neither, the stored API key and secret sign in (approval flow).
+        "groww" => &[
+            LoginField {
+                name: "totp",
+                label: "TOTP (if your Groww API key uses TOTP)",
+                secret: true,
+                required: false,
+            },
+            LoginField {
+                name: "password",
+                label: "Access token (if you paste one from Groww)",
+                secret: true,
+                required: false,
+            },
+        ],
+        _ => &[],
     }
 }
 
@@ -162,6 +202,16 @@ mod tests {
         assert!(f.contains("state=st2"));
         assert!(f.contains("redirect_uri=http%3A%2F%2F127.0.0.1%3A5000%2Ffyers%2Fcallback"));
         assert!(authorize_url("angel", "k", "r", "s").is_none());
+    }
+
+    #[test]
+    fn groww_login_fields_are_optional_secrets() {
+        let f = login_fields("groww");
+        assert_eq!(f.len(), 2);
+        assert_eq!((f[0].name, f[1].name), ("totp", "password"));
+        assert!(f.iter().all(|x| x.secret && !x.required));
+        assert_eq!(auth_type("groww"), AuthType::Form);
+        assert!(login_fields("zerodha").is_empty());
     }
 
     #[test]
