@@ -11,13 +11,18 @@ pub mod catalog;
 pub mod common;
 pub mod dhan;
 pub mod dhan_sandbox;
+pub mod families;
+pub mod flattrade;
 pub mod fyers;
 pub mod groww;
 pub mod kotak;
 #[cfg(any(test, feature = "test-support"))]
 pub mod mock;
+pub mod shoonya;
+pub mod tradesmart;
 pub mod types;
 pub mod upstox;
+pub mod zebu;
 pub mod zerodha;
 
 use crate::error::{AppError, Result};
@@ -312,6 +317,10 @@ impl BrokerRegistry {
             Arc::new(dhan::DhanBroker::new(symbols.clone())),
             Arc::new(dhan_sandbox::broker(symbols.clone())),
             Arc::new(kotak::KotakBroker::new(symbols.clone())),
+            Arc::new(shoonya::broker(symbols.clone())),
+            Arc::new(flattrade::broker(symbols.clone())),
+            Arc::new(tradesmart::broker(symbols.clone())),
+            Arc::new(zebu::broker(symbols.clone())),
         ];
         Self::with_symbols(symbols, brokers)
     }
@@ -381,10 +390,14 @@ mod tests {
                 "angel",
                 "dhan",
                 "dhan_sandbox",
+                "flattrade",
                 "fyers",
                 "groww",
                 "kotak",
+                "shoonya",
+                "tradesmart",
                 "upstox",
+                "zebu",
                 "zerodha"
             ]
         );

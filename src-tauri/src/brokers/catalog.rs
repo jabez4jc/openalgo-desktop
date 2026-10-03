@@ -57,7 +57,8 @@ pub const ALL_BROKERS: &[&str] = &[
 pub fn auth_type(broker: &str) -> AuthType {
     match broker {
         "zerodha" | "fyers" | "upstox" | "dhan" | "arrow" | "paytm" | "pocketful" | "hdfcsky"
-        | "hdfcsecurities" | "flattrade" | "compositedge" | "iiflcapital" => AuthType::OAuth,
+        | "hdfcsecurities" | "flattrade" | "compositedge" | "iiflcapital" | "shoonya" | "zebu"
+        | "tradesmart" => AuthType::OAuth,
         _ => AuthType::Form,
     }
 }
@@ -94,6 +95,28 @@ pub fn authorize_url(
             enc(state)
         ))
         }
+        // Noren family: the authorize URL takes the app key (the half
+        // after `:::` of a `userid:::key` entry).
+        "shoonya" => Some(crate::brokers::families::noren::authorize_url(
+            crate::brokers::shoonya::config(),
+            api_key,
+            state,
+        )),
+        "zebu" => Some(crate::brokers::families::noren::authorize_url(
+            crate::brokers::zebu::config(),
+            api_key,
+            state,
+        )),
+        "tradesmart" => Some(crate::brokers::families::noren::authorize_url(
+            crate::brokers::tradesmart::config(),
+            api_key,
+            state,
+        )),
+        "flattrade" => Some(crate::brokers::families::noren::authorize_url(
+            crate::brokers::flattrade::config(),
+            api_key,
+            state,
+        )),
         _ => None,
     }
 }
