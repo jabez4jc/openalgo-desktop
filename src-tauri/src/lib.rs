@@ -11,6 +11,7 @@ pub mod config;
 pub mod db;
 pub mod error;
 pub mod events;
+pub mod feed;
 pub mod sandbox;
 pub mod security;
 pub mod server;
@@ -49,12 +50,17 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             let data_dir = app.path().app_data_dir()?;
-            let (ctx, server) = tauri::async_runtime::block_on(async {
+            let (ctx, server, feed) = tauri::async_runtime::block_on(async {
                 let ctx = AppState::open_default(&data_dir)?;
                 session::spawn_expiry_task(ctx.clone());
                 let server = server::start(ctx.clone()).await.ok();
-                Ok::<_, error::AppError>((ctx, server))
+                // Market data feed for SDK clients; a taken port is kept in
+                // its status with a trader-facing message.
+                let feed = feed::FeedService::new(ctx.clone());
+                feed.start().await;
+                Ok::<_, error::AppError>((ctx, server, feed))
             })?;
+            app.manage(feed);
 
             let url = if server.is_none() {
                 // Start-up page explaining why the server is not running.
@@ -101,7 +107,11 @@ pub fn run() {
         if let RunEvent::Exit = event {
             if let Some(shell) = handle.try_state::<ShellState>() {
                 let ctx: Arc<AppState> = shell.ctx.clone();
+                let feed = handle.try_state::<Arc<feed::FeedService>>();
                 tauri::async_runtime::block_on(async {
+                    if let Some(f) = feed {
+                        f.stop().await;
+                    }
                     if let Some(h) = shell.server.lock().await.take() {
                         h.stop().await;
                     }
