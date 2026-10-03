@@ -1,0 +1,340 @@
+# CLAUDE.md
+
+Guidance for Claude Code working in this repository. This file carries what is
+**not discoverable by reading the code**: product context, invariants, runtime
+constraints and conventions. Structure and commands are discoverable; read them
+from the repo.
+
+## Overview
+
+OpenAlgo Desktop is a **single-user, cross-platform desktop port of OpenAlgo
+web** (https://github.com/marketcalls/openalgo, about 2 lakh users). It is built
+with Tauri 2, a Rust backend and the OpenAlgo React frontend.
+
+One person installs it on their own machine, signs in, connects one broker and
+trades. There is no server to set up and **no `.env` file**: every credential
+and setting is entered and managed inside the app.
+
+Target platforms, all first-class:
+
+| Platform | Notes |
+| --- | --- |
+| Windows 10/11 x64 | NSIS installer, per-user install |
+| macOS Intel and Apple Silicon | `.dmg` |
+| Linux x64 | AppImage and `.deb` |
+| Raspberry Pi (Linux aarch64) | AppImage and `.deb`. Every native dependency must compile on ARM64 Linux; CI builds it. |
+
+OpenAlgo web users run on desktops, Raspberry Pi, Linux servers and Macs. A
+change that only works on the machine it was written on is not done.
+
+## The compatibility contract
+
+**Anything that works against OpenAlgo web must work against OpenAlgo Desktop
+unchanged.** The Python SDK, TradingView, Amibroker, Chartink, GoCharting,
+Excel and MCP clients are written against the web's wire format. The desktop is
+a drop-in replacement for them.
+
+- **`/api/v1/*` on `http://127.0.0.1:5000`** accepts the same requests and
+  returns the same responses as the web, field for field: key names, status
+  strings, flat versus `{status, data}` envelopes, error shapes, HTTP codes,
+  number types, date and timestamp formats.
+- **The WebSocket feed on `ws://127.0.0.1:8765`** speaks the web protocol:
+  `authenticate`, `subscribe` / `unsubscribe` / `unsubscribe_all`, modes 1/2/3,
+  depth 5/20/30/50, `market_data` frames, the order-update stream, `ping`, the
+  error frame and the 4401 auth-timeout close.
+- **The UI** looks and behaves like the web. The frontend is carried over from
+  the web nearly verbatim; it is not a redesign.
+
+The contract is defined by the web, not by this repo. Sources, in order of
+authority:
+
+1. Golden fixtures recorded from a live web instance, in `tests/fixtures/`
+   (REST request/response pairs and WebSocket transcripts). A contract test
+   that disagrees with a fixture is a desktop bug.
+2. The web docs (the web repo is read-only reference; never edit it):
+   `openalgo/docs/api/**`, `docs/prompt/services_documentation.md`,
+   `docs/prompt/symbol-format.md`, `docs/prompt/crypto-symbol-format.md`,
+   `docs/prompt/order-constants.md`, `docs/prompt/websockets-format.md`,
+   `docs/prompt/openalgo python sdk.md`.
+3. The web implementation: `restx_api/*.py` and `restx_api/schemas.py` for
+   request validation, `services/*.py` for response dicts,
+   `websocket_proxy/server.py` for the streaming protocol.
+
+Observed quirks that are part of the contract and must be reproduced, not
+"fixed":
+
+- The API key is read from the JSON body. The `X-API-KEY` header is not honoured
+  by `/api/v1` endpoints on the web; a client sending only the header gets the
+  400 "missing field" error there, and gets the same here.
+- `optionsymbol`, `optionchain`, `optiongreeks`, `syntheticfuture` and
+  `openposition` return flat objects; `multiquotes` uses `results`.
+- Validation errors carry `message` as an object of field errors; business
+  errors carry a string. Invalid API key is 403. Wrong HTTP method is 404.
+- `/expiry` returns `DD-MMM-YY`; `/optiongreeks` returns `DD-Mon-YYYY`; history
+  and ticker candles are epoch seconds; holidays, timings and WebSocket
+  timestamps are epoch milliseconds.
+- Rate limit is 100 per second per IP, moving window, no rate-limit headers.
+
+## Ports
+
+| Listener | Shipped default | Development on the maintainer's Mac |
+| --- | --- | --- |
+| HTTP (UI, `/api/v1`, broker OAuth callbacks, `/mcp`) | `127.0.0.1:5000` | `127.0.0.1:5500` |
+| WebSocket feed | `127.0.0.1:8765` | `127.0.0.1:8766` |
+
+The maintainer runs OpenAlgo web on 5000 and 8765 on the same machine, so local
+testing uses the development ports. The shipped default stays 5000 and 8765 so
+`http://127.0.0.1:5000/dashboard`, SDK base URLs and broker app redirect URLs
+(`http://127.0.0.1:5000/<broker>/callback`, byte-identical to the web
+convention) carry over from web to desktop untouched. Both ports, the bind host
+and the LAN toggle are changeable in-app. Loopback is the default bind; binding
+beyond loopback is an explicit user choice.
+
+A port already in use (macOS AirPlay holds 5000 on many Macs) must be reported
+to the user in the app with the fix, never only logged.
+
+## Architecture
+
+```
+Tauri window ---- loads ----> http://127.0.0.1:5000  (React app, same as web)
+                                     |
+  External clients (SDK, TradingView, Amibroker, MCP) --+
+                                     |
+                         axum HTTP server  +  Socket.IO (socketioxide)
+                                     |                 ws://:8765 feed server
+                               service layer  <---- event bus ----> subscribers
+                              /      |       \
+                  sandbox engine  broker adapters  symbol master / DBs
+                                     |
+                           broker REST + streaming feeds
+```
+
+- **The Rust server owns everything.** Business logic lives in the service
+  layer, never in a Tauri command or an HTTP handler. Commands and handlers
+  validate, call a service, and shape the response.
+- **The frontend talks HTTP and Socket.IO to the local server**, like the web
+  frontend talks to Flask. Tauri `invoke` is reserved for things only the shell
+  can do (window control, opening the browser, OS keychain prompts). This is
+  what lets the web frontend be carried over with minimal edits, and what lets a
+  browser open the same dashboard.
+- **Event driven, like the web.** Every order operation publishes an event on
+  the in-process bus (topics mirror the web's `events/` package: `order.placed`,
+  `order.failed`, `order.modified`, `order.cancelled`, `order.update`,
+  `position.closed`, `orders.all_cancelled`, `basket.completed`,
+  `split.completed`, `sandbox.order_filled`, `sandbox.auto_squareoff`,
+  `sandbox.t1_settlement`, `analyzer.error`, GTT topics). Subscribers do the side
+  effects: logging, Socket.IO pushes (`order_event`, `order_update`,
+  `analyzer_update`, `cache_loaded`, `master_contract_download`), alerts. The UI
+  refreshes on those pushes; it does not poll. A new side effect is a new
+  subscriber, never a line added to the order path.
+- **Databases**, mirroring the web's isolation: main SQLite, logs SQLite,
+  `sandbox.db` (fully isolated from live), latency, and DuckDB for Historify.
+  Column names follow the web schemas so fixtures and ported tests line up.
+
+### Brokers
+
+All 36 web brokers plus Delta Exchange (crypto) are in scope. They are built by
+**auth family**, not one by one:
+
+| Family | Implementation | Members |
+| --- | --- | --- |
+| Noren / Finvasia | generic `NorenBroker<Config>` with hooks | shoonya, flattrade, tradesmart, zebu (firstock is separate: own JSON transport) |
+| Symphony XTS | generic `XtsBroker<Config>` | fivepaisaxts, jainamxts, compositedge, rmoney, ibulls, wisdom, and others per the audit |
+| OAuth redirect | per broker | zerodha, upstox, fyers, dhan, groww, arrow, paytm, aliceblue, definedge, pocketful, hdfcsky, hdfcsecurities |
+| Direct login + TOTP | per broker | angel, kotak, mstock, motilal, samco, tradejini, fivepaisa, nubra, indmoney |
+| Bespoke | per broker | iiflcapital (REST + MQTT), deltaexchange (HMAC, `CRYPTO` exchange, leverage) |
+
+Priority order: zerodha, fyers, upstox, dhan, kotak, groww, angel, then the
+families. The broker's only job is translation between its shapes and the
+OpenAlgo common symbol, order and streaming formats. **Every book (orders,
+trades, positions, holdings) returns OpenAlgo symbols, never broker trading
+symbols**, or smart orders and close-position silently mismatch.
+
+The symbol master keeps every web `SymToken` column (`symbol`, `brsymbol`,
+`exchange`, `brexchange`, `token`, `expiry` as `DD-MMM-YY`, `strike`,
+`lotsize`, `instrumenttype`, `tick_size`). Dropping a column breaks expiry
+pickers and option chains.
+
+### Sandbox (analyzer mode) is mandatory
+
+Sandbox mode is a core product, not a demo. With analyzer mode on, **every**
+order and account service short-circuits to the sandbox engine before any
+broker call, and responses carry the web's analyze-mode shapes.
+
+The engine mirrors the web's `sandbox/` package: 1 crore default capital;
+margin blocked on placement and netted against opposite positions; MARKET fills
+at LTP (bid/ask when available); LIMIT, SL and SL-M fill from live ticks with a
+polling fallback when the feed is stale; weighted-average netting with realized
+P&L on reduce and average reset on reversal; T+1 settlement of CNC to holdings;
+exchange-aligned MIS auto square-off at the web's configured times; the 03:00
+IST session boundary; GTT; catch-up after the app was closed. Use exact decimal
+arithmetic for money. Time comes from an injected clock so tests are
+deterministic.
+
+### Risk rules live in one place
+
+When the strategy module and RMS land, stop, target, trailing and aggregate
+rules live in one pure Rust module with no I/O: no database, broker, clock or
+logging. Every input is an argument and every decision is a return value.
+Consumers translate, they do not decide. The web's `test/risk/vectors.json` is
+the contract; the Rust core must pass every vector.
+
+### An order path decides once, under the lock
+
+Learned by the web from defects that reversed real positions; they apply here
+unchanged:
+
+- **Claim under the same lock that checks.** The duplicate check and the claim
+  marker are written in one hold, before dispatch. A refused dispatch releases
+  the claim.
+- **Match a fill to the order it belongs to, not to the leg.**
+- **A caller that has already decided the destination says so.** Code exiting a
+  position it opened passes `force_live` rather than re-reading the global
+  analyzer toggle.
+- A stop whose exit orders were refused leaves the run open and managed.
+
+## Security model
+
+Single user, local machine. Whoever controls the OS account controls the app;
+the job is to keep secrets off disk in usable form, out of logs, and away from
+anything that is not the signed-in user.
+
+- **No `.env`, no plaintext secrets on disk.** The data-encryption key and the
+  API-key pepper live in the OS keychain (macOS Keychain, Windows Credential
+  Manager, Linux Secret Service). Where no keychain exists (headless Linux,
+  some Raspberry Pi setups), fall back to a key derived from the user's password
+  and say so in the UI. A hard-coded or XOR-obfuscated key is not encryption.
+- Broker credentials and tokens are AES-256-GCM encrypted with associated data
+  binding each ciphertext to its row and column.
+- **Secrets never leave Rust.** No command or endpoint returns a stored broker
+  secret, password or API key in plaintext after it is saved. Broker OAuth code
+  exchange happens in Rust inside the callback handler, which verifies `state`.
+- **Every Tauri command and every non-public HTTP route requires the signed-in
+  user.** Public routes are the explicit list: `/api/v1/*` (API key), broker
+  callbacks (state-verified), webhook endpoints (secret-verified), static
+  assets.
+- Strict CSP, `withGlobalTauri: false`, devtools off in release builds,
+  `shell:allow-open` scoped to http(s).
+- API keys are verified through an HMAC index plus Argon2, with a short cache;
+  login and API-key failures are throttled per IP.
+- Logs never contain API keys, tokens, OAuth codes, passwords, TOTP secrets or
+  full request bodies of authenticated calls. Wrap secrets in a type whose
+  `Debug` is redacted. Release log level is `info`.
+- Broker tokens expire around 03:00 IST. The stored session resumes after
+  password login until that boundary, then is revoked. Logout revokes it.
+
+## Resource hygiene (no leaks)
+
+The app is a long-lived process: open all trading day, reconnecting broker
+feeds through outages. Anything leaked per request, per tick or per reconnect
+accumulates until the process dies. This is the Rust form of the web's
+`fd-audit` skill; run through it after any change that touches the items
+below, and treat a wave as unfinished until it has been done.
+
+**Descriptors**
+- One shared `reqwest::Client` per process (or per broker), every request with
+  an explicit timeout. Never a client per call.
+- SQLite through the pool; connections returned promptly; never hold one across
+  an `.await` on network I/O. DuckDB connections closed on every path.
+- WebSocket adapters close the old socket before reconnecting, on the error
+  path and in retry loops, with capped backoff.
+- Every spawned tokio task is owned: a `JoinHandle` or `JoinSet` kept and
+  aborted on shutdown, disconnect or broker logout. No fire-and-forget loops.
+- Listeners are shut down gracefully on app exit and on port change.
+
+**Memory**
+- Every cache has a bound and an expiry. A `HashMap` keyed by symbol, order id,
+  request id or client is unbounded unless something evicts it.
+- Every subscription has a matching removal that also runs on the error path:
+  bus subscribers, Socket.IO rooms, feed subscriptions per client, per-symbol
+  registries.
+- Channels are bounded. `broadcast` receivers handle `Lagged` instead of
+  silently growing or dying.
+- Do not retain large payloads (master contract, history, option chains)
+  beyond the request that built them.
+
+**Measure, do not just read.** For a suspected leak, drive the path 100+ times
+and sample descriptors (`lsof -p <pid> | wc -l`) and RSS (`ps -o rss= -p <pid>`)
+before and after. A flat count is proof; a plateau is a cache filling; a line is
+a leak. Report a leak with file, line, the exit path that misses the release,
+and what bounds it, before fixing.
+
+## Scope decisions
+
+In scope: everything OpenAlgo web offers, including the `/trading` charting
+terminal, scalping, the strategy module and RMS, options tools, Historify,
+Action Center, Playground, API key management, logs, monitoring, sandbox, all
+brokers, MCP.
+
+Out of scope, by the maintainer's decision (2026-10-03), so the desktop needs
+no Python runtime:
+
+- Python Strategy Host (`/python`)
+- Flow (`/flow`)
+- pandas-based backtesters: Portfolio Backtester, SIP Backtester, Portfolio
+  Analyzer
+
+Decided:
+
+- **OpenScript** runs on the existing TypeScript engine (`openalgo-script`).
+  Backtests already run in a Web Worker. Live runs use the same engine in a
+  hidden Tauri window fed by the event bus, so backtest and live cannot drift.
+  No Rust OpenScript engine until a cross-engine conformance corpus exists.
+- **MCP** is native Rust (`rmcp`): one tool registry mapping to services, served
+  over stdio (the app binary with an `mcp` subcommand) and streamable HTTP at
+  `/mcp`. Tool names, descriptions and input schemas match the web's MCP server
+  and are pinned by a contract test. Full OAuth for remote connectors comes
+  later; first version uses a scoped token from the API key page.
+
+Open: Telegram bot, WhatsApp bot and the Agent depend on Python packages in the
+web; their desktop form is decided when those waves start.
+
+## Testing
+
+Testing is a deliverable, not a final pass. A change is done when its tests
+are in the same commit.
+
+- **Rust unit tests** for every broker mapping, using recorded broker payloads
+  as fixtures; every service against a mock `Broker`; property tests (proptest)
+  for symbol parsing and sandbox netting invariants.
+- **HTTP contract tests** against the axum server using the golden fixtures:
+  same request in, same status and body shape out.
+- **WebSocket protocol tests** with a real client against the 8765 server,
+  replaying the recorded transcripts.
+- **Migration tests** on populated databases, not only empty ones.
+- **Web suites re-targeted**: the web's API-level tests that only speak HTTP are
+  run against the desktop on the development port.
+- **Frontend**: Vitest unit and component tests carried over from the web with
+  the pages, axe accessibility tests, Playwright end-to-end.
+- **CI** runs all of it on Linux x64, Linux ARM64, macOS and Windows, with
+  coverage reported. `cargo fmt --check`, `cargo clippy -D warnings` and
+  `biome check` must be clean.
+
+The maintainer's live OpenAlgo web instance can be used to record new fixtures.
+Never commit an API key, account id or email into a fixture; use the
+`<APIKEY>`, `<USER_ID>`, `<EMAIL>` placeholders.
+
+## Conventions
+
+- **Rust**: `cargo fmt`, `cargo clippy -- -D warnings`. `tracing` for logs;
+  errors logged with context once, at the boundary that handles them. No
+  `unwrap()` or `expect()` on runtime data paths. Business logic in services.
+- **TypeScript/React**: Biome, functional components with hooks, PascalCase
+  component files, TanStack Query for server state. Keep files close to their
+  web originals so future web changes can be carried over by diff.
+- **Every message a user reads is written for a trader, not a developer.** Name
+  the cause and the next action. Never show a status code, exception, protocol
+  term or endpoint; the technical detail goes to the log.
+- **Vocabulary**: "sandbox mode" and "analyzer mode", never "paper trading" or
+  "virtual trading". Never "arm", "armed" or "arming" where a trader reads it:
+  an alert is Active or Stopped, a destination is Live or Sandbox.
+- **No icons or emojis anywhere**: source, comments, logs, commits, PRs,
+  changelogs, release notes.
+- **Commits**: Conventional Commits (`feat:`, `fix:`, `docs:`, `refactor:`,
+  `test:`, `chore:`, `ci:`). Commit and push to GitHub at every checkpoint
+  where a module builds with its tests green; nobody else uses this repo yet.
+- **Schema changes ship as numbered, idempotent migrations** that check before
+  altering, never clobber a user-customised value, and backfill from existing
+  data rather than a default.
+- **Adding a page**: the route in the frontend router, the same path served by
+  the Rust server's SPA fallback, and the navigation entry, in one change.
