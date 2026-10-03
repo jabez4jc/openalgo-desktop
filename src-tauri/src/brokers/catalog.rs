@@ -84,12 +84,16 @@ pub fn authorize_url(
             enc(redirect_url),
             enc(state)
         )),
-        "upstox" => Some(format!(
+        "upstox" => {
+            // The code exchange must repeat this redirect byte for byte.
+            crate::brokers::upstox::remember_redirect_uri(redirect_url);
+            Some(format!(
             "https://api.upstox.com/v2/login/authorization/dialog?response_type=code&client_id={}&redirect_uri={}&state={}",
             enc(api_key),
             enc(redirect_url),
             enc(state)
-        )),
+        ))
+        }
         _ => None,
     }
 }

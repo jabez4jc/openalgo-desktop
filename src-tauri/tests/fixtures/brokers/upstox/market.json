@@ -1,0 +1,115 @@
+{
+  "quotes": {
+    "status": "success",
+    "data": {
+      "NSE_EQ:RELIANCE": {
+        "ohlc": {"open": 1400.0, "high": 1415.5, "low": 1395.1, "close": 1410.2},
+        "depth": {
+          "buy": [
+            {"quantity": 120, "price": 1410.1, "orders": 3},
+            {"quantity": 80, "price": 1410.0, "orders": 2},
+            {"quantity": 55, "price": 1409.9, "orders": 1}
+          ],
+          "sell": [
+            {"quantity": 40, "price": 1410.3, "orders": 1},
+            {"quantity": 66, "price": 1410.4, "orders": 2}
+          ]
+        },
+        "timestamp": "2026-09-21T15:29:59.123+05:30",
+        "instrument_token": "NSE_EQ|INE002A01018",
+        "symbol": "RELIANCE",
+        "last_price": 1410.2,
+        "volume": 5123456,
+        "average_price": 1405.3,
+        "oi": 0,
+        "net_change": 12.2,
+        "total_buy_quantity": 300000,
+        "total_sell_quantity": 250000,
+        "lower_circuit_limit": 1258.2,
+        "upper_circuit_limit": 1537.8,
+        "last_trade_time": "1758448799000",
+        "prev_close_price": 1398.0
+      },
+      "NSE_FO:NIFTY2610624500CE": {
+        "ohlc": {"open": 110.0, "high": 125.0, "low": 95.0, "close": 101.2},
+        "depth": {"buy": [{"quantity": 750, "price": 101.15, "orders": 4}], "sell": [{"quantity": 375, "price": 101.25, "orders": 2}]},
+        "timestamp": "2026-09-21T15:29:58.001+05:30",
+        "instrument_token": "NSE_FO|40551",
+        "symbol": "NIFTY2610624500CE",
+        "last_price": 101.2,
+        "volume": 9876000,
+        "oi": 4523100,
+        "total_buy_quantity": 120000,
+        "total_sell_quantity": 98000,
+        "prev_close_price": 118.4
+      },
+      "NSE_INDEX:Nifty 50": {
+        "ohlc": {"open": 24480.1, "high": 24560.0, "low": 24420.3, "close": 24512.35},
+        "timestamp": "2026-09-21T15:30:00.000+05:30",
+        "instrument_token": "NSE_INDEX|Nifty 50",
+        "symbol": "NIFTY 50",
+        "last_price": 24512.35,
+        "volume": 0,
+        "oi": 0,
+        "prev_close_price": 24450.0
+      }
+    }
+  },
+  "indicator_ltp": {
+    "status": "success",
+    "data": {
+      "GLOBAL_INDICATOR:null": {"last_price": 66.42, "instrument_token": "GLOBAL_INDICATOR|BZUSD", "ltq": 0, "volume": 0, "cp": 65.9}
+    }
+  },
+  "history_day": {
+    "status": "success",
+    "data": {
+      "candles": [
+        ["2026-09-18T00:00:00+05:30", 1385.0, 1399.0, 1380.2, 1398.0, 4300000, 0],
+        ["2026-09-17T00:00:00+05:30", 1370.0, 1388.0, 1366.0, 1384.5, 5100000, 0]
+      ]
+    }
+  },
+  "history_minute": {
+    "status": "success",
+    "data": {
+      "candles": [
+        ["2026-09-18T09:16:00+05:30", 1386.0, 1387.5, 1385.1, 1387.0, 21000, 0],
+        ["2026-09-18T09:15:00+05:30", 1385.0, 1386.4, 1384.0, 1386.0, 54000, 0]
+      ]
+    }
+  },
+  "gtt_book": {
+    "status": "success",
+    "data": [
+      {
+        "type": "SINGLE", "exchange": "NSE_EQ", "quantity": 10, "product": "D",
+        "rules": [{"strategy": "ENTRY", "trigger_type": "BELOW", "trigger_price": 1350.0, "transaction_type": "BUY", "status": "SCHEDULED", "order_id": null}],
+        "trading_symbol": "RELIANCE", "instrument_token": "NSE_EQ|INE002A01018",
+        "gtt_order_id": "GTT-C26210900001", "expires_at": 1790000000000000, "created_at": 1758448799000000
+      },
+      {
+        "type": "MULTIPLE", "exchange": "NSE_FO", "quantity": 75, "product": "I",
+        "rules": [
+          {"strategy": "ENTRY", "trigger_type": "IMMEDIATE", "trigger_price": 101.2, "transaction_type": "BUY", "status": "COMPLETED"},
+          {"strategy": "TARGET", "trigger_type": "IMMEDIATE", "trigger_price": 140.0, "transaction_type": "SELL", "status": "INACTIVE"},
+          {"strategy": "STOPLOSS", "trigger_type": "IMMEDIATE", "trigger_price": 80.0, "transaction_type": "SELL", "status": "INACTIVE"}
+        ],
+        "trading_symbol": "NIFTY2610624500CE", "instrument_token": "NSE_FO|40551",
+        "gtt_order_id": "GTT-C26210900002", "expires_at": "1790000000000000", "created_at": 1758448799000
+      },
+      {
+        "type": "SINGLE", "exchange": "NSE_EQ", "quantity": 1, "product": "D",
+        "rules": [{"strategy": "ENTRY", "trigger_type": "ABOVE", "trigger_price": 600.0, "transaction_type": "SELL", "status": "CANCELLED"}],
+        "trading_symbol": "SBIN", "instrument_token": "NSE_EQ|INE062A01020",
+        "gtt_order_id": "GTT-C26210900003", "created_at": 1758448799
+      }
+    ]
+  },
+  "gtt_place_ok": {"status": "success", "data": {"gtt_order_ids": ["GTT-C26210900009"]}, "metadata": {"latency": 40}},
+  "order_updates": [
+    {"update_type": "order", "user_id": "<USER_ID>", "userId": "<USER_ID>", "exchange": "NSE", "instrument_token": "NSE_EQ|INE848E01016", "instrument_key": "NSE_EQ|INE848E01016", "trading_symbol": "NHPC-EQ", "tradingsymbol": "NHPC-EQ", "product": "D", "order_type": "LIMIT", "average_price": 0, "price": 77.0, "trigger_price": 0, "quantity": 10, "disclosed_quantity": 0, "pending_quantity": 10, "transaction_type": "BUY", "order_ref_id": "", "exchange_order_id": "1300000000000001", "parent_order_id": null, "validity": "DAY", "status": "open", "is_amo": false, "variety": "SIMPLE", "tag": "openalgo", "exchange_timestamp": "2026-09-21 10:11:12", "status_message": "", "order_id": "260921000000001", "order_request_id": "1", "order_timestamp": "2026-09-21 10:11:12", "filled_quantity": 0, "guid": ""},
+    {"update_type": "order", "exchange": "NFO", "instrument_token": "NSE_FO|40551", "trading_symbol": "NIFTY2610624500CE", "product": "I", "order_type": "SL", "price": 95.0, "trigger_price": 96.0, "quantity": 75, "transaction_type": "SELL", "status": "rejected", "status_message": "RMS: margin shortfall", "order_id": "260921000000002", "filled_quantity": 0, "pending_quantity": 0, "average_price": 0},
+    {"update_type": "position", "exchange": "NSE", "instrument_token": "NSE_EQ|INE848E01016", "quantity": 10}
+  ]
+}

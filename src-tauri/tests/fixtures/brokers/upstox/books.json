@@ -1,0 +1,64 @@
+{
+  "trades": {
+    "status": "success",
+    "data": [
+      {"exchange": "NSE", "product": "D", "trading_symbol": "SBIN-EQ", "tradingsymbol": "SBIN-EQ", "instrument_token": "NSE_EQ|INE062A01020", "order_type": "LIMIT", "transaction_type": "BUY", "quantity": 1, "exchange_order_id": "1300000025660919", "order_id": "260921025562880", "exchange_timestamp": "2026-09-21 13:25:56", "average_price": 570.95, "trade_id": "50091502", "order_ref_id": "", "order_timestamp": "2026-09-21 13:25:56"},
+      {"exchange": "NFO", "product": "I", "trading_symbol": "NIFTY2610624500CE", "instrument_token": "NSE_FO|40551", "order_type": "MARKET", "transaction_type": "SELL", "quantity": 75, "order_id": "260921025562890", "average_price": 101.2, "trade_id": "50091503", "order_timestamp": "2026-09-21 14:00:01"}
+    ]
+  },
+  "positions": {
+    "status": "success",
+    "data": [
+      {"exchange": "NSE", "multiplier": 1.0, "value": -571.0, "pnl": 2.5, "product": "D", "instrument_token": "NSE_EQ|INE062A01020", "average_price": null, "buy_value": 571.0, "overnight_quantity": 0, "day_buy_value": 571.0, "day_buy_price": 571.0, "overnight_buy_amount": 0.0, "overnight_buy_quantity": 0, "day_buy_quantity": 1, "day_sell_value": 0.0, "day_sell_price": 0.0, "overnight_sell_amount": 0.0, "overnight_sell_quantity": 0, "day_sell_quantity": 0, "quantity": 1, "last_price": 573.5, "unrealised": 2.5, "realised": 0.0, "sell_value": 0.0, "tradingsymbol": "SBIN-EQ", "trading_symbol": "SBIN-EQ", "close_price": 570.0, "buy_price": 0.0, "sell_price": 0.0},
+      {"exchange": "NFO", "multiplier": 1.0, "pnl": 300.0, "product": "I", "instrument_token": "NSE_FO|40551", "average_price": 101.2, "buy_value": 0.0, "overnight_quantity": 0, "day_buy_quantity": 0, "day_sell_quantity": 75, "day_sell_price": 101.2, "quantity": -75, "last_price": 97.2, "unrealised": 300.0, "realised": 0.0, "sell_value": 7590.0, "tradingsymbol": "NIFTY2610624500CE", "trading_symbol": "NIFTY2610624500CE", "buy_price": 0.0, "sell_price": 101.2},
+      {"exchange": "NSE", "multiplier": 1.0, "pnl": -40.0, "product": "I", "instrument_token": "NSE_EQ|INE002A01018", "average_price": 0.0, "buy_value": 7000.0, "day_buy_quantity": 5, "day_sell_quantity": 5, "quantity": 0, "last_price": 1392.0, "unrealised": 0.0, "realised": -40.0, "sell_value": 6960.0, "tradingsymbol": "RELIANCE", "buy_price": 1400.0, "sell_price": 1392.0}
+    ]
+  },
+  "holdings": {
+    "status": "success",
+    "data": [
+      {"isin": "INE848E01016", "cnc_used_quantity": 0, "collateral_type": "WC", "company_name": "NHPC LTD", "haircut": 0.2, "product": "D", "quantity": 36, "tradingsymbol": "NHPC-EQ", "trading_symbol": "NHPC-EQ", "last_price": 80.0, "close_price": 79.5, "pnl": 103.3333, "day_change": 0.5, "day_change_percentage": 0.63, "instrument_token": "NSE_EQ|INE848E01016", "average_price": 77.13, "collateral_quantity": 0, "collateral_update_quantity": 0, "t1_quantity": 2, "exchange": "NSE"},
+      {"isin": "INE002A01018", "product": "D", "quantity": 10, "tradingsymbol": "RELIANCE", "last_price": 1400.0, "close_price": 1398.0, "pnl": 0.0, "instrument_token": "NSE_EQ|INE002A01018", "average_price": null, "t1_quantity": 0, "exchange": "NSE"}
+    ]
+  },
+  "funds_v3": {
+    "status": "success",
+    "data": {
+      "available_to_trade": {
+        "cash_available_to_trade": {"total": 125000.5, "margin_used": {"total": 25000.25}},
+        "pledge_available_to_trade": {"margin_from_pledge": {"total": 50000.0}, "margin_used": {"total": 10000.0}}
+      }
+    }
+  },
+  "funds_service_hours": {
+    "status": "error",
+    "errors": [{"errorCode": "UDAPI100072", "message": "The Funds service is accessible from 5:30 AM to 12:00 AM IST daily", "propertyPath": null, "invalidValue": null, "error_code": "UDAPI100072", "property_path": null, "invalid_value": null}]
+  },
+  "margin": {
+    "status": "success",
+    "data": {
+      "margins": [
+        {"equity_margin": 0, "total_margin": 158212.5, "exposure_margin": 31500.0, "tender_margin": 0, "span_margin": 126712.5, "net_buy_premium": 0, "additional_margin": 0},
+        {"equity_margin": 0, "total_margin": 7590.0, "exposure_margin": 0.0, "tender_margin": 0, "span_margin": 0.0, "net_buy_premium": 7590.0, "additional_margin": 0}
+      ],
+      "required_margin": 165802.5,
+      "final_margin": 120000.0
+    }
+  },
+  "token_expired": {
+    "status": "error",
+    "errors": [{"errorCode": "UDAPI100050", "message": "Invalid token used to access API", "propertyPath": null, "invalidValue": null, "error_code": "UDAPI100050"}]
+  },
+  "order_rejected": {
+    "status": "error",
+    "errors": [{"errorCode": "UDAPI1040", "message": "Price not required", "propertyPath": null, "invalidValue": null}]
+  },
+  "rate_limited": {
+    "status": "error",
+    "errors": [{"error_code": "UDAPI10005", "message": "Too Many Request Sent"}]
+  },
+  "place_ok": {"status": "success", "data": {"order_ids": ["1644490272000", "1644490272001"]}, "metadata": {"latency": 30}},
+  "modify_ok": {"status": "success", "data": {"order_id": "1644490272000"}, "metadata": {"latency": 30}},
+  "token_ok": {"email": "<EMAIL>", "exchanges": ["NSE", "NFO", "BSE", "CDS", "BFO", "BCD", "MCX"], "products": ["D", "CO", "I"], "broker": "UPSTOX", "user_id": "<USER_ID>", "user_name": "Trader", "order_types": ["MARKET", "LIMIT", "SL", "SL-M"], "user_type": "individual", "poa": false, "is_active": true, "access_token": "eyJ0eXAiOiJKV1QiLCJrZXlfaWQiOiJza192MS4wIiwiYWxnIjoiSFMyNTYifQ.test.signature", "extended_token": null},
+  "token_refused": {"status": "error", "errors": [{"errorCode": "UDAPI100057", "message": "Invalid Auth code", "propertyPath": null, "invalidValue": null, "error_code": "UDAPI100057"}]}
+}
