@@ -209,6 +209,12 @@ impl KotakBroker {
         self
     }
 
+    /// Replace the history pacing (Neo's one request a second by default).
+    pub fn with_history_pacing(mut self, interval: Duration) -> Self {
+        self.history_pacer = Pacer::with_interval(interval);
+        self
+    }
+
     pub(crate) fn resolver(&self) -> &SymbolResolver {
         &self.symbols
     }

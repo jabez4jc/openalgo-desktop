@@ -58,7 +58,7 @@
     "mrgnUsd": "0.20",
     "rmsVldtd": "OK"
   },
-  "margin_error": {"stat": "Not_Ok", "errMsg": "Invalid token for the segment", "stCode": 1009},
+  "margin_error": {"stat": "Not_Ok", "errMsg": "Scrip not allowed for margin calculation", "stCode": 1009},
   "quotes_not_ok": {"stat": "Not_Ok", "emsg": "Invalid neosymbol", "stCode": 1009},
   "file_paths": {
     "data": {

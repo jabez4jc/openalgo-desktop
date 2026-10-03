@@ -224,6 +224,14 @@ impl DhanBroker {
         self
     }
 
+    /// Replace the market-data pacing (tests run a local fake at full
+    /// speed; the defaults are Dhan's 0.2 s and 1.1 s).
+    pub fn with_pacing(mut self, data: Duration, quote: Duration) -> Self {
+        self.data_pacer = Pacer::with_interval(data);
+        self.quote_pacer = Pacer::with_interval(quote);
+        self
+    }
+
     pub fn variant(&self) -> Variant {
         self.variant
     }

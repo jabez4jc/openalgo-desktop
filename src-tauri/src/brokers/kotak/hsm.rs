@@ -405,7 +405,7 @@ pub struct KotakHsmFeed {
 impl KotakHsmFeed {
     pub fn new(url: &str, token: &str, sid: &str) -> Self {
         Self {
-            url: url.to_string(),
+            url: super::streaming::with_root_path(url),
             token: token.to_string(),
             sid: sid.to_string(),
             decoder: HsmDecoder::new(),

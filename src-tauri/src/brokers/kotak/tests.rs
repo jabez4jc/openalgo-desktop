@@ -442,7 +442,7 @@ fn margin_body_and_response() {
     assert_eq!(parse_margin(&r["margin_ok"]).unwrap(), 98234.55);
     assert_eq!(
         parse_margin(&r["margin_error"]).unwrap_err(),
-        "Invalid token for the segment"
+        "Scrip not allowed for margin calculation"
     );
     assert!(parse_margin(&json!([])).is_err());
 }
@@ -993,6 +993,20 @@ fn feed_config_and_dividers() {
         (None, DEFAULT_SFEED_URL.into())
     );
     assert_eq!(to_wss("http://h/x"), "ws://h/x");
+    assert_eq!(
+        streaming::with_root_path("wss://mlhsm.kotaksecurities.com"),
+        "wss://mlhsm.kotaksecurities.com/"
+    );
+    assert_eq!(streaming::with_root_path("wss://h?x=1"), "wss://h/?x=1");
+    assert_eq!(
+        streaming::with_root_path("wss://h/apifeed"),
+        "wss://h/apifeed"
+    );
+    let hsm = KotakHsmFeed::new(hsm::DEFAULT_HSM_URL, "t", "s");
+    assert_eq!(
+        hsm.ws_request().unwrap().uri().to_string(),
+        "wss://mlhsm.kotaksecurities.com/"
+    );
     assert_eq!(to_wss("wss://h"), "wss://h");
     let d = parse_dividers(
         &json!({"exchanges": {"cde_fo": {"divider": 10000000}, "nse_cm": {"value": 1, "divider": 100}}}),
@@ -1194,4 +1208,42 @@ fn hsm_decoder_snapshots_updates_and_acks() {
         other => panic!("unexpected {:?}", other),
     }
     assert_eq!(feed.topic_count(), 1);
+}
+
+#[test]
+fn feed_state_is_released_with_its_subscriptions() {
+    // Resource hygiene: 300 subscribe / tick / unsubscribe cycles leave
+    // nothing behind in the SFeed client's maps.
+    let mut f = KotakFeed::new(DEFAULT_SFEED_URL, "sid", "U".into(), master());
+    f.on_connected();
+    for i in 0..300u32 {
+        let s = FeedSubscription {
+            token: (500_000 + i).to_string(),
+            ..fsub("SBIN", "NSE", FeedMode::Depth)
+        };
+        f.subscribe_frames(std::slice::from_ref(&s));
+        let ack = json!({"message_code": 1109, "trading_symbols": {format!("nse_cm|{}", 500_000 + i): "X"}});
+        f.parse(&Message::Text(ack.to_string()));
+        f.parse(&Message::Binary(packet(
+            0,
+            1,
+            1,
+            &mini_body(500_000 + i, 100, 0),
+        )));
+        f.unsubscribe_frames(std::slice::from_ref(&s));
+    }
+    assert_eq!((f.subscription_count(), f.state_len()), (0, 0));
+    // An index subscription drops all of its name aliases too.
+    let idx = fsub("NIFTY", "NSE_INDEX", FeedMode::Ltp);
+    f.subscribe_frames(std::slice::from_ref(&idx));
+    f.unsubscribe_frames(std::slice::from_ref(&idx));
+    assert!(f
+        .parse(&Message::Binary(packet(
+            7207,
+            1,
+            0,
+            &index_body(1, 100, 100, "Nifty 50")
+        )))
+        .is_empty());
+    assert_eq!(f.state_len(), 0);
 }

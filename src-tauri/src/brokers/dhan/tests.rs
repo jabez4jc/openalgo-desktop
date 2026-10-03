@@ -765,6 +765,15 @@ fn feed_url_and_subscribe_frames() {
         feed.ws_request().unwrap().uri().to_string(),
         "wss://api-feed.dhan.co/?version=2&token=tok%20en&clientId=1100012345&authType=2"
     );
+    // The request target needs the explicit `/` (no `GET ?version=2`).
+    assert!(feed
+        .ws_request()
+        .unwrap()
+        .uri()
+        .path_and_query()
+        .unwrap()
+        .as_str()
+        .starts_with("/?version=2&"));
     assert!(b.create_feed(&AuthToken::new("tokenonly")).is_err());
     let mut f = DhanFeed::with_url("wss://x", "t", "c");
     let frames = texts(&f.subscribe_frames(&[
@@ -1074,4 +1083,43 @@ fn identity_and_capabilities() {
     assert!(b.capabilities().gtt);
     assert_eq!(b.timeframe_map().len(), 6);
     assert!(b.supported_exchanges().contains(&Exchange::Nco));
+}
+
+#[test]
+fn feed_state_is_released_with_its_subscriptions() {
+    // Resource hygiene: 300 subscribe / tick / unsubscribe cycles leave
+    // nothing behind in the feeds' maps.
+    let mut f = DhanFeed::with_url("wss://x", "t", "c");
+    let mut d20 = Dhan20DepthFeed::with_url("wss://d", "t", "c");
+    for i in 0..300u32 {
+        let s = FeedSubscription {
+            token: (100_000 + i).to_string(),
+            ..sub("SBIN", "NSE", FeedMode::Quote)
+        };
+        f.subscribe_frames(std::slice::from_ref(&s));
+        d20.subscribe_frames(std::slice::from_ref(&s));
+        let mut oi = header(5, 4, 1, 100_000 + i);
+        oi.extend(7u32.to_le_bytes());
+        f.parse(&Message::Binary(oi));
+        // A lone bid half waits for its ask.
+        let mut half = Vec::new();
+        half.extend(332u16.to_le_bytes());
+        half.extend([41u8, 1]);
+        half.extend((100_000 + i).to_le_bytes());
+        half.extend([0u8; 4]);
+        half.extend([0u8; 320]);
+        d20.parse(&Message::Binary(half));
+        f.unsubscribe_frames(std::slice::from_ref(&s));
+        d20.unsubscribe_frames(std::slice::from_ref(&s));
+    }
+    assert_eq!(f.subscription_count(), 0);
+    assert_eq!(d20.sizes(), (0, 0));
+    // Packets for unknown instruments allocate nothing.
+    let mut half = Vec::new();
+    half.extend(332u16.to_le_bytes());
+    half.extend([51u8, 1]);
+    half.extend(999u32.to_le_bytes());
+    half.extend([0u8; 324]);
+    d20.parse(&Message::Binary(half));
+    assert_eq!(d20.sizes(), (0, 0));
 }

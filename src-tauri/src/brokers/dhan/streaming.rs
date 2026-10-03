@@ -99,8 +99,21 @@ fn le_f64(b: &[u8], o: usize) -> f64 {
     f64::from_le_bytes(a)
 }
 
+/// `base` with an explicit `/` path when it has none: the WebSocket client
+/// writes the request target from the raw path-and-query, and
+/// `GET ?version=2...` (no path) is not a valid request line.
+fn with_root_path(base: &str) -> String {
+    let after_scheme = base.split_once("://").map(|(_, r)| r).unwrap_or(base);
+    if after_scheme.contains('/') {
+        base.to_string()
+    } else {
+        format!("{}/", base)
+    }
+}
+
 fn url_with(base: &str, token: &str, client_id: &str, version: bool) -> String {
     let enc = |s: &str| urlencoding::encode(s).into_owned();
+    let base = with_root_path(base);
     if version {
         format!(
             "{}?version=2&token={}&clientId={}&authType=2",
@@ -226,6 +239,11 @@ impl DhanFeed {
         }
         let key = self.subs.keys().find(|(_, t)| *t == token).copied()?;
         self.subs.get_mut(&key)
+    }
+
+    /// Instruments registered (bounded by the subscriptions).
+    pub fn subscription_count(&self) -> usize {
+        self.subs.len()
     }
 
     /// Decode one binary frame.
@@ -485,6 +503,11 @@ impl Dhan20DepthFeed {
                 }
             })
             .collect()
+    }
+
+    /// Instruments registered and half-built books held.
+    pub fn sizes(&self) -> (usize, usize) {
+        (self.subs.len(), self.pending.len())
     }
 
     pub fn parse_binary(&mut self, data: &[u8]) -> Vec<FeedEvent> {
