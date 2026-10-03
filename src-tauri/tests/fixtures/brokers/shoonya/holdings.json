@@ -1,0 +1,5 @@
+[
+  {"stat":"Ok","exch_tsym":[{"exch":"NSE","tsym":"SBIN-EQ","token":"3045","pp":"2","ti":"0.05","ls":"1","isin":"INE062A01020"},{"exch":"BSE","tsym":"SBIN","token":"500112"}],"holdqty":"0","btstqty":"0","brkcolqty":"0","unplgdqty":"0","benqty":"0","npoadqty":"0","npoadt1qty":"4","dpqty":"10","usedqty":"0","upldprc":"780.00","s_prdt_ali":"CNC"},
+  {"stat":"Ok","exch_tsym":[{"exch":"NSE","tsym":"M&M-EQ","token":"2031"}],"holdqty":"0","btstqty":"2","npoadqty":"3","dpqty":"0","usedqty":"1","upldprc":"2900.50"},
+  {"stat":"Not_Ok","emsg":"ignored row"}
+]

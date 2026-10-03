@@ -1,0 +1,4 @@
+[
+  {"stat":"Ok","norenordno":"26100300000011","exch":"NSE","tsym":"SBIN-EQ","token":"3045","qty":"10","prc":"0.00","rprc":"812.45","prd":"I","trantype":"B","prctyp":"MKT","ret":"DAY","status":"OPEN","fillshares":"4","norentm":"09:20:15 03-10-2026"},
+  {"stat":"Ok","norenordno":"26100300000012","exch":"NFO","tsym":"NIFTY27OCT26F","token":"54321","qty":"75","prc":"25000.00","prd":"M","trantype":"S","prctyp":"LMT","ret":"DAY","status":"COMPLETE","instname":"FUTIDX","fillshares":"75","avgprc":"25010.55","norentm":"09:21:00 03-10-2026"}
+]

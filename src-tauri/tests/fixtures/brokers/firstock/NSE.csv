@@ -1,0 +1,5 @@
+Exchange,Token,LotSize,TradingSymbol,CompanyName,ISIN,TickSize,FreezeQty
+NSE,3045,1,SBIN-EQ,STATE BANK OF INDIA,INE062A01020,0.05,100000
+NSE,11915,1,YESBANK-BE,YES BANK LIMITED,INE528G01035,0.01,50000
+NSE,26000,1,Nifty 50,Nifty 50,,0,0
+NSE,26037,1,Nifty Fin Service,Nifty Financial Services,,0,0

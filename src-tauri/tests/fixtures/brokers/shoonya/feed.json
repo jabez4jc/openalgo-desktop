@@ -1,0 +1,13 @@
+{
+  "ack_ok": {"t":"ak","uid":"<USER_ID>","s":"OK"},
+  "ack_bad": {"t":"ak","s":"NOT_OK","emsg":"Invalid access token"},
+  "touchline_snapshot": {"t":"tk","e":"NSE","tk":"3045","ts":"SBIN-EQ","pp":"2","ls":"1","ti":"0.05","lp":"812.40","pc":"0.54","c":"808.00","o":"809.00","h":"815.00","l":"805.10","ap":"811.10","v":"1234567","ltq":"25","ltt":"10:04:59","ft":"1790837699","tbq":"345678","tsq":"456789"},
+  "touchline_update": {"t":"tf","e":"NSE","tk":"3045","lp":"812.90","o":"0","v":"1234600","ft":"1790837702"},
+  "depth_snapshot": {"t":"dk","e":"NFO","tk":"54321","lp":"25080.00","c":"25000.00","o":"25010","h":"25120","l":"24990","v":"120000","toi":"9876525","tbq":"300","tsq":"450","bp1":"25079.90","bq1":"75","bo1":"1","bp2":"25079.80","bq2":"150","bo2":"2","bp3":"25079.70","bq3":"75","bo3":"1","bp4":"25079.60","bq4":"75","bo4":"1","bp5":"25079.50","bq5":"75","bo5":"1","sp1":"25080.10","sq1":"75","so1":"1","sp2":"25080.20","sq2":"75","so2":"1","sp3":"25080.30","sq3":"150","so3":"2","sp4":"25080.40","sq4":"75","so4":"1","sp5":"25080.50","sq5":"75","so5":"1"},
+  "depth_update": {"t":"df","e":"NFO","tk":"54321","lp":"25081.00","bp1":"25080.90","bq1":"150"},
+  "index_tick": {"t":"tk","e":"NSE","tk":"26000","lp":"25012.35","c":"24950.10","o":"24960.00","h":"25030.00","l":"24940.00","pc":"0.25"},
+  "unsubscribed": {"t":"tk","e":"NSE","tk":"999","lp":"1.00"},
+  "heartbeat_ack": {"t":"hk"},
+  "order_update": {"t":"om","norenordno":"26100300000002","uid":"<USER_ID>","actid":"<USER_ID>","exch":"NFO","tsym":"NIFTY27OCT26P25000","trantype":"S","qty":"75","prc":"0.00","trgprc":"118.00","prctyp":"SL-MKT","prd":"M","status":"TRIGGER_PENDING","reporttype":"NewAck","fillshares":"0","avgprc":"0"},
+  "order_rejected": {"t":"om","norenoordno":"26100300000004","exch":"NSE","tsym":"YESBANK-BE","trantype":"B","qty":"100","prc":"19.10","prctyp":"LMT","pcode":"C","status":"","reporttype":"Rejected","rejreason":"RMS:Margin Exceeds"}
+}

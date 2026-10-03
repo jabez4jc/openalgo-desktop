@@ -1,0 +1,4 @@
+Exchange,Token,Lotsize,Symbol,Tradingsymbol,Instrument,Expiry,Strike,Optiontype
+BSE,500112,1,SBIN,SBIN,A,,,
+BSE,1,1,SENSEX,BSE SENSEX,UNDIND,,,
+BSE,12,1,SENSEX50,S&P BSE SENSEX50,UNDIND,,,

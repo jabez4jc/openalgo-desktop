@@ -57,9 +57,8 @@ pub const ALL_BROKERS: &[&str] = &[
 pub fn auth_type(broker: &str) -> AuthType {
     match broker {
         "zerodha" | "fyers" | "upstox" | "dhan" | "arrow" | "paytm" | "pocketful" | "hdfcsky"
-        | "hdfcsecurities" | "flattrade" | "compositedge" | "iiflcapital" | "rmoney" => {
-            AuthType::OAuth
-        }
+        | "hdfcsecurities" | "flattrade" | "compositedge" | "iiflcapital" | "rmoney"
+        | "shoonya" | "zebu" | "tradesmart" => AuthType::OAuth,
         _ => AuthType::Form,
     }
 }
@@ -100,6 +99,28 @@ pub fn authorize_url(
         "compositedge" | "rmoney" => {
             crate::brokers::families::xts::thirdparty_url(broker, api_key, redirect_url, state)
         }
+        // Noren family: the authorize URL takes the app key (the half
+        // after `:::` of a `userid:::key` entry).
+        "shoonya" => Some(crate::brokers::families::noren::authorize_url(
+            crate::brokers::shoonya::config(),
+            api_key,
+            state,
+        )),
+        "zebu" => Some(crate::brokers::families::noren::authorize_url(
+            crate::brokers::zebu::config(),
+            api_key,
+            state,
+        )),
+        "tradesmart" => Some(crate::brokers::families::noren::authorize_url(
+            crate::brokers::tradesmart::config(),
+            api_key,
+            state,
+        )),
+        "flattrade" => Some(crate::brokers::families::noren::authorize_url(
+            crate::brokers::flattrade::config(),
+            api_key,
+            state,
+        )),
         _ => None,
     }
 }
@@ -120,6 +141,28 @@ pub struct LoginField {
 /// secret). Empty for brokers that sign in by redirect or need nothing.
 pub fn login_fields(broker: &str) -> &'static [LoginField] {
     match broker {
+        // Firstock: user id, password and TOTP typed at each login (the
+        // stored API key is the vendor code, the secret the API key).
+        "firstock" => &[
+            LoginField {
+                name: "userid",
+                label: "Firstock user id",
+                secret: false,
+                required: true,
+            },
+            LoginField {
+                name: "password",
+                label: "Password",
+                secret: true,
+                required: true,
+            },
+            LoginField {
+                name: "totp",
+                label: "TOTP",
+                secret: true,
+                required: false,
+            },
+        ],
         // Groww: TOTP for a TOTP API key, or a pasted access token; with
         // neither, the stored API key and secret sign in (approval flow).
         "groww" => &[
@@ -272,6 +315,28 @@ mod tests {
         assert_eq!(names, ["mobile", "totp", "mpin"]);
         assert!(f.iter().all(|x| x.required));
         assert!(!f[0].secret && f[1].secret && f[2].secret);
+    }
+
+    #[test]
+    fn noren_family_sign_in() {
+        for b in ["shoonya", "zebu", "tradesmart", "flattrade"] {
+            assert_eq!(auth_type(b), AuthType::OAuth, "{}", b);
+            let u = authorize_url(b, "U1:::APPKEY", "r", "st9").unwrap();
+            assert!(u.contains("APPKEY") && u.ends_with("state=st9"), "{}", u);
+            assert!(!u.contains("U1"));
+        }
+        assert!(authorize_url("zebu", "k", "r", "s")
+            .unwrap()
+            .starts_with("https://go.mynt.in/OAuthlogin/authorize/oauth?client_id=k"));
+        assert_eq!(auth_type("firstock"), AuthType::Form);
+        let f = login_fields("firstock");
+        assert_eq!(
+            f.iter().map(|x| x.name).collect::<Vec<_>>(),
+            ["userid", "password", "totp"]
+        );
+        assert!(f[1].secret && !f[0].secret);
+        let p = q(&[("code", "c1"), ("state", "s")]);
+        assert_eq!(extract_code("shoonya", &p).as_deref(), Some("c1"));
     }
 
     #[test]

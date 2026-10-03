@@ -1,0 +1,4 @@
+[
+  {"stat":"Ok","norenordno":"26100300000003","exch":"NSE","tsym":"RELIANCE-EQ","prd":"I","trantype":"B","qty":"5","avgprc":"1418.2","flqty":"5","flprc":"1418.2","flid":"55001","norentm":"09:22:00 03-10-2026"},
+  {"stat":"Ok","norenordno":"26100300000006","exch":"NFO","tsym":"NIFTY27OCT26F","prd":"M","trantype":"S","qty":"75","avgprc":"25123.456","flid":"55002","norentm":"10:01:02 03-10-2026"}
+]

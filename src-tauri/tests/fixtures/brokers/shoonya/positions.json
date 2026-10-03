@@ -1,0 +1,5 @@
+[
+  {"stat":"Ok","exch":"NSE","tsym":"RELIANCE-EQ","token":"2885","prd":"I","netqty":"5","netavgprc":"1418.20","lp":"1425.00","rpnl":"0.00","urmtom":"34.00","daybuyqty":"5","daybuyamt":"7091.00","daysellqty":"0","daysellamt":"0.00","cfbuyqty":"0","cfsellqty":"0","prcftr":"1.000000"},
+  {"stat":"Ok","exch":"NFO","tsym":"NIFTY27OCT26F","token":"54321","prd":"M","netqty":"-75","netavgprc":"25100.00","lp":"25080.00","rpnl":"150.00","urmtom":"0","daybuyqty":"0","daysellqty":"75","daysellamt":"1882500.00","prcftr":"1.000000"},
+  {"stat":"Ok","exch":"NSE","tsym":"SBIN-EQ","token":"3045","prd":"C","netqty":"0","netavgprc":"0","daybuyavgprc":"810.00","lp":"812.00","rpnl":"-25.50","urmtom":"0"}
+]

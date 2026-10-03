@@ -1,0 +1,7 @@
+[
+  {"stat":"Ok","norenordno":"26100300000001","uid":"<USER_ID>","actid":"<USER_ID>","exch":"NSE","tsym":"SBIN-EQ","token":"3045","qty":"10","prc":"812.50","trgprc":"0.00","prd":"C","trantype":"B","prctyp":"LMT","ret":"DAY","status":"OPEN","norentm":"09:20:15 03-10-2026","exch_tm":"03-10-2026 09:20:15","exchordid":"1100000012345678"},
+  {"stat":"Ok","norenordno":"26100300000002","exch":"NFO","tsym":"NIFTY27OCT26P25000","token":"54323","qty":"75","prc":"0.00","trgprc":"118.00","prd":"M","trantype":"S","prctyp":"SL-MKT","ret":"DAY","status":"TRIGGER_PENDING","norentm":"09:21:00 03-10-2026"},
+  {"stat":"Ok","norenordno":"26100300000003","exch":"NSE","tsym":"RELIANCE-EQ","token":"2885","qty":"5","prc":"0.00","prd":"I","trantype":"B","prctyp":"MKT","ret":"DAY","status":"COMPLETE","fillshares":"5","avgprc":"1418.20","rprc":"1418.20","norentm":"09:22:00 03-10-2026"},
+  {"stat":"Ok","norenordno":"26100300000004","exch":"NSE","tsym":"YESBANK-BE","token":"11915","qty":"100","prc":"19.10","prd":"C","trantype":"B","prctyp":"LMT","ret":"DAY","status":"REJECTED","rejreason":"RMS:Margin Exceeds","norentm":"09:23:00 03-10-2026"},
+  {"stat":"Ok","norenordno":"26100300000005","exch":"NSE","tsym":"UNKNOWN-EQ","token":"1","qty":"1","prc":"10","prd":"C","trantype":"S","prctyp":"SL-LMT","ret":"DAY","status":"CANCELED","norentm":"09:24:00 03-10-2026"}
+]

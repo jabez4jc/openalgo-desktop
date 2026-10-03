@@ -13,7 +13,9 @@ pub mod compositedge;
 pub mod dhan;
 pub mod dhan_sandbox;
 pub mod families;
+pub mod firstock;
 pub mod fivepaisaxts;
+pub mod flattrade;
 pub mod fyers;
 pub mod groww;
 pub mod ibulls;
@@ -23,9 +25,12 @@ pub mod kotak;
 #[cfg(any(test, feature = "test-support"))]
 pub mod mock;
 pub mod rmoney;
+pub mod shoonya;
+pub mod tradesmart;
 pub mod types;
 pub mod upstox;
 pub mod wisdom;
+pub mod zebu;
 pub mod zerodha;
 
 use crate::error::{AppError, Result};
@@ -332,6 +337,11 @@ impl BrokerRegistry {
             Arc::new(ibulls::broker(symbols.clone())),
             Arc::new(wisdom::broker(symbols.clone())),
             Arc::new(iifl::broker(symbols.clone())),
+            Arc::new(shoonya::broker(symbols.clone())),
+            Arc::new(flattrade::broker(symbols.clone())),
+            Arc::new(tradesmart::broker(symbols.clone())),
+            Arc::new(zebu::broker(symbols.clone())),
+            Arc::new(firstock::FirstockBroker::new(symbols.clone())),
         ];
         Self::with_symbols(symbols, brokers)
     }
@@ -402,7 +412,9 @@ mod tests {
                 "compositedge",
                 "dhan",
                 "dhan_sandbox",
+                "firstock",
                 "fivepaisaxts",
+                "flattrade",
                 "fyers",
                 "groww",
                 "ibulls",
@@ -410,8 +422,11 @@ mod tests {
                 "jainamxts",
                 "kotak",
                 "rmoney",
+                "shoonya",
+                "tradesmart",
                 "upstox",
                 "wisdom",
+                "zebu",
                 "zerodha"
             ]
         );

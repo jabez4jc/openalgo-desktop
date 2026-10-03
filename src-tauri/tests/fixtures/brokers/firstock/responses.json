@@ -1,0 +1,44 @@
+{
+  "login_ok": {"status":"success","message":"Login successful","data":{"actid":"<USER_ID>","userName":"<USER_ID>","susertoken":"jkey-abc"}},
+  "login_failed": {"status":"failed","code":"401","name":"INVALID_CREDENTIALS","error":{"field":"password","message":"Invalid password"}},
+  "order_book": {"status":"success","data":[
+    {"userId":"<USER_ID>","exchange":"NSE","orderNumber":"1234567890111","status":"OPEN","tradingSymbol":"SBIN-EQ","token":"3045","quantity":"10","price":"812.50","triggerPrice":"0.00","product":"C","transactionType":"B","priceType":"LMT","orderTime":"10:00:01 03-10-2026"},
+    {"exchange":"NFO","orderNumber":"1234567890112","status":"TRIGGER_PENDING","tradingSymbol":"NIFTY27OCT26F","token":"54321","quantity":"75","price":"0","triggerPrice":"25000","product":"M","transactionType":"S","priceType":"SL-MKT","orderTime":"10:00:02 03-10-2026"},
+    {"exchange":"NSE","orderNumber":"1234567890113","status":"REJECTED","tradingSymbol":"YESBANK-BE","token":"11915","quantity":"1","price":"19","product":"I","transactionType":"B","priceType":"LIMIT","rejectReason":"RMS:Margin Exceeds","orderTime":"10:00:03 03-10-2026"},
+    {"exchange":"NSE","orderNumber":"1234567890114","status":"COMPLETE","tradingSymbol":"SBIN-EQ","token":"3045","quantity":"5","price":"0","product":"C","transactionType":"S","priceType":"MKT","orderTime":"10:00:04 03-10-2026"}
+  ]},
+  "trade_book": {"status":"success","data":[
+    {"exchange":"NSE","orderNumber":"1234567890114","tradingSymbol":"SBIN-EQ","token":"3045","fillQuantity":"5","fillPrice":"811.95","fillTime":"10:00:05 03-10-2026","transactionType":"S","product":"C","fillId":"77001"}
+  ]},
+  "positions": {"status":"success","data":[
+    {"exchange":"NFO","tradingSymbol":"NIFTY27OCT26F","token":"54321","product":"M","netQuantity":"-75","netAveragePrice":"25100.00","dayBuyQuantity":"0","daySellQuantity":"75","dayBuyAmount":"0","daySellAmount":"1882500.00","unrealizedMTOM":"1500.00","RealizedPNL":"150.00"},
+    {"exchange":"NSE","tradingSymbol":"SBIN-EQ","token":"3045","product":"I","netQuantity":"0","netAveragePrice":"0","RealizedPNL":"-12.50"}
+  ]},
+  "holdings": {"status":"success","data":[
+    {"exchangeTradingSymbol":[{"exchange":"NSE","token":"3045","tradingSymbol":"SBIN-EQ"},{"exchange":"BSE","token":"500112","tradingSymbol":"SBIN"}]}
+  ]},
+  "limit": {"status":"success","data":{"cash":"100000.00","payin":"5000.00","marginused":"20000.00","brkcollamt":"2500.00"}},
+  "quote": {"status":"success","data":{"exchange":"NSE","tradingSymbol":"SBIN-EQ","lastTradedPrice":"812.40","dayOpenPrice":"809.00","dayHighPrice":"815.00","dayLowPrice":"805.10","dayClosePrice":"808.00","volume":"1234567","openInterest":"0","lastTradedQuantity":"25","totalBuyQuantity":"345678","totalSellQuantity":"456789","bestBuyPrice1":"812.35","bestBuyQuantity1":"100","bestSellPrice1":"812.45","bestSellQuantity1":"200","bestBuyPrice2":"812.30","bestBuyQuantity2":"110","bestSellPrice2":"812.50","bestSellQuantity2":"210"}},
+  "multiquotes": {"status":"success","data":[
+    {"exchange":"NSE","tradingSymbol":"SBIN-EQ","lastTradedPrice":"812.40","dayClosePrice":"808.00"},
+    {"exchange":"NFO","tradingSymbol":"NIFTY27OCT26F","lastTradedPrice":"25080.00","dayClosePrice":"25000.00","openInterest":"9876525"}
+  ]},
+  "history_minute": {"status":"success","data":[
+    {"epochTime":1790826360,"open":"810.00","high":"811.00","low":"809.50","close":"810.50","volume":"1500"},
+    {"time":"2026-10-01T09:15:00","open":"809.00","high":"810.20","low":"808.80","close":"810.00","volume":"1500"}
+  ]},
+  "history_day": {"status":"success","data":[
+    {"epochTime":1790812800,"open":"808","high":"815","low":"805","close":"812","volume":"8000000"}
+  ]},
+  "index_list": {"status":"success","data":[
+    {"exchange":"NSE","tradingSymbol":"NIFTY 50","idxname":"Nifty 50","token":"26000"},
+    {"exchange":"NSE","tradingSymbol":"NIFTY BANK","idxname":"Nifty Bank","token":"26009"},
+    {"exchange":"BSE","tradingSymbol":"SENSEX","idxname":"S&P BSE SENSEX","token":"1"}
+  ]},
+  "basket_margin": {"status":"success","data":{"BasketMargin":[],"MarginOnNewOrder":126783,"PreviousMargin":0,"TradedMargin":126783}},
+  "place_ok": {"status":"success","message":"Order placed","data":{"orderNumber":"1234567890200","requestTime":"10:00:00 03-10-2026"}},
+  "cancel_failed": {"status":"failed","code":"404","name":"ORDER_NOT_FOUND","error":{"field":"orderNumber","message":"Order not found to cancel"}},
+  "feed_v1": {"c_symbol":"3045","c_exch_seg":"NSE","i_last_traded_price":81240,"i_open_price":80900,"i_high_price":81500,"i_low_price":80510,"i_closing_price":80800,"i_volume_traded_today":1234567,"i_last_trade_quantity":25,"i_total_buy_quantity":345678,"i_total_sell_quantity":456789,"i_average_trade_price":81110,"i_last_trade_time":1790837699},
+  "feed_v2": {"NFO:54321":{"i_last_traded_price":2508000,"i_open_price":0,"i_closing_price":2500000,"i_total_open_interest":9876525,"i_volume_traded_today":9223372036854775808,"best_buy":[{"price":2507990,"quantity":75,"orders":1}],"best_sell":[{"price":2508010,"quantity":150,"orders":2},{"price":9223372036854775808,"quantity":0,"orders":0}]}},
+  "feed_failed": {"status":"failed","message":"unauthenticated"}
+}
