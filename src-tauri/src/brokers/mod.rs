@@ -9,8 +9,11 @@
 pub mod angel;
 pub mod catalog;
 pub mod common;
+pub mod dhan;
+pub mod dhan_sandbox;
 pub mod fyers;
 pub mod groww;
+pub mod kotak;
 #[cfg(any(test, feature = "test-support"))]
 pub mod mock;
 pub mod types;
@@ -306,6 +309,9 @@ impl BrokerRegistry {
             Arc::new(fyers::FyersBroker::new(symbols.clone())),
             Arc::new(upstox::UpstoxBroker::new(symbols.clone())),
             Arc::new(groww::GrowwBroker::new(symbols.clone())),
+            Arc::new(dhan::DhanBroker::new(symbols.clone())),
+            Arc::new(dhan_sandbox::broker(symbols.clone())),
+            Arc::new(kotak::KotakBroker::new(symbols.clone())),
         ];
         Self::with_symbols(symbols, brokers)
     }
@@ -369,7 +375,19 @@ mod tests {
     #[test]
     fn registry_shares_one_symbol_master() {
         let reg = BrokerRegistry::new();
-        assert_eq!(reg.ids(), ["angel", "fyers", "groww", "upstox", "zerodha"]);
+        assert_eq!(
+            reg.ids(),
+            [
+                "angel",
+                "dhan",
+                "dhan_sandbox",
+                "fyers",
+                "groww",
+                "kotak",
+                "upstox",
+                "zerodha"
+            ]
+        );
         let s = reg.symbols();
         s.load(vec![common::symbols::tests::row(
             "SBIN", "SBIN-EQ", "NSE", "1",

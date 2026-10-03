@@ -1,0 +1,32 @@
+[
+  {
+    "dhanClientId": "<USER_ID>",
+    "orderId": "52261003001",
+    "exchangeOrderId": "1100000012345678",
+    "exchangeTradeId": "15532678",
+    "transactionType": "BUY",
+    "exchangeSegment": "NSE_EQ",
+    "productType": "CNC",
+    "orderType": "MARKET",
+    "tradingSymbol": "SBIN",
+    "securityId": "3045",
+    "tradedQuantity": 10,
+    "tradedPrice": 812.35,
+    "createTime": "2026-10-03 09:20:12",
+    "updateTime": "2026-10-03 09:20:12",
+    "exchangeTime": "2026-10-03 09:20:12"
+  },
+  {
+    "dhanClientId": "<USER_ID>",
+    "orderId": "52261003010",
+    "exchangeTradeId": "15532700",
+    "transactionType": "SELL",
+    "exchangeSegment": "NSE_FNO",
+    "productType": "INTRADAY",
+    "tradingSymbol": "NIFTY-Oct2026-25000-PE",
+    "securityId": "35004",
+    "tradedQuantity": 75,
+    "tradedPrice": 98.4,
+    "updateTime": "2026-10-03 11:00:00"
+  }
+]

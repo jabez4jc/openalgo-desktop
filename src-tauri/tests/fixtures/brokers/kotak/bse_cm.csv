@@ -1,0 +1,4 @@
+pSymbol,pGroup,pExchSeg,pInstType,pSymbolName,pTrdSymbol,pOptionType,pScripRefKey,pISIN,pAssetCode,pSubGroup,pCombinedSymbol,pDisplaySymbol,pDesc,lLotSize,pExpiryDate,lExpiryDate,dStrikePrice;,dTickSize ,lFreezeQty
+500112,A,bse_cm,,SBIN,SBIN,XX,SBIN,INE062A01020,,,SBIN,SBIN,STATE BANK OF INDIA,1,,-1,-1,5,1
+1,,bse_cm,,SENSEX,SENSEX,XX,SENSEX,,,,SENSEX,SENSEX,S&P BSE SENSEX,1,,-1,-1,1,1
+500999,A,bse_cm,,,ORPHAN,XX,ORPHAN,INE000000000,,,ORPHAN,ORPHAN,NO SYMBOL NAME,1,,-1,-1,1,1

@@ -144,6 +144,10 @@ pub fn extract_code(broker: &str, params: &HashMap<String, String>) -> Option<St
     match broker {
         "zerodha" => get("request_token"),
         "fyers" => get("auth_code"),
+        // Dhan consent redirect (web brlogin accepts all three spellings).
+        "dhan" | "dhan_sandbox" => get("tokenId")
+            .or_else(|| get("token_id"))
+            .or_else(|| get("token")),
         "arrow" | "hdfcsecurities" | "hdfcsky" => get("request_token")
             .or_else(|| get("requestToken"))
             .or_else(|| get("request-token"))
@@ -212,6 +216,19 @@ mod tests {
         assert!(f.iter().all(|x| x.secret && !x.required));
         assert_eq!(auth_type("groww"), AuthType::Form);
         assert!(login_fields("zerodha").is_empty());
+    }
+
+    #[test]
+    fn dhan_uses_token_id() {
+        let p = q(&[("tokenId", "tid-1"), ("code", "x")]);
+        assert_eq!(extract_code("dhan", &p).as_deref(), Some("tid-1"));
+        assert_eq!(
+            extract_code("dhan", &q(&[("token_id", "t2")])).as_deref(),
+            Some("t2")
+        );
+        assert_eq!(extract_code("dhan", &q(&[("code", "x")])), None);
+        assert_eq!(auth_type("kotak"), AuthType::Form);
+        assert_eq!(auth_type("dhan_sandbox"), AuthType::Form);
     }
 
     #[test]

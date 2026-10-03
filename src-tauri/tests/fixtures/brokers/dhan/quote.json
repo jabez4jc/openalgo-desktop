@@ -1,0 +1,55 @@
+{
+  "data": {
+    "NSE_EQ": {
+      "3045": {
+        "average_price": 813.12,
+        "buy_quantity": 512633,
+        "depth": {
+          "buy": [
+            {"quantity": 100, "orders": 1, "price": 814.05},
+            {"quantity": 220, "orders": 3, "price": 814.0},
+            {"quantity": 50, "orders": 1, "price": 813.95}
+          ],
+          "sell": [
+            {"quantity": 75, "orders": 2, "price": 814.1},
+            {"quantity": 10, "orders": 1, "price": 814.15},
+            {"quantity": 300, "orders": 4, "price": 814.2},
+            {"quantity": 5, "orders": 1, "price": 814.25},
+            {"quantity": 900, "orders": 9, "price": 814.3}
+          ]
+        },
+        "last_price": 814.1,
+        "last_quantity": 5,
+        "last_trade_time": "03/10/2026 11:15:02",
+        "lower_circuit_limit": 731.0,
+        "net_change": 1.75,
+        "ohlc": {"close": 812.35, "high": 816.0, "low": 808.5, "open": 810.0},
+        "oi": 0,
+        "oi_day_high": 0,
+        "oi_day_low": 0,
+        "sell_quantity": 689415,
+        "upper_circuit_limit": 893.6,
+        "volume": 4823170
+      }
+    },
+    "IDX_I": {
+      "13": {
+        "last_price": 25012.35,
+        "ohlc": {"close": 24980.0, "high": 25040.0, "low": 24930.55, "open": 24950.1},
+        "volume": 0
+      }
+    },
+    "NSE_FNO": {
+      "35003": {
+        "lastPrice": 121.4,
+        "last_quantity": 75,
+        "ohlc": {"close": 118.0, "high": 125.0, "low": 110.5, "open": 115.0},
+        "open_interest": 5234100,
+        "volume": "1250775",
+        "depth": null
+      },
+      "35004": {}
+    }
+  },
+  "status": "success"
+}

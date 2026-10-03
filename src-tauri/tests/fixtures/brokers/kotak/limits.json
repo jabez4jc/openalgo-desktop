@@ -1,0 +1,13 @@
+{
+  "stat": "Ok",
+  "stCode": 200,
+  "CollateralValue": "179542.80",
+  "Collateral": "222565.50",
+  "MarginUsed": "0.20",
+  "Net": "402108.10",
+  "UnrealizedMtomPrsnt": "-1250.75",
+  "RealizedMtomPrsnt": "320.00",
+  "RmsPayInAmt": "0.00",
+  "RmsPayOutAmt": "0.00",
+  "Category": "CLIENT"
+}
