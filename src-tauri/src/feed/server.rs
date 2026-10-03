@@ -446,9 +446,19 @@ async fn serve_conn(stream: TcpStream, shared: Arc<Shared>, token: CancellationT
         writer.0.abort();
     }
     if closing {
-        // Give the peer a moment to answer our close frame.
+        // Finish the closing handshake: keep reading, through errors, until
+        // the peer answers our close frame or a second passes. After an
+        // oversized message the rest of its payload is still unread, and
+        // dropping a socket with unread data makes Windows send a reset that
+        // discards our close frame (the client then sees 1006, not 1009).
         let _ = timeout(Duration::from_secs(1), async {
-            while let Some(Ok(_)) = stream.next().await {}
+            while let Some(item) = stream.next().await {
+                if let Err(WsError::ConnectionClosed | WsError::AlreadyClosed | WsError::Io(_)) =
+                    item
+                {
+                    break;
+                }
+            }
         })
         .await;
     }
