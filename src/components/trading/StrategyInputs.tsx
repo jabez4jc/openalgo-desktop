@@ -30,7 +30,7 @@
  */
 
 import { Fragment, useId } from 'react'
-import { type InputDeclaration, defaultValueOf } from '@/lib/trading/backtestInputs'
+import { defaultValueOf, type InputDeclaration } from '@/lib/trading/backtestInputs'
 
 interface Props {
   declarations: readonly InputDeclaration[]

@@ -19,14 +19,15 @@ import {
   type DockOrder,
   type DockPosition,
   isWorking,
-  realisedFromTrades,
   parsePosition,
+  realisedFromTrades,
   sumOpenPnl,
 } from './blotter'
 import type { ChartOrderBridgeRef } from './chartOrderBridge'
 import { DockShell } from './DockShell'
 import type { DockTab } from './dockState'
 import { ModifyOrderDialog, type ModifyValues, sendsPrice, sendsTrigger } from './ModifyOrderDialog'
+import { OrdersTable } from './OrdersTable'
 import {
   apiErrorMessage,
   cancelAllDockOrders,
@@ -35,7 +36,6 @@ import {
   closeDockPosition,
   type OrderActionContext,
 } from './orderActions'
-import { OrdersTable } from './OrdersTable'
 import { PnlStrip } from './PnlStrip'
 import { PositionsTable } from './PositionsTable'
 import { TradesTable } from './TradesTable'

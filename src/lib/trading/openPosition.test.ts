@@ -66,7 +66,15 @@ describe('finding what is open', () => {
 })
 
 describe('what it is worth', () => {
-  const long = { side: 'long', units: 2, entryPrice: 100, openedAt: null, barsHeld: null, maxFavourable: null, maxAdverse: null } as const
+  const long = {
+    side: 'long',
+    units: 2,
+    entryPrice: 100,
+    openedAt: null,
+    barsHeld: null,
+    maxFavourable: null,
+    maxAdverse: null,
+  } as const
   const short = { ...long, side: 'short' } as const
 
   it('values a long up and a short down as profit', () => {

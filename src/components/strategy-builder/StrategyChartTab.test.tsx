@@ -98,8 +98,16 @@ function renderTab(underlying: string) {
 }
 
 /** A socket price for one leg, the shape the shared manager hands out. */
-function socketPrice(exchange: string, symbol: string, ltp: number, source: 'websocket' | 'rest' = 'websocket') {
-  return [`${exchange}:${symbol}`, { symbol, exchange, data: { ltp }, lastUpdate: Date.now(), updateSource: source }] as const
+function socketPrice(
+  exchange: string,
+  symbol: string,
+  ltp: number,
+  source: 'websocket' | 'rest' = 'websocket'
+) {
+  return [
+    `${exchange}:${symbol}`,
+    { symbol, exchange, data: { ltp }, lastUpdate: Date.now(), updateSource: source },
+  ] as const
 }
 function marketData(entries: ReturnType<typeof socketPrice>[] = []) {
   return { data: new Map(entries), isConnected: true, isPaused: false, isFallbackMode: false }
@@ -193,7 +201,13 @@ describe('StrategyChartTab request sequencing', () => {
 
 describe('StrategyChartTab live premium', () => {
   const T = 1_700_000_000
-  const SOLD_PUT: StrategyLeg = { ...LEG, id: 'put', side: 'SELL', optionType: 'PE', symbol: 'TEST27AUG26100PE' }
+  const SOLD_PUT: StrategyLeg = {
+    ...LEG,
+    id: 'put',
+    side: 'SELL',
+    optionType: 'PE',
+    symbol: 'TEST27AUG26100PE',
+  }
   const twoLegs = (underlying: string) => (
     <StrategyChartTab
       underlying={underlying}
@@ -224,7 +238,10 @@ describe('StrategyChartTab live premium', () => {
     // Bought call at 12, sold put at 30: the sold leg counts positive, so the
     // spread is |30 - 12| = 18, folded into the bar history ended on.
     mocks.useMarketData.mockReturnValue(
-      marketData([socketPrice('CRYPTO', 'TEST27AUG26100CE', 12), socketPrice('CRYPTO', 'TEST27AUG26100PE', 30)])
+      marketData([
+        socketPrice('CRYPTO', 'TEST27AUG26100CE', 12),
+        socketPrice('CRYPTO', 'TEST27AUG26100PE', 30),
+      ])
     )
     view.rerender(twoLegs('BTC'))
     const pushed = mocks.chartState.current!.pushed
@@ -240,7 +257,10 @@ describe('StrategyChartTab live premium', () => {
       ])
     })
     mocks.useMarketData.mockReturnValue(
-      marketData([socketPrice('CRYPTO', 'TEST27AUG26100CE', 12), socketPrice('CRYPTO', 'TEST27AUG26100PE', 31)])
+      marketData([
+        socketPrice('CRYPTO', 'TEST27AUG26100CE', 12),
+        socketPrice('CRYPTO', 'TEST27AUG26100PE', 31),
+      ])
     )
     view.rerender(twoLegs('BTC'))
     expect(pushed).toHaveLength(2)
@@ -257,7 +277,10 @@ describe('StrategyChartTab live premium', () => {
     mocks.useMarketData.mockReturnValue(marketData([socketPrice('CRYPTO', 'TEST27AUG26100CE', 12)]))
     view.rerender(twoLegs('BTC'))
     mocks.useMarketData.mockReturnValue(
-      marketData([socketPrice('CRYPTO', 'TEST27AUG26100CE', 12), socketPrice('CRYPTO', 'TEST27AUG26100PE', 30, 'rest')])
+      marketData([
+        socketPrice('CRYPTO', 'TEST27AUG26100CE', 12),
+        socketPrice('CRYPTO', 'TEST27AUG26100PE', 30, 'rest'),
+      ])
     )
     view.rerender(twoLegs('BTC'))
     expect(mocks.chartState.current!.pushed).toHaveLength(0)

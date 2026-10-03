@@ -43,7 +43,14 @@ const {
 
 /** One history row as the platform answers it: seconds, not milliseconds. */
 function row(at: number) {
-  return { timestamp: 1_700_000_000 + at * 60, open: 100, high: 101, low: 99, close: 100, volume: 5 }
+  return {
+    timestamp: 1_700_000_000 + at * 60,
+    open: 100,
+    high: 101,
+    low: 99,
+    close: 100,
+    volume: 5,
+  }
 }
 
 function aRequest(overrides: Record<string, unknown> = {}) {
@@ -252,7 +259,9 @@ describe('a run that works', () => {
 
     const handedBars = backtest.mock.calls[0][1] as { time: number }[]
     expect(handedBars[0].time).toBe(1_700_000_000_000)
-    expect(settingsFor).toHaveBeenCalledWith(expect.objectContaining({ lotSize: 50, tickSize: 0.05 }))
+    expect(settingsFor).toHaveBeenCalledWith(
+      expect.objectContaining({ lotSize: 50, tickSize: 0.05 })
+    )
   })
 
   it('parses the program from canonical text rather than handing over the string', async () => {

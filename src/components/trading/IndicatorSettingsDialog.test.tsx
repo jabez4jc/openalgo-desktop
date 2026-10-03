@@ -257,7 +257,13 @@ describe('picking an input on the chart', () => {
         onPick={onPick}
       />
     )
-    return { onApply, onClose, onPick, cancel, answer: (value: InputPick | null) => answer?.(value) }
+    return {
+      onApply,
+      onClose,
+      onPick,
+      cancel,
+      answer: (value: InputPick | null) => answer?.(value),
+    }
   }
 
   it('offers Pick for price and time inputs only', () => {

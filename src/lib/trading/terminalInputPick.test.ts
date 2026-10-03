@@ -20,7 +20,12 @@ function terminalWith() {
   }
   const terminal = Object.create(TradingTerminal.prototype) as TradingTerminal
   Object.assign(terminal, { chart, destroyed: false })
-  return { terminal, calls, cancel, end: (value: unknown) => listeners.get('pick:end')?.({ value }) }
+  return {
+    terminal,
+    calls,
+    cancel,
+    end: (value: unknown) => listeners.get('pick:end')?.({ value }),
+  }
 }
 
 describe('picking a study input on the chart', () => {

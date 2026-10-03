@@ -1,4 +1,4 @@
-import { createLinkGroup, type Chart, type LinkGroup } from 'openalgo-charts'
+import { type Chart, createLinkGroup, type LinkGroup } from 'openalgo-charts'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TradingTerminal } from './terminal'
 

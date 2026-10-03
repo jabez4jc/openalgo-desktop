@@ -36,6 +36,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
+import type { DataExportOptions } from '@/lib/trading/chartDataExport'
 import {
   type ChartStateGate,
   type ChartStateView,
@@ -64,7 +65,6 @@ import {
   type TerminalContextMenu,
   TradingTerminal,
 } from '@/lib/trading/terminal'
-import type { DataExportOptions } from '@/lib/trading/chartDataExport'
 import type { WorkspaceReplaySnapshot } from '@/lib/trading/workspaceReplay'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
@@ -75,7 +75,6 @@ import { ChartToolbar } from './ChartToolbar'
 import { ComparisonMenu } from './ComparisonMenu'
 import { DrawingStyleBar } from './DrawingStyleBar'
 import { DrawingTextDialog, type TextRequest } from './DrawingTextDialog'
-import { PriceScaleMenu } from './PriceScaleMenu'
 import { ChartOrderBridgeContext } from './dock/chartOrderBridge'
 import {
   type ChartOrderAction,
@@ -86,6 +85,7 @@ import {
   stillHeld,
 } from './dock/chartOrderRows'
 import { cancelDockOrder, closeDockPosition } from './dock/orderActions'
+import { PriceScaleMenu } from './PriceScaleMenu'
 import { QuickIntervalBox, useQuickEntry, useSeedBuffer } from './QuickEntry'
 import { Tip } from './Tip'
 
@@ -1405,7 +1405,13 @@ export function ChartPane({
           <div className="mx-0.5 h-5 w-px shrink-0 bg-border" aria-hidden="true" />
           {/* Wrapped, so the label still shows while the button is disabled: a
               disabled button takes no pointer events of its own. */}
-          <Tip tip={{ title: 'Undo chart change', chord: `${MOD_KEY}+Z`, sub: 'Orders are never undone' }}>
+          <Tip
+            tip={{
+              title: 'Undo chart change',
+              chord: `${MOD_KEY}+Z`,
+              sub: 'Orders are never undone',
+            }}
+          >
             <span className="inline-flex shrink-0">
               <Button
                 variant="ghost"

@@ -1,4 +1,4 @@
-import { getDrawingTool, type Drawing, type DrawContext } from 'openalgo-charts/draw'
+import { type DrawContext, type Drawing, getDrawingTool } from 'openalgo-charts/draw'
 import { TradingTerminal } from './terminal'
 
 const theme = { background: 'rgb(19,23,34)', lineColor: '#2962ff' }
@@ -75,7 +75,10 @@ function paint(drawing: Drawing) {
 }
 
 describe('drawing content editor appearance', () => {
-  it.each(['callout', 'price-label'])('ignores obsolete background overrides when editing saved %s', (tool) => {
+  it.each([
+    'callout',
+    'price-label',
+  ])('ignores obsolete background overrides when editing saved %s', (tool) => {
     const { drawing, terminal } = setup(tool)
     drawing.style.color = '#ffff00'
     drawing.text = { ...drawing.text, backgroundColor: '#434651' }

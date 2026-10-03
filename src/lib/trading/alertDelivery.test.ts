@@ -18,9 +18,7 @@ function context(onProblem = vi.fn()) {
 }
 
 /** A fetch that answers each path with an ok flag, a body status and a reason. */
-function fetchWith(
-  answers: Record<string, { ok: boolean; status?: string; message?: string }>
-) {
+function fetchWith(answers: Record<string, { ok: boolean; status?: string; message?: string }>) {
   const calls: { url: string; body: Record<string, unknown> }[] = []
   const impl = vi.fn(async (url: string, init?: RequestInit) => {
     const answer = answers[url] ?? { ok: true }
@@ -270,11 +268,11 @@ describe('how the outward channels are attempted', () => {
       })
     )
 
-    const sending = deliverAlert(
-      { ...OFF, telegram: true, whatsapp: true },
-      NOTICE,
-      { apiKey: 'k', username: 'rajandran', onProblem: vi.fn() }
-    )
+    const sending = deliverAlert({ ...OFF, telegram: true, whatsapp: true }, NOTICE, {
+      apiKey: 'k',
+      username: 'rajandran',
+      onProblem: vi.fn(),
+    })
 
     // Let the microtask queue drain without letting Telegram answer.
     await Promise.resolve()

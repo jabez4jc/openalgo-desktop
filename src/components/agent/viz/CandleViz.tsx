@@ -317,7 +317,6 @@ export function CandleViz({ spec, title, source, variant = 'figure', className }
         return
       }
 
-
       const definition = types.CHART_TYPES[chartSpec.chartType] ?? types.CHART_TYPES.candlestick
       // Only Heikin Ashi is reachable from the backend's list and it ignores
       // the box size, but the movement-driven types share one signature, so

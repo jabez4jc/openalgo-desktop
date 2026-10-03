@@ -8,12 +8,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import {
-  declaredOf,
-  defaultValueOf,
-  inputsOf,
-  settingsFromForm,
-} from './backtestInputs'
+import { declaredOf, defaultValueOf, inputsOf, settingsFromForm } from './backtestInputs'
 
 const PROGRAM = {
   meta: {

@@ -106,7 +106,10 @@ function defaultUnitsFor(program: unknown, key: string): number | null {
  * `edited` is the panel's own form state, keyed the same way it sends settings.
  * A stated quantity ignores it entirely, which is the point.
  */
-export function unitsFor(quantity: Quantity, edited: Readonly<Record<string, string>>): number | null {
+export function unitsFor(
+  quantity: Quantity,
+  edited: Readonly<Record<string, string>>
+): number | null {
   if (quantity.kind === 'stated') return quantity.units
   if (quantity.kind === 'unknown') return null
   const typed = edited[quantity.key]

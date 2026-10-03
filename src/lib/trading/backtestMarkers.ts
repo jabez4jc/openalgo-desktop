@@ -186,7 +186,10 @@ export function foldReversals(markers: readonly ReportMarker[]): ReportMarker[] 
     const entry = firstExits ? second : first
     const a = finite(first.units)
     const b = finite(second.units)
-    out.push({ ...entry, units: a !== null && b !== null ? Math.abs(a) + Math.abs(b) : entry.units })
+    out.push({
+      ...entry,
+      units: a !== null && b !== null ? Math.abs(a) + Math.abs(b) : entry.units,
+    })
   }
 
   return out

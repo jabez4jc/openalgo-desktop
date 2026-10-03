@@ -859,8 +859,18 @@ describe('collapseToUnderlyings', () => {
     // "RELIANCE INDUSTRIES LTD" in the picker and stored it as the underlying.
     const results = collapseToUnderlyings(
       [
-        { symbol: 'RELIANCE', name: 'RELIANCE INDUSTRIES LTD', exchange: 'NSE', instrumenttype: 'EQ' },
-        { symbol: 'RELINFRA', name: 'RELIANCE INFRASTRUCTU LTD', exchange: 'NSE', instrumenttype: 'EQ' },
+        {
+          symbol: 'RELIANCE',
+          name: 'RELIANCE INDUSTRIES LTD',
+          exchange: 'NSE',
+          instrumenttype: 'EQ',
+        },
+        {
+          symbol: 'RELINFRA',
+          name: 'RELIANCE INFRASTRUCTU LTD',
+          exchange: 'NSE',
+          instrumenttype: 'EQ',
+        },
       ],
       'RELIANCE'
     )

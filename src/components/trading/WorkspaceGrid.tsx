@@ -1,6 +1,6 @@
 import type { ComponentProps } from 'react'
 import { useCallback, useMemo, useRef, useState } from 'react'
-import { layoutById, LAYOUTS } from '@/lib/chart/layouts'
+import { LAYOUTS, layoutById } from '@/lib/chart/layouts'
 import { type GridWeights, parseAreas, parseTracks, tracksTemplate } from '@/lib/trading/gridSizes'
 import type { PreparedChartGrid } from '@/lib/trading/preparedGrid'
 import { ChartPane } from './ChartPane'

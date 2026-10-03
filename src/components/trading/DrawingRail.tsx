@@ -478,7 +478,14 @@ export function DrawingRail({
           </button>
         </div>
       </Tip>
-      <Tip side="right" tip={{ title: 'Undo chart change', chord: `${MOD_KEY} + Z`, sub: 'Orders are never undone' }}>
+      <Tip
+        side="right"
+        tip={{
+          title: 'Undo chart change',
+          chord: `${MOD_KEY} + Z`,
+          sub: 'Orders are never undone',
+        }}
+      >
         <div className="group relative">
           <button
             type="button"

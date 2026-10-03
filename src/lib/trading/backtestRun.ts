@@ -467,10 +467,7 @@ export async function runBacktest(request: BacktestRequest): Promise<BacktestOut
  * Answers `null` for a run that was abandoned, which is a run nobody is waiting
  * for rather than a run that failed.
  */
-async function fold(
-  message: BacktestMessage,
-  signal?: AbortSignal
-): Promise<BacktestReply | null> {
+async function fold(message: BacktestMessage, signal?: AbortSignal): Promise<BacktestReply | null> {
   if (workersAvailable()) {
     try {
       return await runOnWorker(message, signal)

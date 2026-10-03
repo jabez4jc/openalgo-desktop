@@ -131,7 +131,9 @@ describe('the marks a run puts on the chart', () => {
   function markedRun(): BacktestOutcome {
     return stoppedRun({
       stopped: undefined,
-      markers: [{ time: Date.UTC(2026, 8, 15, 9, 0), kind: 'entry', side: 'buy', units: 1, price: 100 }],
+      markers: [
+        { time: Date.UTC(2026, 8, 15, 9, 0), kind: 'entry', side: 'buy', units: 1, price: 100 },
+      ],
     } as Partial<BacktestOutcome>)
   }
 

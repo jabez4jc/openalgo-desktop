@@ -3,8 +3,8 @@ import { isPlainSymbol, parseExpression } from 'openalgo-charts/transform'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { useSupportedExchanges } from '@/hooks/useSupportedExchanges'
-import type { SearchRow } from '@/lib/trading/terminal'
 import { SEARCH_INPUT_ATTR } from '@/lib/trading/quickEntry'
+import type { SearchRow } from '@/lib/trading/terminal'
 import { cn } from '@/lib/utils'
 
 /**

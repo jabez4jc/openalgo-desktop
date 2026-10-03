@@ -598,7 +598,11 @@ export class TerminalComparisons {
     }
     this.selectedMode = mode
     this.controller?.setMode(this.engineMode())
-    if (rebasingMode(mode) === null && restoreMode !== null && scale?.options.mode !== restoreMode) {
+    if (
+      rebasingMode(mode) === null &&
+      restoreMode !== null &&
+      scale?.options.mode !== restoreMode
+    ) {
       scale?.setOptions({ mode: restoreMode })
     }
     this.syncAxis()

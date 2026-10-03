@@ -14,12 +14,12 @@
  * trader changes most.
  */
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { conditionHolds } from '@/lib/trading/inputConditions'
 import type {
   ChartSettingsField,
   ChartSettingsPairField,
   ChartSettingsRequest,
 } from '@/lib/trading/terminal'
-import { conditionHolds } from '@/lib/trading/inputConditions'
 import { cn } from '@/lib/utils'
 import { SettingsField } from './IndicatorSettingsDialog'
 import { TickBox } from './TickBox'

@@ -47,9 +47,9 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   agentErrorMessage,
   agentQueryKeys,
-  cancelChatGptLogin,
   type ChatGptLogin,
   type ChatGptStatus,
+  cancelChatGptLogin,
   getChatGptStatus,
   removeChatGptSession,
   startChatGptLogin,

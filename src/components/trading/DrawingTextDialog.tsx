@@ -1,6 +1,7 @@
 /** Edit drawing content with only the controls supported by its published schema. */
-import { DRAW_TOOL_METADATA } from '@/lib/trading/drawingToolMetadata'
+
 import { useEffect, useRef, useState } from 'react'
+import { DRAW_TOOL_METADATA } from '@/lib/trading/drawingToolMetadata'
 import type { DrawTextStyle } from '@/lib/trading/terminal'
 import { cn } from '@/lib/utils'
 import { TickBox } from './TickBox'

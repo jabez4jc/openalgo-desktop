@@ -81,7 +81,9 @@ export function ObjectsPanel({ model, paneLabel }: Props) {
       // Optional providers are host code. Keep their failure inside this panel.
     }
     setActionError(
-      accepted || !model ? null : { model, message: `Could not ${verb.toLocaleLowerCase()} ${name}` }
+      accepted || !model
+        ? null
+        : { model, message: `Could not ${verb.toLocaleLowerCase()} ${name}` }
     )
   }
 
@@ -220,18 +222,14 @@ export function ObjectsPanel({ model, paneLabel }: Props) {
                         <Action
                           label="Focus"
                           name={object.name}
-                          onClick={() =>
-                            act('focus', object.name, () => model.focus(object.id))
-                          }
+                          onClick={() => act('focus', object.name, () => model.focus(object.id))}
                         />
                       )}
                       {object.capabilities.remove && (
                         <Action
                           label="Remove"
                           name={object.name}
-                          onClick={() =>
-                            act('remove', object.name, () => model.remove(object.id))
-                          }
+                          onClick={() => act('remove', object.name, () => model.remove(object.id))}
                           danger
                         />
                       )}

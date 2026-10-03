@@ -1,4 +1,4 @@
-import { registeredDrawingTools, DRAWING_TOOL_ICONS } from 'openalgo-charts/draw'
+import { DRAWING_TOOL_ICONS, registeredDrawingTools } from 'openalgo-charts/draw'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { DRAW_GROUPS, drawToolIcon } from './drawTools'
 

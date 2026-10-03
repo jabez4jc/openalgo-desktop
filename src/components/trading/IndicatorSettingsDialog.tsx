@@ -498,7 +498,11 @@ export function SettingsField({
         </p>
       )}
       {problem && (
-        <p id={errorId} aria-live="polite" className="col-span-2 -mt-2 text-[11px] text-destructive">
+        <p
+          id={errorId}
+          aria-live="polite"
+          className="col-span-2 -mt-2 text-[11px] text-destructive"
+        >
           {problem}
         </p>
       )}

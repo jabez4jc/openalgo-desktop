@@ -108,10 +108,7 @@ export function runOnWorker(
     const onAbort = () => finish(() => reject(new Error('aborted')))
 
     const timer = window.setTimeout(
-      () =>
-        finish(() =>
-          reject(new Error('the run did not finish in time'))
-        ),
+      () => finish(() => reject(new Error('the run did not finish in time'))),
       PATIENCE_MS
     )
 

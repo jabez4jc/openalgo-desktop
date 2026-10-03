@@ -9,9 +9,9 @@
  */
 
 import { type ReactNode, useState } from 'react'
+import { momentText, moneyText, signedMoney, signedPercent } from '@/lib/trading/backtestFormat'
 import type { BacktestOutcome } from '@/lib/trading/backtestRun'
 import { cn } from '@/lib/utils'
-import { momentText, moneyText, signedMoney, signedPercent } from '@/lib/trading/backtestFormat'
 import { BacktestChart, type CurveKind, type CurvePoint, seriesFrom } from './BacktestChart'
 
 type Tab = 'equity' | 'drawdown' | 'trades'
@@ -179,7 +179,9 @@ export function headline(
     const pct = first.value !== 0 ? (change / first.value) * 100 : 0
     return (
       <>
-        <span className="font-medium text-foreground">Equity {moneyText(last.value, currency)}</span>
+        <span className="font-medium text-foreground">
+          Equity {moneyText(last.value, currency)}
+        </span>
         <span className={change >= 0 ? 'text-emerald-500' : 'text-destructive'}>
           {` ${signedMoney(change, currency)} (${signedPercent(pct)})`}
         </span>

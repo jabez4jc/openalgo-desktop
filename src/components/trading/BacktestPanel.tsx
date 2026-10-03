@@ -18,27 +18,21 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { type PriceableItem, useLivePrice } from '@/hooks/useLivePrice'
-import { cn } from '@/lib/utils'
+import { declaredOf, inputsOf, settingsFromForm } from '@/lib/trading/backtestInputs'
+import { chartMarkersFrom } from '@/lib/trading/backtestMarkers'
 import {
   type BacktestOutcome,
   MAX_BARS,
   type RunStop,
   runBacktest,
 } from '@/lib/trading/backtestRun'
-import {
-  declaredOf,
-  inputsOf,
-  settingsFromForm,
-} from '@/lib/trading/backtestInputs'
-import { chartMarkersFrom } from '@/lib/trading/backtestMarkers'
+import { backtestLookbackDays } from '@/lib/trading/intervals'
 import {
   markToPrice,
   openCountOf,
   openPositionOf,
   type ReportTrade,
 } from '@/lib/trading/openPosition'
-import { quantityNote, quantityOf, unitsFor } from '@/lib/trading/strategyQuantity'
-import { backtestLookbackDays } from '@/lib/trading/intervals'
 import {
   compileSource,
   kindOf,
@@ -46,9 +40,11 @@ import {
   readScript,
   type StoredScript,
 } from '@/lib/trading/openscriptFiles'
+import { quantityNote, quantityOf, unitsFor } from '@/lib/trading/strategyQuantity'
+import { cn } from '@/lib/utils'
 import { BacktestResultTabs } from './BacktestResultTabs'
-import { StrategyInputs } from './StrategyInputs'
 import { PANEL_HEADER, PanelShell } from './panelShell'
+import { StrategyInputs } from './StrategyInputs'
 
 /** The three chart facts a run is of. */
 export interface RunTarget {
@@ -130,7 +126,10 @@ const MARKS_KEY = 'trading.panel.backtest.marks'
 function money(value: unknown, digits = 2): string {
   const n = Number(value)
   if (!Number.isFinite(n)) return '-'
-  return n.toLocaleString(undefined, { minimumFractionDigits: digits, maximumFractionDigits: digits })
+  return n.toLocaleString(undefined, {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  })
 }
 
 function percent(value: unknown): string {
@@ -475,54 +474,54 @@ export function BacktestPanel({
 
   const runNamed = useCallback(
     async (which: string) => {
-    const chart = getChartContext()
-    if (!which || !chart) return
+      const chart = getChartContext()
+      if (!which || !chart) return
 
-    inflight.current?.abort()
-    const controller = new AbortController()
-    inflight.current = controller
+      inflight.current?.abort()
+      const controller = new AbortController()
+      inflight.current = controller
 
-    setRunning(true)
-    setOutcome(null)
-    try {
-      const source = await readScript(which, controller.signal)
-      const result = await runBacktest({
-        file: which,
-        source,
-        symbol: chart.symbol,
-        exchange: chart.exchange,
-        interval: chart.interval,
-        startDate: from,
-        endDate: to,
-        apiKey,
-        inputs: settingsFromForm(declarations, edited),
-        signal: controller.signal,
-      })
-      if (controller.signal.aborted) return
-      setOutcome(result)
+      setRunning(true)
+      setOutcome(null)
+      try {
+        const source = await readScript(which, controller.signal)
+        const result = await runBacktest({
+          file: which,
+          source,
+          symbol: chart.symbol,
+          exchange: chart.exchange,
+          interval: chart.interval,
+          startDate: from,
+          endDate: to,
+          apiKey,
+          inputs: settingsFromForm(declarations, edited),
+          signal: controller.signal,
+        })
+        if (controller.signal.aborted) return
+        setOutcome(result)
 
-      // The fills go on the price as soon as they exist. A previous run's marks
-      // are replaced rather than added to, and a run that produced none clears
-      // them, so what is on the chart is always this run and only this run.
-      if (onMarkChart) {
-        if (showMarks) {
-          const marks = result.ok ? chartMarkersFrom(result.markers ?? []) : []
-          // Tied to the strategy, so removing it from the chart takes these
-          // marks down with it, and the count beside the button stops.
-          const owner = { file: which, onCleared: () => setMarked(0) }
-          setMarked(onMarkChart(marks, owner) ? marks.length : null)
-        } else {
-          onMarkChart([])
-          setMarked(0)
+        // The fills go on the price as soon as they exist. A previous run's marks
+        // are replaced rather than added to, and a run that produced none clears
+        // them, so what is on the chart is always this run and only this run.
+        if (onMarkChart) {
+          if (showMarks) {
+            const marks = result.ok ? chartMarkersFrom(result.markers ?? []) : []
+            // Tied to the strategy, so removing it from the chart takes these
+            // marks down with it, and the count beside the button stops.
+            const owner = { file: which, onCleared: () => setMarked(0) }
+            setMarked(onMarkChart(marks, owner) ? marks.length : null)
+          } else {
+            onMarkChart([])
+            setMarked(0)
+          }
         }
+      } catch {
+        if (!controller.signal.aborted) {
+          setOutcome({ ok: false, problem: 'The script could not be read.' })
+        }
+      } finally {
+        if (!controller.signal.aborted) setRunning(false)
       }
-    } catch {
-      if (!controller.signal.aborted) {
-        setOutcome({ ok: false, problem: 'The script could not be read.' })
-      }
-    } finally {
-      if (!controller.signal.aborted) setRunning(false)
-    }
     },
     [apiKey, declarations, edited, from, getChartContext, onMarkChart, showMarks, to]
   )
@@ -589,7 +588,9 @@ export function BacktestPanel({
 
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
         <label className="flex flex-col gap-1">
-          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Strategy</span>
+          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            Strategy
+          </span>
           <select
             className="h-8 rounded border border-border bg-background px-2 text-xs"
             value={file}
@@ -725,10 +726,8 @@ export function BacktestPanel({
                 charges are counted and their profit is not, because it has not been realised.
               </p>
             )}
-
           </>
         )}
-
 
         {file !== '' && (declarations.length > 0 || declared) && (
           <div className="rounded border border-border">
@@ -774,7 +773,9 @@ export function BacktestPanel({
                       </dd>
                       <dt>Order size</dt>
                       <dd className="text-right">
-                        {sending === null ? `${declared.qty} ${declared.qtyType}` : `${sending} ${declared.qtyType}`}
+                        {sending === null
+                          ? `${declared.qty} ${declared.qtyType}`
+                          : `${sending} ${declared.qtyType}`}
                         {quantity.kind === 'input' && ' (yours)'}
                       </dd>
                       <dt>Pyramiding</dt>
@@ -789,10 +790,10 @@ export function BacktestPanel({
                       <dd className="text-right">{declared.fillOn}</dd>
                     </dl>
                     <p className="text-[10px] leading-relaxed text-muted-foreground">
-                      These are the script's own, set in its `strategy()` line, and are shown
-                      rather than offered: a commission supplied here beside a declared one
-                      describes the same money twice and is refused before the first bar. Edit
-                      the script to change them.
+                      These are the script's own, set in its `strategy()` line, and are shown rather
+                      than offered: a commission supplied here beside a declared one describes the
+                      same money twice and is refused before the first bar. Edit the script to
+                      change them.
                     </p>
                   </div>
                 )}
@@ -819,7 +820,10 @@ export function BacktestPanel({
               This script does not compile
             </span>
             {outcome.diagnostics.slice(0, 5).map((d) => (
-              <span key={`${d.code}-${d.line}-${d.column}`} className="font-mono text-[10px] text-muted-foreground">
+              <span
+                key={`${d.code}-${d.line}-${d.column}`}
+                className="font-mono text-[10px] text-muted-foreground"
+              >
                 {d.line}:{d.column} {d.code} {d.message}
               </span>
             ))}
@@ -899,8 +903,8 @@ export function BacktestPanel({
                 ? `Marked at ${valued.price.toFixed(2)}. `
                 : 'No price has arrived for this instrument yet, so it is not valued. '}
               {alsoOpen > 0 && `${alsoOpen} more open ${alsoOpen === 1 ? 'trade' : 'trades'}. `}
-              This strategy is on the chart, which draws and does not trade. Nothing is held at
-              your broker because of it. Add it under Strategies to trade it.
+              This strategy is on the chart, which draws and does not trade. Nothing is held at your
+              broker because of it. Add it under Strategies to trade it.
             </p>
           </div>
         )}

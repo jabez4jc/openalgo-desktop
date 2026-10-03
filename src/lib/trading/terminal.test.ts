@@ -831,9 +831,7 @@ describe('a chart with an armed alert stays awake when the tab is hidden', () =>
 
   it('does not decide visibility from the tab alone', () => {
     // The shape this replaces, which ignored every alert on the chart.
-    expect(source).not.toContain(
-      "this.data?.setVisible(document.visibilityState !== 'hidden')"
-    )
+    expect(source).not.toContain("this.data?.setVisible(document.visibilityState !== 'hidden')")
   })
 
   it('keeps the feed live while an alert is armed', () => {

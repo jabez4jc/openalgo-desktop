@@ -55,7 +55,13 @@ describe('reading one row', () => {
   it('reads every field by each spelling a module in this platform uses', () => {
     // Catches one spelling assumed. A quantity read by the wrong name is zero,
     // which reports a flat position on a strategy that is holding something.
-    const other = { tradingsymbol: 'TCS', brexchange: 'NSE', netqty: -3, avgprice: 100, unrealised: -7 }
+    const other = {
+      tradingsymbol: 'TCS',
+      brexchange: 'NSE',
+      netqty: -3,
+      avgprice: 100,
+      unrealised: -7,
+    }
     const read = positionFrom(other)
 
     expect(read.symbol).toBe('TCS')

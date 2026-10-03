@@ -18,8 +18,7 @@ function withNotification(
   class Fake {
     public onclick: (() => void) | null = null
     public static permission: NotificationPermission = permission
-    public static requestPermission =
-      request ?? (async () => Fake.permission)
+    public static requestPermission = request ?? (async () => Fake.permission)
     constructor(title: string, options?: NotificationOptions) {
       shown.push({ title, options })
     }

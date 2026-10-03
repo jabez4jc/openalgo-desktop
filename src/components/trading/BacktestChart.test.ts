@@ -39,10 +39,7 @@ describe('seriesFrom', () => {
   it('drops a point with no time instead of placing it at the epoch', () => {
     // Catches a null time coerced to 0. One such point drags the axis back to
     // 1970 and squashes the entire curve into the last pixel column.
-    const { equity } = seriesFrom([
-      { time: null, equity: 100, drawdown: 0 },
-      point(0, 110, 0),
-    ])
+    const { equity } = seriesFrom([{ time: null, equity: 100, drawdown: 0 }, point(0, 110, 0)])
 
     expect(equity).toHaveLength(1)
     expect(equity[0].time).toBe(1_700_000_000)

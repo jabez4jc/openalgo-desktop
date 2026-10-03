@@ -173,9 +173,10 @@ async function post(path: string, body: Record<string, unknown>): Promise<SendFa
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
-  const answer = (await res.json().catch(() => null)) as
-    | { status?: string; message?: string }
-    | null
+  const answer = (await res.json().catch(() => null)) as {
+    status?: string
+    message?: string
+  } | null
   const said = typeof answer?.message === 'string' ? answer.message.trim() : ''
   if (!res.ok) return said || 'The message was not accepted.'
   // A 200 carrying an error status is still a refusal, and it carries a reason

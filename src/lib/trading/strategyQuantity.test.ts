@@ -20,7 +20,12 @@ async function compile(source: string) {
   const checked = check(handle, parseTokens(handle, lex(handle, bag), bag), bag)
   const program = emit(handle, checked, bag, {}).program
   if (program === undefined) {
-    throw new Error(bag.ordered().map((one) => `${one.code} ${one.message}`).join('; '))
+    throw new Error(
+      bag
+        .ordered()
+        .map((one) => `${one.code} ${one.message}`)
+        .join('; ')
+    )
   }
   return program
 }
@@ -41,7 +46,9 @@ describe('reading a real compiled program', () => {
     // unknown, and reading it as a number would make it stated: both answer
     // "you may not change this" for a script that said you may.
     const quantity = quantityOf(
-      await compile('//@version=1\nq = input(3, "Quantity", min = 1)\nstrategy("a", qty = q)\nbuy()\n')
+      await compile(
+        '//@version=1\nq = input(3, "Quantity", min = 1)\nstrategy("a", qty = q)\nbuy()\n'
+      )
     )
 
     expect(quantity.kind).toBe('input')
@@ -60,7 +67,9 @@ describe('reading a real compiled program', () => {
   })
 
   it('answers unknown for a study, which declares no size at all', async () => {
-    expect(quantityOf(await compile('//@version=1\nstudy("a")\nplot(close)\n')).kind).toBe('unknown')
+    expect(quantityOf(await compile('//@version=1\nstudy("a")\nplot(close)\n')).kind).toBe(
+      'unknown'
+    )
   })
 })
 

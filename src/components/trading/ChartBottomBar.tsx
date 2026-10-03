@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
-import { applyChartDialogMetrics, buildChartTheme, isLightTheme } from '@/lib/trading/chartTheme'
 import type { BottomBarPane, TradingBottomBar } from '@/lib/trading/bottomBar'
+import { applyChartDialogMetrics, buildChartTheme, isLightTheme } from '@/lib/trading/chartTheme'
 import { useThemeStore } from '@/stores/themeStore'
 import { showToast } from '@/utils/toast'
 

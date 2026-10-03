@@ -63,7 +63,9 @@ describe('BacktestResultTabs', () => {
 
   it('says so when there is nothing to draw or list', async () => {
     render(<BacktestResultTabs outcome={outcome({ equity: [], trades: [] })} money={money} />)
-    expect(screen.getByText('This run has too few bars to draw an equity curve.')).toBeInTheDocument()
+    expect(
+      screen.getByText('This run has too few bars to draw an equity curve.')
+    ).toBeInTheDocument()
     await userEvent.click(screen.getByRole('tab', { name: 'Trades' }))
     expect(screen.getByText('This run took no trades.')).toBeInTheDocument()
   })

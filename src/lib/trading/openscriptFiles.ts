@@ -213,7 +213,7 @@ async function writeHeaders(): Promise<HeadersInit> {
 export async function saveScript(
   file: string,
   source: string,
-  compiled?: CompileResult,
+  compiled?: CompileResult
 ): Promise<StoredScript> {
   const result = compiled ?? (await compileSource(file, source))
   const response = await fetch(`${BASE}/${encodeURIComponent(file)}`, {

@@ -93,9 +93,9 @@ describe('ObjectsPanel', () => {
     expect(screen.getByRole('complementary', { name: 'Objects' })).toBeInTheDocument()
     expect(screen.getByText('Pane 2')).toBeInTheDocument()
     expect(screen.getByText(/Loading/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Select Open interest' })).toHaveAccessibleDescription(
-      'Indicator · Chart pane 2 · Loading · Visible'
-    )
+    expect(
+      screen.getByRole('button', { name: 'Select Open interest' })
+    ).toHaveAccessibleDescription('Indicator · Chart pane 2 · Loading · Visible')
 
     await userEvent.type(screen.getByRole('searchbox', { name: 'Search objects' }), 'interest')
     expect(screen.getByText('Open interest')).toBeInTheDocument()

@@ -15,8 +15,8 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Position } from '@/types/trading'
 import { render, screen, within } from '@/test/test-utils'
+import type { Position } from '@/types/trading'
 
 const mocks = vi.hoisted(() => ({
   getPositions: vi.fn(),

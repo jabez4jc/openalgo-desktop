@@ -9,7 +9,13 @@
  * premium.
  */
 
-import { type Bar, CandleBuilder, type DataLoadingSnapshot, intervalToSeconds, type SeriesApi } from 'openalgo-charts'
+import {
+  type Bar,
+  CandleBuilder,
+  type DataLoadingSnapshot,
+  intervalToSeconds,
+  type SeriesApi,
+} from 'openalgo-charts'
 import type { Widget } from 'openalgo-charts/widget'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
