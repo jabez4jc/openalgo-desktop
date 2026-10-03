@@ -1,4 +1,3 @@
-import { invoke } from '@tauri-apps/api/core'
 import {
   AlertCircle,
   ArrowRight,
@@ -12,8 +11,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { toast } from 'sonner'
+import { Link } from 'react-router'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   AlertDialog,
@@ -28,19 +26,14 @@ import {
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuthStore } from '@/stores/authStore'
+import { showToast } from '@/utils/toast'
 
-interface GetApiKeyResponse {
-  status: string
-  has_api_key: boolean
-  api_key: string | null
-}
-
-interface RegenerateApiKeyResponse {
-  status: string
-  id: number
-  name: string
-  api_key: string
-  message: string
+async function fetchCSRFToken(): Promise<string> {
+  const response = await fetch('/auth/csrf-token', {
+    credentials: 'include',
+  })
+  const data = await response.json()
+  return data.csrf_token
 }
 
 export default function ApiKey() {
@@ -56,22 +49,35 @@ export default function ApiKey() {
   const [orderMode, setOrderMode] = useState<'auto' | 'semi_auto'>('auto')
   const [isTogglingMode, setIsTogglingMode] = useState(false)
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: one-time API key load on mount; fetchApiKeyData has no reactive inputs
   useEffect(() => {
     fetchApiKeyData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const fetchApiKeyData = async () => {
     setIsLoading(true)
     try {
-      const response = await invoke<GetApiKeyResponse>('get_user_api_key')
-      setApiKey(response.api_key)
-      setHasApiKey(response.has_api_key)
-      // Order mode is stored in settings, default to auto for now
-      setOrderMode('auto')
-    } catch (error) {
-      console.error('Error fetching API key:', error)
-      toast.error('Failed to load API key')
+      const response = await fetch('/apikey', {
+        credentials: 'include',
+        headers: {
+          Accept: 'application/json',
+        },
+      })
+
+      if (response.ok) {
+        const contentType = response.headers.get('content-type')
+        if (contentType?.includes('application/json')) {
+          const data = await response.json()
+          setApiKey(data.api_key || null)
+          setHasApiKey(!!data.api_key)
+          setOrderMode(data.order_mode || 'auto')
+        } else {
+          // Backend returned HTML - this shouldn't happen now
+          showToast.error('Failed to load API key - please refresh', 'system')
+        }
+      }
+    } catch (_error) {
+      showToast.error('Failed to load API key', 'system')
     } finally {
       setIsLoading(false)
     }
@@ -81,9 +87,9 @@ export default function ApiKey() {
     if (apiKey) {
       try {
         await navigator.clipboard.writeText(apiKey)
-        toast.success('API key copied to clipboard')
+        showToast.success('API key copied to clipboard', 'clipboard')
       } catch {
-        toast.error('Failed to copy API key')
+        showToast.error('Failed to copy API key', 'clipboard')
       }
     }
   }
@@ -93,14 +99,32 @@ export default function ApiKey() {
     setShowRegenerateDialog(false)
 
     try {
-      const response = await invoke<RegenerateApiKeyResponse>('regenerate_api_key')
-      setApiKey(response.api_key)
-      setHasApiKey(true)
-      setShowApiKey(true)
-      toast.success('API key generated successfully')
-    } catch (error) {
-      console.error('Error regenerating API key:', error)
-      toast.error('Failed to generate API key')
+      const csrfToken = await fetchCSRFToken()
+
+      const response = await fetch('/apikey', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken,
+        },
+        body: JSON.stringify({
+          user_id: user?.username,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.api_key) {
+        setApiKey(data.api_key)
+        setHasApiKey(true)
+        setShowApiKey(true)
+        showToast.success('API key generated successfully', 'system')
+      } else {
+        showToast.error(data.error || 'Failed to generate API key', 'system')
+      }
+    } catch (_error) {
+      showToast.error('Failed to generate API key', 'system')
     } finally {
       setIsRegenerating(false)
     }
@@ -111,13 +135,34 @@ export default function ApiKey() {
     setIsTogglingMode(true)
 
     try {
-      // TODO: Implement order mode persistence via Tauri command
-      // For now, just update locally
-      setOrderMode(newMode)
-      toast.success(`Order mode updated to ${newMode === 'semi_auto' ? 'Semi-Auto' : 'Auto'}`)
-    } catch (error) {
-      console.error('Error toggling order mode:', error)
-      toast.error('Failed to update order mode')
+      const csrfToken = await fetchCSRFToken()
+
+      const response = await fetch('/apikey/mode', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken,
+        },
+        body: JSON.stringify({
+          user_id: user?.username,
+          mode: newMode,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.mode) {
+        setOrderMode(data.mode)
+        showToast.success(
+          `Order mode updated to ${data.mode === 'semi_auto' ? 'Semi-Auto' : 'Auto'}`,
+          'system'
+        )
+      } else {
+        showToast.error(data.error || 'Failed to update order mode', 'system')
+      }
+    } catch (_error) {
+      showToast.error('Failed to update order mode', 'system')
     } finally {
       setIsTogglingMode(false)
     }
@@ -164,6 +209,8 @@ export default function ApiKey() {
                 className="h-8 w-8 shrink-0"
                 onClick={() => setShowApiKey(!showApiKey)}
                 disabled={!hasApiKey}
+                title={showApiKey ? 'Hide API key' : 'Show API key'}
+                aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
               >
                 {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </Button>

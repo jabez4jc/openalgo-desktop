@@ -1,7 +1,6 @@
 import { ArrowLeft, Pencil, Plus, Save, Search, Snowflake, Trash2, Upload, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { toast } from 'sonner'
+import { Link } from 'react-router'
 import { adminApi } from '@/api/admin'
 import {
   AlertDialog,
@@ -41,6 +40,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import type { FreezeQty } from '@/types/admin'
+import { showToast } from '@/utils/toast'
 
 const EXCHANGES = ['NFO', 'BFO', 'CDS', 'MCX']
 
@@ -70,6 +70,7 @@ export default function FreezeQtyPage() {
   const [uploadFile, setUploadFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: one-time fetch of freeze data on mount; fetchFreezeData is recreated each render and adding it would re-run the fetch on every render
   useEffect(() => {
     fetchFreezeData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -93,9 +94,8 @@ export default function FreezeQtyPage() {
       const data = await adminApi.getFreezeList()
       setFreezeData(data)
       setFilteredData(data)
-    } catch (error) {
-      console.error('Error fetching freeze data:', error)
-      toast.error('Failed to load freeze quantities')
+    } catch (_error) {
+      showToast.error('Failed to load freeze quantities', 'admin')
     } finally {
       setIsLoading(false)
     }
@@ -103,7 +103,7 @@ export default function FreezeQtyPage() {
 
   const handleAdd = async () => {
     if (!newEntry.symbol || !newEntry.freeze_qty) {
-      toast.error('Please fill in all fields')
+      showToast.error('Please fill in all fields', 'admin')
       return
     }
 
@@ -116,16 +116,16 @@ export default function FreezeQtyPage() {
       })
 
       if (response.status === 'success') {
-        toast.success(response.message || 'Entry added successfully')
+        showToast.success(response.message || 'Entry added successfully', 'admin')
         setShowAddDialog(false)
         setNewEntry({ exchange: 'NFO', symbol: '', freeze_qty: '' })
         fetchFreezeData()
       } else {
-        toast.error(response.message || 'Failed to add entry')
+        showToast.error(response.message || 'Failed to add entry', 'admin')
       }
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } }
-      toast.error(err.response?.data?.message || 'Failed to add entry')
+      showToast.error(err.response?.data?.message || 'Failed to add entry', 'admin')
     } finally {
       setIsAdding(false)
     }
@@ -138,7 +138,7 @@ export default function FreezeQtyPage() {
 
   const handleSaveEdit = async (id: number) => {
     if (!editValue) {
-      toast.error('Please enter a freeze quantity')
+      showToast.error('Please enter a freeze quantity', 'admin')
       return
     }
 
@@ -149,15 +149,15 @@ export default function FreezeQtyPage() {
       })
 
       if (response.status === 'success') {
-        toast.success(response.message || 'Entry updated successfully')
+        showToast.success(response.message || 'Entry updated successfully', 'admin')
         setEditingId(null)
         fetchFreezeData()
       } else {
-        toast.error(response.message || 'Failed to update entry')
+        showToast.error(response.message || 'Failed to update entry', 'admin')
       }
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } }
-      toast.error(err.response?.data?.message || 'Failed to update entry')
+      showToast.error(err.response?.data?.message || 'Failed to update entry', 'admin')
     } finally {
       setIsSaving(false)
     }
@@ -171,15 +171,15 @@ export default function FreezeQtyPage() {
       const response = await adminApi.deleteFreeze(deleteEntry.id)
 
       if (response.status === 'success') {
-        toast.success(response.message || 'Entry deleted successfully')
+        showToast.success(response.message || 'Entry deleted successfully', 'admin')
         setDeleteEntry(null)
         fetchFreezeData()
       } else {
-        toast.error(response.message || 'Failed to delete entry')
+        showToast.error(response.message || 'Failed to delete entry', 'admin')
       }
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } }
-      toast.error(err.response?.data?.message || 'Failed to delete entry')
+      showToast.error(err.response?.data?.message || 'Failed to delete entry', 'admin')
     } finally {
       setIsDeleting(false)
     }
@@ -187,7 +187,7 @@ export default function FreezeQtyPage() {
 
   const handleUpload = async () => {
     if (!uploadFile) {
-      toast.error('Please select a CSV file')
+      showToast.error('Please select a CSV file', 'admin')
       return
     }
 
@@ -196,16 +196,16 @@ export default function FreezeQtyPage() {
       const response = await adminApi.uploadFreezeCSV(uploadFile, uploadExchange)
 
       if (response.status === 'success') {
-        toast.success(response.message || 'CSV uploaded successfully')
+        showToast.success(response.message || 'CSV uploaded successfully', 'admin')
         setShowUploadDialog(false)
         setUploadFile(null)
         fetchFreezeData()
       } else {
-        toast.error(response.message || 'Failed to upload CSV')
+        showToast.error(response.message || 'Failed to upload CSV', 'admin')
       }
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } }
-      toast.error(err.response?.data?.message || 'Failed to upload CSV')
+      showToast.error(err.response?.data?.message || 'Failed to upload CSV', 'admin')
     } finally {
       setIsUploading(false)
     }
@@ -329,6 +329,7 @@ export default function FreezeQtyPage() {
                               onChange={(e) => setEditValue(e.target.value)}
                               className="w-24 h-8"
                               min={1}
+                              aria-label={`Freeze quantity for ${entry.symbol}`}
                             />
                             <Button
                               size="icon"
@@ -336,6 +337,8 @@ export default function FreezeQtyPage() {
                               className="h-8 w-8"
                               onClick={() => handleSaveEdit(entry.id)}
                               disabled={isSaving}
+                              title="Save changes"
+                              aria-label={`Save freeze quantity for ${entry.symbol}`}
                             >
                               <Save className="h-4 w-4" />
                             </Button>
@@ -344,6 +347,8 @@ export default function FreezeQtyPage() {
                               variant="ghost"
                               className="h-8 w-8"
                               onClick={() => setEditingId(null)}
+                              title="Cancel editing"
+                              aria-label={`Cancel editing ${entry.symbol}`}
                             >
                               <X className="h-4 w-4" />
                             </Button>
@@ -360,6 +365,8 @@ export default function FreezeQtyPage() {
                               variant="ghost"
                               className="h-8 w-8"
                               onClick={() => handleEdit(entry)}
+                              title="Edit freeze quantity"
+                              aria-label={`Edit freeze quantity for ${entry.symbol}`}
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
@@ -368,6 +375,8 @@ export default function FreezeQtyPage() {
                               variant="ghost"
                               className="h-8 w-8 text-destructive hover:text-destructive"
                               onClick={() => setDeleteEntry(entry)}
+                              title="Delete entry"
+                              aria-label={`Delete freeze quantity for ${entry.symbol}`}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>

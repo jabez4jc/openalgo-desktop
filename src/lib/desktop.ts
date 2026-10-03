@@ -1,0 +1,136 @@
+/**
+ * Everything the desktop app does differently from OpenAlgo web, in one place.
+ *
+ * The frontend is the web frontend carried over nearly verbatim, so that a web
+ * change can be applied here by diff. The few things a desktop shell needs on
+ * top live in this module, and each web file that uses it carries a single
+ * "Desktop:" comment explaining why. Keep it small: business logic belongs in
+ * the local server, which the app reaches over HTTP and Socket.IO exactly as
+ * the web frontend reaches Flask.
+ *
+ * The same page can also be opened in an ordinary browser pointed at the local
+ * server, so every helper here works outside the Tauri shell too.
+ */
+
+import { isTauri } from '@tauri-apps/api/core'
+import { Server } from 'lucide-react'
+import type { NavItem } from '@/config/navigation'
+
+/** True when running inside the Tauri window rather than a plain browser tab. */
+export function isDesktopShell(): boolean {
+  try {
+    return isTauri()
+  } catch {
+    return false
+  }
+}
+
+/**
+ * The market data feed address used when the server does not report one.
+ *
+ * Matches the shipped default (8765) and the development port (8766) the
+ * maintainer uses so the desktop can run next to OpenAlgo web on one machine.
+ */
+export const DEFAULT_WEBSOCKET_URL = import.meta.env.DEV
+  ? 'ws://127.0.0.1:8766'
+  : 'ws://127.0.0.1:8765'
+
+/** Profile menu entries that exist only in the desktop app. */
+export const desktopProfileMenuItems: NavItem[] = [
+  { href: '/settings/server', label: 'Server Settings', icon: Server },
+]
+
+/** An absolute http(s) address on a different origin than the app itself. */
+export function isExternalHttpUrl(href: string, base: string = window.location.href): boolean {
+  let url: URL
+  try {
+    url = new URL(href, base)
+  } catch {
+    return false
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return false
+  return url.origin !== new URL(base).origin
+}
+
+/**
+ * Open a web page in the user's default browser.
+ *
+ * Inside the Tauri window a target="_blank" link or window.open() has no
+ * browser tab to land in, so the shell plugin hands the address to the OS.
+ * In a plain browser this is an ordinary new tab.
+ */
+export async function openExternal(url: string): Promise<void> {
+  if (isDesktopShell()) {
+    const { open } = await import('@tauri-apps/plugin-shell')
+    await open(url)
+    return
+  }
+  window.open(url, '_blank', 'noopener,noreferrer')
+}
+
+/**
+ * Save a same-origin download (an export endpoint) without opening a window.
+ *
+ * The web opens exports with window.open(url, '_blank') and lets the new tab
+ * turn into a download. The desktop window cannot open tabs, so the same
+ * request is made through a temporary download link instead; the server's
+ * Content-Disposition header still names the file.
+ */
+function downloadInPlace(url: string): void {
+  const link = document.createElement('a')
+  link.href = url
+  link.download = ''
+  link.rel = 'noopener'
+  link.style.display = 'none'
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+}
+
+function anchorFromEvent(event: MouseEvent): HTMLAnchorElement | null {
+  const target = event.target
+  if (!(target instanceof Element)) return null
+  return target.closest('a[href]') as HTMLAnchorElement | null
+}
+
+/**
+ * Route external links and new-window requests through the desktop shell.
+ *
+ * Installed once at startup. Does nothing in a plain browser. Returns a
+ * function that removes the handlers again (used by tests).
+ */
+export function installDesktopShellHandlers(): () => void {
+  if (!isDesktopShell()) return () => {}
+
+  // Bubble phase on window: React's own onClick handlers (and any
+  // preventDefault they call) have already run by the time this fires.
+  const onClick = (event: MouseEvent) => {
+    if (event.defaultPrevented || event.button !== 0) return
+    const anchor = anchorFromEvent(event)
+    if (!anchor) return
+    const href = anchor.getAttribute('href') ?? ''
+    if (!isExternalHttpUrl(href)) return
+    event.preventDefault()
+    void openExternal(anchor.href)
+  }
+  window.addEventListener('click', onClick)
+
+  const originalOpen = window.open
+  window.open = (url?: string | URL, target?: string, features?: string) => {
+    const href = url === undefined ? '' : String(url)
+    if (href && isExternalHttpUrl(href)) {
+      void openExternal(new URL(href, window.location.href).toString())
+      return null
+    }
+    if (href && (target === '_blank' || target === undefined)) {
+      downloadInPlace(href)
+      return null
+    }
+    return originalOpen.call(window, url, target, features)
+  }
+
+  return () => {
+    window.removeEventListener('click', onClick)
+    window.open = originalOpen
+  }
+}

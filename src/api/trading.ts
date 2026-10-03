@@ -1,42 +1,17 @@
-/**
- * Trading API for OpenAlgo Desktop
- *
- * Uses Tauri IPC commands for trading operations.
- */
-
 import type {
-  Funds,
+  ApiResponse,
+  GttOrder,
   Holding,
-  MarketDepth,
-  ModifyOrderRequest,
+  MarginData,
   Order,
-  OrderRequest,
-  OrderResponse,
+  OrderStats,
+  PlaceOrderRequest,
+  PortfolioStats,
   Position,
-  Quote,
-} from './client'
-import {
-  fundsCommands,
-  holdingsCommands,
-  orderCommands,
-  positionCommands,
-  quoteCommands,
-} from './client'
+  Trade,
+} from '@/types/trading'
+import { apiClient, webClient } from './client'
 
-// Re-export types
-export type {
-  Order,
-  OrderRequest,
-  OrderResponse,
-  ModifyOrderRequest,
-  Position,
-  Holding,
-  Funds,
-  Quote,
-  MarketDepth,
-}
-
-// Legacy types for compatibility with existing pages
 export interface QuotesData {
   ask: number
   bid: number
@@ -46,6 +21,26 @@ export interface QuotesData {
   oi: number
   open: number
   prev_close: number
+  volume: number
+}
+
+export interface DepthLevel {
+  price: number
+  quantity: number
+}
+
+export interface DepthData {
+  asks: DepthLevel[]
+  bids: DepthLevel[]
+  high: number
+  low: number
+  ltp: number
+  ltq: number
+  oi: number
+  open: number
+  prev_close: number
+  totalbuyqty: number
+  totalsellqty: number
   volume: number
 }
 
@@ -60,85 +55,37 @@ export interface MultiQuotesResult {
   data: QuotesData
 }
 
-export interface ApiResponse<T> {
-  status: 'success' | 'error' | 'info'
-  data?: T
+// MultiQuotes API has a different response structure (results at root, not in data)
+export interface MultiQuotesApiResponse {
+  status: 'success' | 'error'
+  results?: MultiQuotesResult[]
   message?: string
 }
 
-export interface MarginData {
-  availablecash: number
-  collateral: number
-  m2mrealized: number
-  m2munrealized: number
-  utiliseddebits: number
-}
-
-export interface Trade {
+export interface BasketOrderItem {
   symbol: string
   exchange: string
   action: 'BUY' | 'SELL'
   quantity: number
-  average_price: number
-  trade_value: number
-  product: string
-  orderid: string
-  timestamp: string
-  trade_id?: string
-}
-
-export interface OrderStats {
-  total_buy_orders: number
-  total_sell_orders: number
-  total_completed_orders: number
-  total_open_orders: number
-  total_rejected_orders: number
-}
-
-export interface PortfolioStats {
-  totalholdingvalue: number
-  totalinvvalue: number
-  totalprofitandloss: number
-  totalpnlpercentage: number
-}
-
-export interface PlaceOrderRequest {
-  apikey?: string // Not needed for desktop but kept for compatibility
-  symbol: string
-  exchange: string
-  action: string
-  product: string
-  pricetype: string
-  price: number
-  quantity: number
+  pricetype: 'MARKET' | 'LIMIT' | 'SL' | 'SL-M'
+  product: 'CNC' | 'NRML' | 'MIS'
+  price?: number
   trigger_price?: number
   disclosed_quantity?: number
 }
 
-// Convert Quote to QuotesData format
-function toQuotesData(quote: Quote): QuotesData {
-  return {
-    ask: quote.ask,
-    bid: quote.bid,
-    high: quote.high,
-    low: quote.low,
-    ltp: quote.ltp,
-    oi: quote.oi,
-    open: quote.open,
-    prev_close: quote.close,
-    volume: quote.volume,
-  }
+export interface BasketOrderResult {
+  symbol: string
+  status: 'success' | 'error'
+  orderid?: string
+  message?: string
 }
 
-// Convert Position to legacy format if needed
-function toMarginData(funds: Funds): MarginData {
-  return {
-    availablecash: funds.available_cash,
-    collateral: funds.collateral,
-    m2mrealized: 0,
-    m2munrealized: 0,
-    utiliseddebits: funds.used_margin,
-  }
+export interface BasketOrderResponse {
+  status: 'success' | 'error'
+  message?: string
+  results?: BasketOrderResult[]
+  mode?: 'live' | 'analyze'
 }
 
 export const tradingApi = {
@@ -146,222 +93,134 @@ export const tradingApi = {
    * Get real-time quotes for a symbol
    */
   getQuotes: async (
-    _apiKey: string, // Ignored in desktop - auth is session-based
+    apiKey: string,
     symbol: string,
     exchange: string
   ): Promise<ApiResponse<QuotesData>> => {
-    try {
-      const quotes = await quoteCommands.getQuote([{ exchange, symbol }])
-      if (quotes.length > 0) {
-        return {
-          status: 'success',
-          data: toQuotesData(quotes[0]),
-        }
-      }
-      return {
-        status: 'error',
-        message: 'No quote data returned',
-      }
-    } catch (error) {
-      return {
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      }
-    }
+    const response = await apiClient.post<ApiResponse<QuotesData>>('/quotes', {
+      apikey: apiKey,
+      symbol,
+      exchange,
+    })
+    return response.data
   },
 
   /**
    * Get real-time quotes for multiple symbols
    */
   getMultiQuotes: async (
-    _apiKey: string,
+    apiKey: string,
     symbols: MultiQuotesSymbol[]
-  ): Promise<{ status: string; results?: MultiQuotesResult[]; message?: string }> => {
-    try {
-      const quotes = await quoteCommands.getQuote(
-        symbols.map((s) => ({ exchange: s.exchange, symbol: s.symbol }))
-      )
-      return {
-        status: 'success',
-        results: quotes.map((q) => ({
-          symbol: q.symbol,
-          exchange: q.exchange,
-          data: toQuotesData(q),
-        })),
-      }
-    } catch (error) {
-      return {
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      }
-    }
+  ): Promise<MultiQuotesApiResponse> => {
+    const response = await apiClient.post<MultiQuotesApiResponse>('/multiquotes', {
+      apikey: apiKey,
+      symbols,
+    })
+    return response.data
+  },
+
+  /**
+   * Get market depth for a symbol (5-level order book)
+   */
+  getDepth: async (
+    apiKey: string,
+    symbol: string,
+    exchange: string
+  ): Promise<ApiResponse<DepthData>> => {
+    const response = await apiClient.post<ApiResponse<DepthData>>('/depth', {
+      apikey: apiKey,
+      symbol,
+      exchange,
+    })
+    return response.data
   },
 
   /**
    * Get margin/funds data
    */
-  getFunds: async (_apiKey: string): Promise<ApiResponse<MarginData>> => {
-    try {
-      const funds = await fundsCommands.getFunds()
-      return {
-        status: 'success',
-        data: toMarginData(funds),
-      }
-    } catch (error) {
-      return {
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      }
-    }
+  getFunds: async (apiKey: string): Promise<ApiResponse<MarginData>> => {
+    const response = await apiClient.post<ApiResponse<MarginData>>('/funds', {
+      apikey: apiKey,
+    })
+    return response.data
   },
 
   /**
    * Get positions
    */
-  getPositions: async (_apiKey: string): Promise<ApiResponse<Position[]>> => {
-    try {
-      const positions = await positionCommands.getPositions()
-      return {
-        status: 'success',
-        data: positions,
-      }
-    } catch (error) {
-      return {
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      }
-    }
+  getPositions: async (apiKey: string): Promise<ApiResponse<Position[]>> => {
+    const response = await apiClient.post<ApiResponse<Position[]>>('/positionbook', {
+      apikey: apiKey,
+    })
+    return response.data
   },
 
   /**
    * Get order book
    */
   getOrders: async (
-    _apiKey: string
+    apiKey: string
   ): Promise<ApiResponse<{ orders: Order[]; statistics: OrderStats }>> => {
-    try {
-      const orders = await orderCommands.getOrderBook()
-
-      // Calculate statistics
-      const stats: OrderStats = {
-        total_buy_orders: orders.filter((o) => o.side === 'BUY' || o.action === 'BUY').length,
-        total_sell_orders: orders.filter((o) => o.side === 'SELL' || o.action === 'SELL').length,
-        total_completed_orders: orders.filter((o) => o.status === 'complete').length,
-        total_open_orders: orders.filter((o) => o.status === 'pending' || o.status === 'open')
-          .length,
-        total_rejected_orders: orders.filter((o) => o.status === 'rejected').length,
+    const response = await apiClient.post<ApiResponse<{ orders: Order[]; statistics: OrderStats }>>(
+      '/orderbook',
+      {
+        apikey: apiKey,
       }
-
-      return {
-        status: 'success',
-        data: { orders, statistics: stats },
-      }
-    } catch (error) {
-      return {
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      }
-    }
+    )
+    return response.data
   },
 
   /**
    * Get trade book
    */
-  getTrades: async (_apiKey: string): Promise<ApiResponse<Trade[]>> => {
-    try {
-      const trades = await orderCommands.getTradeBook()
-      return {
-        status: 'success',
-        data: trades.map(
-          (t): Trade => ({
-            symbol: t.symbol,
-            exchange: t.exchange,
-            action: t.action || (t.side === 'BUY' ? 'BUY' : 'SELL'),
-            quantity: t.quantity,
-            average_price: t.average_price,
-            trade_value: t.average_price * t.quantity,
-            product: t.product,
-            orderid: t.orderid || t.order_id,
-            timestamp: t.timestamp || t.order_timestamp,
-            trade_id: t.exchange_order_id || t.order_id,
-          })
-        ),
-      }
-    } catch (error) {
-      return {
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      }
-    }
+  getTrades: async (apiKey: string): Promise<ApiResponse<Trade[]>> => {
+    const response = await apiClient.post<ApiResponse<Trade[]>>('/tradebook', {
+      apikey: apiKey,
+    })
+    return response.data
   },
 
   /**
    * Get holdings
    */
   getHoldings: async (
-    _apiKey: string
+    apiKey: string
   ): Promise<ApiResponse<{ holdings: Holding[]; statistics: PortfolioStats }>> => {
-    try {
-      const holdings = await holdingsCommands.getHoldings()
-
-      // Calculate statistics
-      const totalInvestment = holdings.reduce((sum, h) => sum + h.average_price * h.quantity, 0)
-      const currentValue = holdings.reduce((sum, h) => sum + h.current_value, 0)
-      const totalPnl = holdings.reduce((sum, h) => sum + h.pnl, 0)
-      const totalPnlPercent = totalInvestment > 0 ? (totalPnl / totalInvestment) * 100 : 0
-
-      const stats: PortfolioStats = {
-        totalholdingvalue: currentValue,
-        totalinvvalue: totalInvestment,
-        totalprofitandloss: totalPnl,
-        totalpnlpercentage: totalPnlPercent,
-      }
-
-      return {
-        status: 'success',
-        data: { holdings, statistics: stats },
-      }
-    } catch (error) {
-      return {
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      }
-    }
+    const response = await apiClient.post<
+      ApiResponse<{ holdings: Holding[]; statistics: PortfolioStats }>
+    >('/holdings', {
+      apikey: apiKey,
+    })
+    return response.data
   },
 
   /**
    * Place order
    */
   placeOrder: async (order: PlaceOrderRequest): Promise<ApiResponse<{ orderid: string }>> => {
-    try {
-      const response = await orderCommands.placeOrder({
-        symbol: order.symbol,
-        exchange: order.exchange,
-        side: order.action,
-        quantity: order.quantity,
-        price: order.price,
-        order_type: order.pricetype,
-        product: order.product,
-        validity: 'DAY',
-        trigger_price: order.trigger_price,
-        disclosed_quantity: order.disclosed_quantity,
-        amo: false,
-      })
-
-      return {
-        status: 'success',
-        data: { orderid: response.order_id },
-      }
-    } catch (error) {
-      return {
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      }
-    }
+    const response = await apiClient.post<ApiResponse<{ orderid: string }>>('/placeorder', order)
+    return response.data
   },
 
   /**
-   * Modify order
+   * Place a basket of orders in one call. Each item is independent — the
+   * backend returns a per-order `results[]` so partial success is possible.
+   */
+  placeBasketOrder: async (
+    apiKey: string,
+    strategy: string,
+    orders: BasketOrderItem[]
+  ): Promise<BasketOrderResponse> => {
+    const response = await apiClient.post<BasketOrderResponse>('/basketorder', {
+      apikey: apiKey,
+      strategy,
+      orders,
+    })
+    return response.data
+  },
+
+  /**
+   * Modify order (uses session auth with CSRF)
    */
   modifyOrder: async (
     orderid: string,
@@ -371,131 +230,114 @@ export const tradingApi = {
       action: string
       product: string
       pricetype: string
-      price: number
       quantity: number
+      price?: number
       trigger_price?: number
       disclosed_quantity?: number
     }
   ): Promise<ApiResponse<{ orderid: string }>> => {
-    try {
-      const response = await orderCommands.modifyOrder(orderid, {
-        quantity: orderData.quantity,
-        price: orderData.price,
-        order_type: orderData.pricetype,
-        trigger_price: orderData.trigger_price,
-      })
-
-      return {
-        status: 'success',
-        data: { orderid: response.order_id },
-      }
-    } catch (error) {
-      return {
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      }
-    }
+    const response = await webClient.post<ApiResponse<{ orderid: string }>>('/modify_order', {
+      orderid,
+      ...orderData,
+    })
+    return response.data
   },
 
   /**
-   * Cancel order
+   * Cancel order (uses session auth with CSRF)
    */
   cancelOrder: async (orderid: string): Promise<ApiResponse<{ orderid: string }>> => {
-    try {
-      const response = await orderCommands.cancelOrder(orderid)
-      return {
-        status: 'success',
-        data: { orderid: response.order_id },
-      }
-    } catch (error) {
-      return {
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      }
-    }
+    const response = await webClient.post<ApiResponse<{ orderid: string }>>('/cancel_order', {
+      orderid,
+    })
+    return response.data
   },
 
   /**
-   * Close a specific position
+   * Close a specific position (uses session auth with CSRF)
    */
   closePosition: async (
     symbol: string,
     exchange: string,
     product: string
   ): Promise<ApiResponse<void>> => {
-    try {
-      // Get current position to determine quantity and direction
-      const positions = await positionCommands.getPositions()
-      const position = positions.find(
-        (p) => p.symbol === symbol && p.exchange === exchange && p.product === product
-      )
-
-      if (!position || position.quantity === 0) {
-        return {
-          status: 'error',
-          message: 'Position not found or already closed',
-        }
-      }
-
-      await positionCommands.closePosition({
-        symbol,
-        exchange,
-        product,
-        quantity: Math.abs(position.quantity),
-        position_type: position.quantity > 0 ? 'long' : 'short',
-      })
-
-      return { status: 'success' }
-    } catch (error) {
-      return {
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      }
-    }
+    // Uses the web route which handles session-based auth with CSRF
+    const response = await webClient.post<ApiResponse<void>>('/close_position', {
+      symbol,
+      exchange,
+      product,
+    })
+    return response.data
   },
 
   /**
-   * Close all positions
+   * Close all positions (uses session auth with CSRF)
    */
   closeAllPositions: async (): Promise<ApiResponse<void>> => {
-    try {
-      await positionCommands.closeAllPositions()
-      return { status: 'success' }
-    } catch (error) {
-      return {
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      }
-    }
+    const response = await webClient.post<ApiResponse<void>>('/close_all_positions', {})
+    return response.data
   },
 
   /**
-   * Cancel all orders
+   * Cancel all orders (uses session auth with CSRF)
    */
   cancelAllOrders: async (): Promise<ApiResponse<void>> => {
-    try {
-      const orders = await orderCommands.getOrderBook()
-      const pendingOrders = orders.filter(
-        (o) => o.status === 'pending' || o.status === 'open' || o.status === 'trigger_pending'
-      )
-
-      await Promise.all(pendingOrders.map((o) => orderCommands.cancelOrder(o.order_id)))
-
-      return { status: 'success' }
-    } catch (error) {
-      return {
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      }
-    }
+    const response = await webClient.post<ApiResponse<void>>('/cancel_all_orders', {})
+    return response.data
   },
 
   /**
-   * Get market depth
+   * Get the GTT (Good Till Triggered) order book — active triggers + recent history.
    */
-  getMarketDepth: async (exchange: string, symbol: string): Promise<MarketDepth> => {
-    return quoteCommands.getMarketDepth(exchange, symbol)
+  getGttOrderbook: async (
+    apiKey: string,
+    status: 'active' | 'all' = 'active'
+  ): Promise<ApiResponse<GttOrder[]>> => {
+    const response = await apiClient.post<ApiResponse<GttOrder[]>>('/gttorderbook', {
+      apikey: apiKey,
+      status,
+    })
+    return response.data
+  },
+
+  /**
+   * Cancel an active GTT trigger (uses session auth with CSRF).
+   */
+  cancelGttOrder: async (triggerId: string): Promise<ApiResponse<{ trigger_id: string }>> => {
+    const response = await webClient.post<ApiResponse<{ trigger_id: string }>>(
+      '/cancel_gtt_order',
+      { trigger_id: triggerId }
+    )
+    return response.data
+  },
+
+  /**
+   * Modify an active GTT trigger (uses session auth with CSRF).
+   * Flat replacement body — same shape as PlaceGTTOrder plus trigger_id.
+   * last_price is fetched server-side from the broker's quotes endpoint.
+   */
+  modifyGttOrder: async (
+    triggerId: string,
+    payload: {
+      symbol: string
+      exchange: string
+      trigger_type: 'SINGLE' | 'OCO'
+      action: 'BUY' | 'SELL' | string
+      product: string
+      quantity: number
+      pricetype: string
+      price: number
+      triggerprice_sl: number
+      triggerprice_tg: number
+      stoploss?: number | null
+      target?: number | null
+      strategy?: string
+    }
+  ): Promise<ApiResponse<{ trigger_id: string }>> => {
+    const response = await webClient.post<ApiResponse<{ trigger_id: string }>>(
+      '/modify_gtt_order',
+      { trigger_id: triggerId, ...payload }
+    )
+    return response.data
   },
 }
-
-export default tradingApi

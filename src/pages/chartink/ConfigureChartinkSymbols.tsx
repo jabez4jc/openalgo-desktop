@@ -1,7 +1,6 @@
 import { ArrowLeft, FileText, Plus, RefreshCw, Search, Trash2, Upload } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { toast } from 'sonner'
+import { Link, useParams } from 'react-router'
 import { chartinkApi } from '@/api/chartink'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -43,9 +42,9 @@ import {
 } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
-import type { ChartinkStrategy, ChartinkSymbolMapping } from '@/types/chartink'
+import type { ChartinkStrategy, ChartinkSymbolMapping, SymbolSearchResult } from '@/types/chartink'
 import { CHARTINK_EXCHANGES, CHARTINK_PRODUCTS } from '@/types/chartink'
-import type { SymbolSearchResult } from '@/types/strategy'
+import { showToast } from '@/utils/toast'
 
 export default function ConfigureChartinkSymbols() {
   const { strategyId } = useParams<{ strategyId: string }>()
@@ -79,14 +78,14 @@ export default function ConfigureChartinkSymbols() {
       const data = await chartinkApi.getStrategy(Number(strategyId))
       setStrategy(data.strategy)
       setMappings(data.mappings || [])
-    } catch (error) {
-      console.error('Failed to fetch strategy:', error)
-      toast.error('Failed to load strategy')
+    } catch (_error) {
+      showToast.error('Failed to load strategy', 'chartink')
     } finally {
       setLoading(false)
     }
   }
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: one-time fetch of the strategy on mount; fetchStrategy is recreated each render and adding it would re-run the fetch on every render
   useEffect(() => {
     fetchStrategy()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -107,8 +106,7 @@ export default function ConfigureChartinkSymbols() {
           exchangeFilter as 'NSE' | 'BSE' | undefined
         )
         setSearchResults(results)
-      } catch (error) {
-        console.error('Search failed:', error)
+      } catch (_error) {
       } finally {
         setSearchLoading(false)
       }
@@ -139,19 +137,19 @@ export default function ConfigureChartinkSymbols() {
     e.preventDefault()
 
     if (!chartinkSymbol) {
-      toast.error('Please enter the Chartink symbol')
+      showToast.error('Please enter the Chartink symbol', 'chartink')
       return
     }
     if (!exchange) {
-      toast.error('Please select an exchange (NSE or BSE only)')
+      showToast.error('Please select an exchange (NSE or BSE only)', 'chartink')
       return
     }
     if (!quantity || Number(quantity) < 1) {
-      toast.error('Quantity must be at least 1')
+      showToast.error('Quantity must be at least 1', 'chartink')
       return
     }
     if (!productType) {
-      toast.error('Please select a product type (MIS or CNC)')
+      showToast.error('Please select a product type (MIS or CNC)', 'chartink')
       return
     }
 
@@ -165,7 +163,7 @@ export default function ConfigureChartinkSymbols() {
       })
 
       if (response.status === 'success') {
-        toast.success('Symbol added successfully')
+        showToast.success('Symbol added successfully', 'chartink')
         // Reset form
         setSelectedSymbol(null)
         setSymbolSearch('')
@@ -176,11 +174,10 @@ export default function ConfigureChartinkSymbols() {
         // Refresh mappings
         fetchStrategy()
       } else {
-        toast.error(response.message || 'Failed to add symbol')
+        showToast.error(response.message || 'Failed to add symbol', 'chartink')
       }
-    } catch (error) {
-      console.error('Failed to add symbol:', error)
-      toast.error('Failed to add symbol')
+    } catch (_error) {
+      showToast.error('Failed to add symbol', 'chartink')
     } finally {
       setSubmitting(false)
     }
@@ -190,7 +187,7 @@ export default function ConfigureChartinkSymbols() {
     e.preventDefault()
 
     if (!csvData.trim()) {
-      toast.error('Please enter CSV data')
+      showToast.error('Please enter CSV data', 'chartink')
       return
     }
 
@@ -200,15 +197,17 @@ export default function ConfigureChartinkSymbols() {
 
       if (response.status === 'success') {
         const { added = 0, failed = 0 } = response.data || {}
-        toast.success(`Added ${added} symbols${failed > 0 ? `, ${failed} failed` : ''}`)
+        showToast.success(
+          `Added ${added} symbols${failed > 0 ? `, ${failed} failed` : ''}`,
+          'chartink'
+        )
         setCsvData('')
         fetchStrategy()
       } else {
-        toast.error(response.message || 'Failed to add symbols')
+        showToast.error(response.message || 'Failed to add symbols', 'chartink')
       }
-    } catch (error) {
-      console.error('Failed to add bulk symbols:', error)
-      toast.error('Failed to add symbols')
+    } catch (_error) {
+      showToast.error('Failed to add symbols', 'chartink')
     } finally {
       setSubmitting(false)
     }
@@ -221,13 +220,12 @@ export default function ConfigureChartinkSymbols() {
       const response = await chartinkApi.deleteSymbolMapping(Number(strategyId), mappingToDelete)
       if (response.status === 'success') {
         setMappings(mappings.filter((m) => m.id !== mappingToDelete))
-        toast.success('Symbol removed')
+        showToast.success('Symbol removed', 'chartink')
       } else {
-        toast.error(response.message || 'Failed to remove symbol')
+        showToast.error(response.message || 'Failed to remove symbol', 'chartink')
       }
-    } catch (error) {
-      console.error('Failed to delete mapping:', error)
-      toast.error('Failed to remove symbol')
+    } catch (_error) {
+      showToast.error('Failed to remove symbol', 'chartink')
     } finally {
       setDeleteDialogOpen(false)
       setMappingToDelete(null)
@@ -509,6 +507,7 @@ export default function ConfigureChartinkSymbols() {
                           setMappingToDelete(mapping.id)
                           setDeleteDialogOpen(true)
                         }}
+                        aria-label="Delete symbol mapping"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

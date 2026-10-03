@@ -1,7 +1,6 @@
 import { ArrowLeft, Calendar, ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { toast } from 'sonner'
+import { Link } from 'react-router'
 import { adminApi } from '@/api/admin'
 import {
   AlertDialog,
@@ -42,7 +41,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import type { Holiday } from '@/types/admin'
+import type { Holiday, SpecialSessionExchange } from '@/types/admin'
+import { showToast } from '@/utils/toast'
 
 const HOLIDAY_TYPES = [
   { value: 'TRADING_HOLIDAY', label: 'Trading Holiday' },
@@ -64,11 +64,13 @@ export default function HolidaysPage() {
     description: string
     holiday_type: 'TRADING_HOLIDAY' | 'SETTLEMENT_HOLIDAY' | 'SPECIAL_SESSION'
     closed_exchanges: string[]
+    open_exchanges: SpecialSessionExchange[]
   }>({
     date: '',
     description: '',
     holiday_type: 'TRADING_HOLIDAY',
     closed_exchanges: [],
+    open_exchanges: [],
   })
   const [isAdding, setIsAdding] = useState(false)
 
@@ -76,6 +78,7 @@ export default function HolidaysPage() {
   const [deleteHoliday, setDeleteHoliday] = useState<Holiday | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: fetch is intentionally keyed only on currentYear; fetchHolidays is recreated each render and adding it would re-run the fetch on every render
   useEffect(() => {
     fetchHolidays(currentYear)
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -88,50 +91,81 @@ export default function HolidaysPage() {
       setHolidays(response.data)
       setYears(response.years)
       setExchanges(response.exchanges)
-    } catch (error) {
-      console.error('Error fetching holidays:', error)
-      toast.error('Failed to load holidays')
+    } catch (_error) {
+      showToast.error('Failed to load holidays', 'admin')
     } finally {
       setIsLoading(false)
     }
   }
 
+  // Convert HH:MM time string to epoch milliseconds for a given date
+  const timeToEpochMs = (dateStr: string, timeStr: string): number => {
+    const [hours, minutes] = timeStr.split(':').map(Number)
+    const date = new Date(`${dateStr}T00:00:00+05:30`) // IST timezone
+    date.setHours(hours, minutes, 0, 0)
+    return date.getTime()
+  }
+
   const handleAdd = async () => {
     if (!newHoliday.date || !newHoliday.description) {
-      toast.error('Please fill in date and description')
+      showToast.error('Please fill in date and description', 'admin')
       return
     }
 
     if (newHoliday.holiday_type === 'TRADING_HOLIDAY' && newHoliday.closed_exchanges.length === 0) {
-      toast.error('Please select at least one exchange to close')
+      showToast.error('Please select at least one exchange to close', 'admin')
       return
+    }
+
+    if (newHoliday.holiday_type === 'SPECIAL_SESSION') {
+      if (newHoliday.open_exchanges.length === 0) {
+        showToast.error('Please add at least one exchange with timings', 'admin')
+        return
+      }
+      // Validate all exchanges have valid timings
+      for (const ex of newHoliday.open_exchanges) {
+        if (!ex.start_time || !ex.end_time) {
+          showToast.error(`Please enter start and end time for ${ex.exchange}`, 'admin')
+          return
+        }
+      }
     }
 
     setIsAdding(true)
     try {
+      // Convert open_exchanges times to epoch milliseconds
+      const openExchangesWithEpoch = newHoliday.open_exchanges.map((ex) => ({
+        exchange: ex.exchange,
+        start_time: timeToEpochMs(newHoliday.date, ex.start_time),
+        end_time: timeToEpochMs(newHoliday.date, ex.end_time),
+      }))
+
       const response = await adminApi.addHoliday({
         date: newHoliday.date,
         description: newHoliday.description,
         holiday_type: newHoliday.holiday_type,
         closed_exchanges: newHoliday.closed_exchanges,
+        open_exchanges:
+          newHoliday.holiday_type === 'SPECIAL_SESSION' ? openExchangesWithEpoch : undefined,
       })
 
       if (response.status === 'success') {
-        toast.success(response.message || 'Holiday added successfully')
+        showToast.success(response.message || 'Holiday added successfully', 'admin')
         setShowAddDialog(false)
         setNewHoliday({
           date: '',
           description: '',
           holiday_type: 'TRADING_HOLIDAY',
           closed_exchanges: [],
+          open_exchanges: [],
         })
         fetchHolidays(currentYear)
       } else {
-        toast.error(response.message || 'Failed to add holiday')
+        showToast.error(response.message || 'Failed to add holiday', 'admin')
       }
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } }
-      toast.error(err.response?.data?.message || 'Failed to add holiday')
+      showToast.error(err.response?.data?.message || 'Failed to add holiday', 'admin')
     } finally {
       setIsAdding(false)
     }
@@ -145,15 +179,15 @@ export default function HolidaysPage() {
       const response = await adminApi.deleteHoliday(deleteHoliday.id)
 
       if (response.status === 'success') {
-        toast.success(response.message || 'Holiday deleted successfully')
+        showToast.success(response.message || 'Holiday deleted successfully', 'admin')
         setDeleteHoliday(null)
         fetchHolidays(currentYear)
       } else {
-        toast.error(response.message || 'Failed to delete holiday')
+        showToast.error(response.message || 'Failed to delete holiday', 'admin')
       }
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } }
-      toast.error(err.response?.data?.message || 'Failed to delete holiday')
+      showToast.error(err.response?.data?.message || 'Failed to delete holiday', 'admin')
     } finally {
       setIsDeleting(false)
     }
@@ -172,6 +206,50 @@ export default function HolidaysPage() {
     setNewHoliday((prev) => ({
       ...prev,
       closed_exchanges: exchanges,
+    }))
+  }
+
+  // Special session exchange management
+  const addSpecialSessionExchange = (exchange: string) => {
+    if (newHoliday.open_exchanges.find((e) => e.exchange === exchange)) {
+      return // Already added
+    }
+    setNewHoliday((prev) => ({
+      ...prev,
+      open_exchanges: [
+        ...prev.open_exchanges,
+        { exchange, start_time: '18:00', end_time: '19:15' }, // Default Muhurat timings
+      ],
+    }))
+  }
+
+  const removeSpecialSessionExchange = (exchange: string) => {
+    setNewHoliday((prev) => ({
+      ...prev,
+      open_exchanges: prev.open_exchanges.filter((e) => e.exchange !== exchange),
+    }))
+  }
+
+  const updateSpecialSessionTime = (
+    exchange: string,
+    field: 'start_time' | 'end_time',
+    value: string
+  ) => {
+    setNewHoliday((prev) => ({
+      ...prev,
+      open_exchanges: prev.open_exchanges.map((e) =>
+        e.exchange === exchange ? { ...e, [field]: value } : e
+      ),
+    }))
+  }
+
+  const addAllExchangesForSpecialSession = () => {
+    const newExchanges = exchanges
+      .filter((ex) => !newHoliday.open_exchanges.find((e) => e.exchange === ex))
+      .map((ex) => ({ exchange: ex, start_time: '18:00', end_time: '19:15' }))
+    setNewHoliday((prev) => ({
+      ...prev,
+      open_exchanges: [...prev.open_exchanges, ...newExchanges],
     }))
   }
 
@@ -257,6 +335,8 @@ export default function HolidaysPage() {
                 size="icon"
                 onClick={() => setCurrentYear((y) => y - 1)}
                 disabled={!years.includes(currentYear - 1)}
+                title="Previous year"
+                aria-label="Previous year"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -280,6 +360,8 @@ export default function HolidaysPage() {
                 size="icon"
                 onClick={() => setCurrentYear((y) => y + 1)}
                 disabled={!years.includes(currentYear + 1)}
+                title="Next year"
+                aria-label="Next year"
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -336,6 +418,8 @@ export default function HolidaysPage() {
                           variant="ghost"
                           className="h-8 w-8 text-destructive hover:text-destructive"
                           onClick={() => setDeleteHoliday(holiday)}
+                          title="Delete holiday"
+                          aria-label={`Delete holiday ${holiday.description}`}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -423,6 +507,83 @@ export default function HolidaysPage() {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+            {newHoliday.holiday_type === 'SPECIAL_SESSION' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Exchanges with Special Timings</Label>
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="h-auto p-0"
+                    onClick={addAllExchangesForSpecialSession}
+                  >
+                    Add All
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Set trading hours for each exchange during this special session (e.g., Muhurat
+                  Trading 18:00-19:15)
+                </p>
+                {/* Add exchange selector */}
+                <div className="flex gap-2">
+                  <Select onValueChange={(value) => addSpecialSessionExchange(value)} value="">
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Select exchange to add..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {exchanges
+                        .filter((ex) => !newHoliday.open_exchanges.find((e) => e.exchange === ex))
+                        .map((exchange) => (
+                          <SelectItem key={exchange} value={exchange}>
+                            {exchange}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {/* List of added exchanges with timings */}
+                {newHoliday.open_exchanges.length > 0 && (
+                  <div className="space-y-2 border rounded-md p-3">
+                    {newHoliday.open_exchanges.map((ex) => (
+                      <div key={ex.exchange} className="flex items-center gap-2">
+                        <Badge variant="outline" className="min-w-[50px] justify-center">
+                          {ex.exchange}
+                        </Badge>
+                        <Input
+                          type="time"
+                          value={ex.start_time}
+                          onChange={(e) =>
+                            updateSpecialSessionTime(ex.exchange, 'start_time', e.target.value)
+                          }
+                          className="w-[110px]"
+                          aria-label={`Start time for ${ex.exchange}`}
+                        />
+                        <span className="text-muted-foreground">to</span>
+                        <Input
+                          type="time"
+                          value={ex.end_time}
+                          onChange={(e) =>
+                            updateSpecialSessionTime(ex.exchange, 'end_time', e.target.value)
+                          }
+                          className="w-[110px]"
+                          aria-label={`End time for ${ex.exchange}`}
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => removeSpecialSessionExchange(ex.exchange)}
+                          title="Remove exchange"
+                          aria-label={`Remove ${ex.exchange} from special session`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

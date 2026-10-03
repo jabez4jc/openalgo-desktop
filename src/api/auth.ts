@@ -1,154 +1,104 @@
-/**
- * Auth API for OpenAlgo Desktop
- *
- * Uses Tauri IPC commands for authentication operations.
- */
-
-import type {
-  BrokerCredentials,
-  BrokerInfo,
-  BrokerLoginResponse,
-  BrokerStatus,
-  LoginResponse,
-  UserInfo,
-} from './client'
-import { authCommands, brokerCommands, settingsCommands } from './client'
-
-// Re-export types for compatibility
-export type { BrokerInfo, LoginResponse, UserInfo }
-
-export interface LoginCredentials {
-  username: string
-  password: string
-}
-
-export interface SessionInfo {
-  authenticated: boolean
-  user?: UserInfo
-  broker?: BrokerStatus
-}
+import type { BrokerInfo, LoginCredentials, LoginResponse, SessionInfo } from '@/types/auth'
+import { authClient } from './client'
 
 export const authApi = {
   /**
    * Login with username and password
    */
-  login: async (credentials: LoginCredentials): Promise<LoginResponse> => {
-    return authCommands.login({
-      username: credentials.username,
-      password: credentials.password,
+  login: async (credentials: LoginCredentials, csrfToken?: string): Promise<LoginResponse> => {
+    const formData = new FormData()
+    formData.append('username', credentials.username)
+    formData.append('password', credentials.password)
+    if (csrfToken) {
+      formData.append('csrf_token', csrfToken)
+    }
+
+    const response = await authClient.post<LoginResponse>('/auth/login', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
     })
+    return response.data
   },
 
   /**
    * Logout current user
    */
   logout: async (): Promise<void> => {
-    await authCommands.logout()
+    await authClient.post('/auth/logout')
   },
 
   /**
    * Get current session info
    */
   getSession: async (): Promise<SessionInfo> => {
-    const [isAuthenticated, user, brokerStatus] = await Promise.all([
-      authCommands.checkSession(),
-      authCommands.getCurrentUser(),
-      brokerCommands.getBrokerStatus(),
-    ])
-
-    return {
-      authenticated: isAuthenticated,
-      user: user || undefined,
-      broker: brokerStatus,
-    }
-  },
-
-  /**
-   * Check if user is authenticated
-   */
-  checkSession: async (): Promise<boolean> => {
-    return authCommands.checkSession()
-  },
-
-  /**
-   * Get current user info
-   */
-  getCurrentUser: async (): Promise<UserInfo | null> => {
-    return authCommands.getCurrentUser()
+    const response = await authClient.get<SessionInfo>('/auth/session')
+    return response.data
   },
 
   /**
    * Get list of available brokers
    */
   getBrokers: async (): Promise<BrokerInfo[]> => {
-    return brokerCommands.getAvailableBrokers()
+    const response = await authClient.get<{ brokers: BrokerInfo[] }>('/auth/brokers')
+    return response.data.brokers
   },
 
   /**
-   * Login to broker with credentials
+   * Initiate broker OAuth flow
    */
-  brokerLogin: async (
-    brokerId: string,
-    credentials: BrokerCredentials
-  ): Promise<BrokerLoginResponse> => {
-    return brokerCommands.brokerLogin({
-      broker_id: brokerId,
-      credentials,
-    })
+  initiateBrokerAuth: async (
+    broker: string
+  ): Promise<{ redirect_url?: string; requires_totp?: boolean }> => {
+    const response = await authClient.post(`/auth/broker/${broker}`)
+    return response.data
   },
 
   /**
-   * Logout from broker
+   * Submit TOTP for broker authentication
    */
-  brokerLogout: async (): Promise<void> => {
-    await brokerCommands.brokerLogout()
+  submitTOTP: async (
+    broker: string,
+    totp: string,
+    additionalFields?: Record<string, string>
+  ): Promise<LoginResponse> => {
+    const formData = new FormData()
+    formData.append('totp', totp)
+    if (additionalFields) {
+      Object.entries(additionalFields).forEach(([key, value]) => {
+        formData.append(key, value)
+      })
+    }
+    const response = await authClient.post<LoginResponse>(`/${broker}/auth`, formData)
+    return response.data
   },
 
   /**
-   * Get broker connection status
+   * Get CSRF token for forms
    */
-  getBrokerStatus: async (): Promise<BrokerStatus> => {
-    return brokerCommands.getBrokerStatus()
+  getCSRFToken: async (): Promise<string> => {
+    const response = await authClient.get<{ csrf_token: string }>('/auth/csrf-token')
+    return response.data.csrf_token
   },
 
   /**
-   * Set active broker
+   * Reset password request
    */
-  setActiveBroker: async (brokerId: string): Promise<void> => {
-    await brokerCommands.setActiveBroker(brokerId)
+  resetPassword: async (email: string): Promise<LoginResponse> => {
+    const formData = new FormData()
+    formData.append('email', email)
+    const response = await authClient.post<LoginResponse>('/auth/reset-password', formData)
+    return response.data
   },
 
   /**
-   * Save broker API credentials to OS keychain
+   * Change password
    */
-  saveBrokerCredentials: async (
-    brokerId: string,
-    apiKey: string,
-    apiSecret?: string,
-    clientId?: string
-  ): Promise<void> => {
-    await settingsCommands.saveBrokerCredentials({
-      broker_id: brokerId,
-      api_key: apiKey,
-      api_secret: apiSecret,
-      client_id: clientId,
-    })
-  },
-
-  /**
-   * Delete broker credentials from OS keychain
-   */
-  deleteBrokerCredentials: async (brokerId: string): Promise<void> => {
-    await settingsCommands.deleteBrokerCredentials(brokerId)
-  },
-
-  /**
-   * Change password (for app user, not broker)
-   */
-  changePassword: async (_currentPassword: string, _newPassword: string): Promise<void> => {
-    // TODO: Implement password change command in Rust
-    throw new Error('Password change not yet implemented')
+  changePassword: async (currentPassword: string, newPassword: string): Promise<LoginResponse> => {
+    const formData = new FormData()
+    formData.append('current_password', currentPassword)
+    formData.append('new_password', newPassword)
+    const response = await authClient.post<LoginResponse>('/auth/change-password', formData)
+    return response.data
   },
 }
-
-export default authApi

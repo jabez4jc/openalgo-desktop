@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   ArrowDown,
   ArrowLeft,
   ArrowUp,
@@ -13,10 +14,10 @@ import {
   X,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { io, type Socket } from 'socket.io-client'
-import { toast } from 'sonner'
+import { Link } from 'react-router'
 import { webClient } from '@/api/client'
+import { useSocketContext } from '@/components/socket/SocketProvider'
+import { useKeepReconnecting } from '@/components/socket/useKeepReconnecting'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
   AlertDialog,
@@ -41,6 +42,8 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useAlertStore } from '@/stores/alertStore'
+import { showToast } from '@/utils/toast'
 
 interface PendingOrder {
   id: number
@@ -48,14 +51,63 @@ interface PendingOrder {
   api_type: string
   symbol: string
   exchange: string
-  action: 'BUY' | 'SELL'
-  quantity: number
-  price: number
+  action: 'BUY' | 'SELL' | 'MULTI'
+  quantity: number | string
+  price: number | string
   price_type: string
   product_type: string
   status: 'pending' | 'approved' | 'rejected'
   created_at_ist: string
   raw_order_data: Record<string, unknown>
+  /** What the broker said once the order was sent, e.g. open, complete, rejected. */
+  broker_status?: string | null
+  broker_order_id?: string | null
+  /**
+   * Seconds since the order was approved, measured by the server when this
+   * list was read. Null while it is pending. Approval age alone cannot tell
+   * whether a long split or basket send is still running.
+   */
+  approved_age_seconds?: number | null
+}
+
+/**
+ * The broker_status of an approved order OpenAlgo has started sending and has
+ * no broker answer recorded for (SUBMITTING in database/action_center_db.py).
+ *
+ * It is written just before the order goes to the broker and replaced by the
+ * broker's answer as soon as there is one. A long-running split or basket send
+ * can remain in this state for minutes; a crash can leave it there indefinitely.
+ * Elapsed time cannot distinguish those cases, so the page never treats age as
+ * proof that sending stopped.
+ */
+const SENDING_NOT_CONFIRMED = 'submitting'
+
+/**
+ * When to show a longer-wait notice. This is a prompt to investigate an order
+ * without a broker answer, not a deadline after which sending must have stopped.
+ */
+export const SEND_SETTLE_MS = 120_000
+
+/** When this order's send began, on this page's clock, or null if unknown. */
+function sendStartedAt(order: PendingOrder, readAt: number): number | null {
+  const age = order.approved_age_seconds
+  if (typeof age !== 'number' || !Number.isFinite(age)) return null
+  return readAt - age * 1000
+}
+
+function isClaimed(order: PendingOrder): boolean {
+  return order.status === 'approved' && order.broker_status === SENDING_NOT_CONFIRMED
+}
+
+/** An approved order in the initial sending window. */
+function isSending(order: PendingOrder, readAt: number, now: number): boolean {
+  const started = sendStartedAt(order, readAt)
+  return isClaimed(order) && started !== null && now - started < SEND_SETTLE_MS
+}
+
+/** An approved order still lacking an answer after the initial window. */
+function isSendNotConfirmed(order: PendingOrder, readAt: number, now: number): boolean {
+  return isClaimed(order) && !isSending(order, readAt, now)
 }
 
 interface OrderStats {
@@ -89,6 +141,9 @@ export default function ActionCenterPage() {
     'pending'
   )
   const [expandedOrders, setExpandedOrders] = useState<Set<number>>(new Set())
+  // When the list was read, and the clock the send states are judged by.
+  const [readAt, setReadAt] = useState(() => Date.now())
+  const [now, setNow] = useState(() => Date.now())
 
   // Confirmation dialogs
   const [orderToDelete, setOrderToDelete] = useState<PendingOrder | null>(null)
@@ -97,18 +152,22 @@ export default function ActionCenterPage() {
   const [isRejecting, setIsRejecting] = useState<number | null>(null)
   const [isApprovingAll, setIsApprovingAll] = useState(false)
 
-  // Socket ref for realtime updates
-  const socketRef = useRef<Socket | null>(null)
+  // The app-wide Socket.IO connection, for realtime updates
+  const { socket } = useSocketContext()
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const fetchData = useCallback(async () => {
     try {
-      const statusParam = activeFilter === 'all' ? '' : activeFilter
+      // Always named, "all" included: the server reads a missing status as
+      // pending, so All Orders used to list only the pending ones.
       const response = await webClient.get<ActionCenterResponse>(
-        `/action-center/api/data${statusParam ? `?status=${statusParam}` : ''}`
+        `/action-center/api/data?status=${activeFilter}`
       )
 
       if (response.data.status === 'success') {
+        const read = Date.now()
+        setReadAt(read)
+        setNow(read)
         setOrders(Array.isArray(response.data.data.orders) ? response.data.data.orders : [])
         setStats(
           response.data.data.statistics || {
@@ -120,9 +179,8 @@ export default function ActionCenterPage() {
           }
         )
       }
-    } catch (error) {
-      console.error('Error fetching action center data:', error)
-      toast.error('Failed to load action center data')
+    } catch (_error) {
+      showToast.error('Failed to load action center data', 'actionCenter')
     } finally {
       setIsLoading(false)
       setIsRefreshing(false)
@@ -131,61 +189,88 @@ export default function ActionCenterPage() {
 
   useEffect(() => {
     fetchData()
-    // Auto-refresh every 30 seconds for pending orders
-    if (activeFilter === 'pending') {
-      const interval = setInterval(fetchData, 30000)
-      return () => clearInterval(interval)
-    }
-  }, [fetchData, activeFilter])
+  }, [fetchData])
 
-  // Socket connection for realtime order updates
+  // A send may finish, which refreshes this page through pending_order_updated,
+  // or outlive SEND_SETTLE_MS. Look again then and show the longer-wait notice
+  // without assuming that the send stopped.
   useEffect(() => {
-    // Create audio element for alert sounds
+    let next: number | null = null
+    for (const order of orders) {
+      if (!isSending(order, readAt, now)) continue
+      const started = sendStartedAt(order, readAt)
+      if (started === null) continue
+      const settles = started + SEND_SETTLE_MS
+      if (next === null || settles < next) next = settles
+    }
+    if (next === null) return
+    const timer = window.setTimeout(
+      () => {
+        setNow(Date.now())
+        fetchData()
+      },
+      Math.max(0, next - Date.now()) + 50
+    )
+    return () => window.clearTimeout(timer)
+  }, [orders, readAt, now, fetchData])
+
+  // Alert sound for newly queued orders
+  useEffect(() => {
     audioRef.current = new Audio('/sounds/alert.mp3')
     audioRef.current.preload = 'auto'
+  }, [])
 
-    // Connect to socket server
-    const protocol = window.location.protocol
-    const host = window.location.hostname
-    const port = window.location.port
-
-    socketRef.current = io(`${protocol}//${host}:${port}`, {
-      transports: ['websocket', 'polling'],
-    })
-
-    const socket = socketRef.current
+  // Realtime order updates, on the app-wide connection SocketProvider owns.
+  // This page used to open a second connection of its own, which the server had
+  // to keep waiting alongside the first for as long as the page was open.
+  useEffect(() => {
+    if (!socket) return
 
     // Listen for new pending orders (semi-auto mode)
-    socket.on('pending_order_created', (data: { api_type: string; message: string }) => {
-      // Play alert sound
-      if (audioRef.current) {
+    const onCreated = (data: { api_type: string; message: string }) => {
+      const { shouldShowToast, shouldPlaySound } = useAlertStore.getState()
+
+      // Play alert sound if enabled
+      if (shouldPlaySound() && shouldShowToast('actionCenter') && audioRef.current) {
         audioRef.current.play().catch(() => {})
       }
 
-      // Show toast notification
-      toast.warning(`New Order Queued: ${data.message}`, {
+      // Show toast notification (showToast handles category filtering)
+      showToast.warning(`New Order Queued: ${data.message}`, 'actionCenter', {
         duration: 5000,
       })
 
-      // Refresh data to show new order
+      // Refresh data to show new order (always do this regardless of toast settings)
       fetchData()
-    })
+    }
 
     // Listen for order updates (approved, rejected, deleted)
-    socket.on('pending_order_updated', () => {
+    const onUpdated = () => {
       // Refresh data
       fetchData()
-    })
-
-    return () => {
-      socket.disconnect()
     }
-  }, [fetchData])
+
+    socket.on('pending_order_created', onCreated)
+    socket.on('pending_order_updated', onUpdated)
+
+    // Remove only this page's handlers: the connection is shared with the rest
+    // of the app and stays open.
+    return () => {
+      socket.off('pending_order_created', onCreated)
+      socket.off('pending_order_updated', onUpdated)
+    }
+  }, [socket, fetchData])
+
+  // The connection this page used to own never stopped trying to reconnect, so
+  // a trader waiting here for orders to approve got them again after a server
+  // restart of any length. The shared connection gives up after five attempts;
+  // keep it trying while this page is open.
+  useKeepReconnecting(socket)
 
   const handleRefresh = async () => {
     setIsRefreshing(true)
     await fetchData()
-    toast.success('Data refreshed')
+    showToast.success('Data refreshed', 'actionCenter')
   }
 
   const handleApprove = async (orderId: number) => {
@@ -197,17 +282,17 @@ export default function ActionCenterPage() {
       )
 
       if (response.data.status === 'success') {
-        toast.success(response.data.message || 'Order approved and executed')
+        showToast.success(response.data.message || 'Order approved and executed', 'actionCenter')
         fetchData()
       } else if (response.data.status === 'warning') {
-        toast.warning(response.data.message)
+        showToast.warning(response.data.message, 'actionCenter')
         fetchData()
       } else {
-        toast.error(response.data.message || 'Failed to approve order')
+        showToast.error(response.data.message || 'Failed to approve order', 'actionCenter')
       }
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } }
-      toast.error(err.response?.data?.message || 'Failed to approve order')
+      showToast.error(err.response?.data?.message || 'Failed to approve order', 'actionCenter')
     } finally {
       setIsApproving(null)
     }
@@ -222,14 +307,14 @@ export default function ActionCenterPage() {
       )
 
       if (response.data.status === 'success') {
-        toast.success('Order rejected')
+        showToast.success('Order rejected', 'actionCenter')
         fetchData()
       } else {
-        toast.error(response.data.message || 'Failed to reject order')
+        showToast.error(response.data.message || 'Failed to reject order', 'actionCenter')
       }
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } }
-      toast.error(err.response?.data?.message || 'Failed to reject order')
+      showToast.error(err.response?.data?.message || 'Failed to reject order', 'actionCenter')
     } finally {
       setIsRejecting(null)
     }
@@ -245,15 +330,15 @@ export default function ActionCenterPage() {
       )
 
       if (response.data.status === 'success') {
-        toast.success('Order deleted')
+        showToast.success('Order deleted', 'actionCenter')
         setOrderToDelete(null)
         fetchData()
       } else {
-        toast.error(response.data.message || 'Failed to delete order')
+        showToast.error(response.data.message || 'Failed to delete order', 'actionCenter')
       }
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } }
-      toast.error(err.response?.data?.message || 'Failed to delete order')
+      showToast.error(err.response?.data?.message || 'Failed to delete order', 'actionCenter')
     } finally {
       setIsDeleting(false)
     }
@@ -268,17 +353,17 @@ export default function ActionCenterPage() {
       )
 
       if (response.data.status === 'success') {
-        toast.success(response.data.message || 'All orders approved')
+        showToast.success(response.data.message || 'All orders approved', 'actionCenter')
         fetchData()
       } else if (response.data.status === 'warning') {
-        toast.warning(response.data.message)
+        showToast.warning(response.data.message, 'actionCenter')
         fetchData()
       } else {
-        toast.error(response.data.message || 'Failed to approve all orders')
+        showToast.error(response.data.message || 'Failed to approve all orders', 'actionCenter')
       }
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } }
-      toast.error(err.response?.data?.message || 'Failed to approve all orders')
+      showToast.error(err.response?.data?.message || 'Failed to approve all orders', 'actionCenter')
     } finally {
       setIsApprovingAll(false)
     }
@@ -534,14 +619,16 @@ export default function ActionCenterPage() {
                             className={`gap-1 ${
                               order.action === 'BUY'
                                 ? 'bg-green-500 hover:bg-green-600'
-                                : 'bg-red-500 hover:bg-red-600'
+                                : order.action === 'SELL'
+                                  ? 'bg-red-500 hover:bg-red-600'
+                                  : 'bg-muted text-muted-foreground hover:bg-muted'
                             }`}
                           >
                             {order.action === 'BUY' ? (
                               <ArrowUp className="h-3 w-3" />
-                            ) : (
+                            ) : order.action === 'SELL' ? (
                               <ArrowDown className="h-3 w-3" />
-                            )}
+                            ) : null}
                             {order.action}
                           </Badge>
                         </TableCell>
@@ -568,6 +655,11 @@ export default function ActionCenterPage() {
                               variant="ghost"
                               className="h-8 w-8"
                               onClick={() => toggleExpanded(order.id)}
+                              aria-label={
+                                expandedOrders.has(order.id)
+                                  ? 'Collapse order details'
+                                  : 'Expand order details'
+                              }
                             >
                               {expandedOrders.has(order.id) ? (
                                 <ChevronUp className="h-4 w-4" />
@@ -575,6 +667,21 @@ export default function ActionCenterPage() {
                                 <ChevronDown className="h-4 w-4" />
                               )}
                             </Button>
+
+                            {isSending(order, readAt, now) && (
+                              <Badge variant="outline" className="h-8">
+                                Sending
+                              </Badge>
+                            )}
+
+                            {isSendNotConfirmed(order, readAt, now) && (
+                              <Badge
+                                variant="outline"
+                                className="h-8 border-amber-500 text-amber-700 dark:text-amber-400"
+                              >
+                                Status unclear
+                              </Badge>
+                            )}
 
                             {order.status === 'pending' ? (
                               <>
@@ -617,6 +724,25 @@ export default function ActionCenterPage() {
                           </div>
                         </TableCell>
                       </TableRow>
+
+                      {/* A long send may still be running or have been interrupted. */}
+                      {isSendNotConfirmed(order, readAt, now) && (
+                        <TableRow>
+                          <TableCell colSpan={10} className="p-2">
+                            <Alert variant="warning">
+                              <AlertTriangle className="h-4 w-4" />
+                              <AlertTitle>This order may still be sending</AlertTitle>
+                              <AlertDescription>
+                                OpenAlgo has no broker answer recorded. A split or basket order can
+                                take longer than two minutes. Sending may still be in progress, or
+                                an interruption may have left its outcome unknown. Check your
+                                broker's order book and refresh this page. Do not place this order
+                                again while its status is unclear.
+                              </AlertDescription>
+                            </Alert>
+                          </TableCell>
+                        </TableRow>
+                      )}
 
                       {/* Expanded Details Row */}
                       {expandedOrders.has(order.id) && (

@@ -1,23 +1,11 @@
-import { invoke } from '@tauri-apps/api/core'
-import { BarChart3, BookOpen, FileText, MessageCircle, Search, Zap } from 'lucide-react'
+import { BarChart3, BookOpen, FileText, GraduationCap, Search, Zap } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import { useOrderEventRefresh } from '@/hooks/useOrderEventRefresh'
 import { cn } from '@/lib/utils'
-import { onModeChange, useThemeStore } from '@/stores/themeStore'
-
-interface FundsData {
-  available_cash: number
-  used_margin: number
-  total_margin: number
-  opening_balance: number
-  payin: number
-  payout: number
-  span: number
-  exposure: number
-  collateral: number
-}
+import { onModeChange } from '@/stores/themeStore'
 
 interface MarginData {
   availablecash: string
@@ -31,15 +19,6 @@ interface MasterContractStatus {
   status: 'pending' | 'downloading' | 'success' | 'error'
   message?: string
   total_symbols?: number
-}
-
-interface SandboxFunds {
-  initial_capital: number
-  available_capital: number
-  used_margin: number
-  realized_pnl: number
-  unrealized_pnl: number
-  total_pnl: number
 }
 
 // Format number in Indian format with Cr/L suffixes
@@ -88,58 +67,52 @@ export default function Dashboard() {
     status: 'pending',
   })
   const [isAuthenticated, setIsAuthenticated] = useState(true) // Assume authenticated initially
-  const { appMode } = useThemeStore()
+  // Broker token revoked/expired while the app session is still valid
+  // (daily token rollover). Routes the user to /broker, not /login (#1400).
+  const [brokerExpired, setBrokerExpired] = useState(false)
 
-  // Fetch dashboard funds data using Tauri invoke
+  // Fetch dashboard funds data
   const fetchFundsData = useCallback(async () => {
     try {
       setIsLoading(true)
+      const response = await fetch('/auth/dashboard-data', {
+        credentials: 'include',
+      })
 
-      // In analyzer mode, fetch sandbox funds instead of live funds
-      if (appMode === 'analyzer' || appMode === 'sandbox') {
-        const sandboxFunds = await invoke<SandboxFunds>('get_sandbox_funds')
-        // Convert SandboxFunds to MarginData format for compatibility
-        setMarginData({
-          availablecash: sandboxFunds.available_capital.toString(),
-          collateral: '0', // Sandbox doesn't track collateral
-          m2munrealized: sandboxFunds.unrealized_pnl.toString(),
-          m2mrealized: sandboxFunds.realized_pnl.toString(),
-          utiliseddebits: sandboxFunds.used_margin.toString(),
-        })
+      if (response.status === 401) {
+        const body = await response.json().catch(() => null)
+        if (body?.code === 'BROKER_SESSION_EXPIRED') {
+          setBrokerExpired(true)
+        } else {
+          setIsAuthenticated(false)
+        }
+        setIsLoading(false)
+        return
+      }
+
+      const data = await response.json()
+
+      if (data.status === 'success' && data.data) {
+        setMarginData(data.data)
         setError(null)
       } else {
-        // Live mode - fetch from broker
-        const funds = await invoke<FundsData>('get_funds')
-        // Convert FundsData to MarginData format for compatibility
-        setMarginData({
-          availablecash: funds.available_cash.toString(),
-          collateral: funds.collateral.toString(),
-          m2munrealized: '0', // Not available from funds API
-          m2mrealized: '0', // Not available from funds API
-          utiliseddebits: funds.used_margin.toString(),
-        })
-        setError(null)
+        setError(data.message || 'Failed to fetch margin data')
       }
-    } catch (err) {
-      console.error('Error fetching funds:', err)
-      // Check if it's an auth error
-      const errorMsg = err instanceof Error ? err.message : String(err)
-      if (errorMsg.includes('not authenticated') || errorMsg.includes('No broker session')) {
-        setIsAuthenticated(false)
-      } else {
-        setError('Failed to fetch margin data')
-      }
+    } catch (_err) {
+      setError('Failed to fetch margin data')
     } finally {
       setIsLoading(false)
     }
-  }, [appMode])
+  }, [])
 
   useEffect(() => {
     fetchFundsData()
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchFundsData, 30000)
-    return () => clearInterval(interval)
   }, [fetchFundsData])
+
+  // Refresh funds when an order is placed (via SocketIO event)
+  useOrderEventRefresh(fetchFundsData, {
+    events: ['order_event', 'analyzer_update', 'close_position_event'],
+  })
 
   // Listen for mode changes and refresh data
   useEffect(() => {
@@ -150,16 +123,20 @@ export default function Dashboard() {
     return () => unsubscribe()
   }, [fetchFundsData])
 
-  // Check master contract status using Tauri invoke
+  // Check master contract status
   const checkMasterContractStatus = useCallback(async () => {
     try {
-      // Get symbol count from the symbol cache
-      const count = await invoke<number>('get_symbol_count')
-      if (count > 0) {
-        setMasterContract({ status: 'success', total_symbols: count })
-      } else {
-        setMasterContract({ status: 'pending', message: 'No symbols loaded' })
+      const response = await fetch('/api/master-contract/status', {
+        credentials: 'include',
+        headers: { Accept: 'application/json' },
+      })
+
+      if (response.status === 401) {
+        return
       }
+
+      const data = await response.json()
+      setMasterContract(data)
     } catch (_err) {
       setMasterContract({ status: 'error', message: 'Failed to check status' })
     }
@@ -268,17 +245,18 @@ export default function Dashboard() {
       borderColor: 'border-green-500/20 hover:border-green-500/40',
     },
     {
-      href: '/telegram',
-      label: 'Telegram Alerts',
-      description: 'Configure telegram notifications',
-      icon: MessageCircle,
+      href: 'https://www.openalgo.in/learn',
+      label: 'OpenVarsity',
+      description: 'Learn algo trading with OpenAlgo',
+      icon: GraduationCap,
       gradient: 'from-blue-500/10 to-blue-500/5 hover:from-blue-500/20 hover:to-blue-500/10',
       iconBg: 'bg-blue-500/20',
       iconColor: 'text-blue-500',
       borderColor: 'border-blue-500/20 hover:border-blue-500/40',
+      external: true,
     },
     {
-      href: '/latency',
+      href: '/logs/latency',
       label: 'Latency Monitor',
       description: 'Monitor order & API latency',
       icon: Zap,
@@ -289,6 +267,25 @@ export default function Dashboard() {
       borderColor: 'border-orange-500/20 hover:border-orange-500/40',
     },
   ]
+
+  // Broker token expired but the app session is fine: send the user to the
+  // broker reconnect flow, not /login (which would bounce back) — #1400.
+  if (brokerExpired) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4">
+        <h1 className="text-2xl font-bold">Broker Session Expired</h1>
+        <p className="text-muted-foreground">
+          Your broker token has expired (brokers roll tokens daily). Reconnect to continue trading.
+        </p>
+        <Link
+          to="/broker"
+          className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+        >
+          Reconnect Broker
+        </Link>
+      </div>
+    )
+  }
 
   // If not authenticated, show login prompt
   if (!isAuthenticated) {

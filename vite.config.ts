@@ -3,73 +3,89 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
 
+// Desktop: in development the Rust server runs on the maintainer's dev port
+// (5500, next to OpenAlgo web on 5000), so the dev server proxies there.
+const BACKEND = process.env.OPENALGO_DEV_BACKEND || 'http://127.0.0.1:5500'
+
 // https://vite.dev/config/
-// Tauri expects a fixed port, fail if that port is not available
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    // No build-time compression plugin. The .br/.gz variants it used to emit
+    // were force-committed with frontend/dist/ by CI, and because compressed
+    // output can be neither deflated nor delta-compressed by git, they grew
+    // into two thirds of the repository history and tripled clone times.
+    // utils/precompress_assets.py regenerates the gzip variants at app
+    // startup instead, from the tracked raw assets, in about 30ms once warm.
   ],
+  // plotly.js-dist-min's UMD wrapper has an unguarded `global.matchMedia`
+  // reference. Vite 8 no longer shims Node's `global` in the browser, so the
+  // /tools pages that load Plotly (StrategyBuilder, MaxPain, OI Tracker, etc.)
+  // threw "global is not defined". Map `global` to the browser `globalThis`.
+  define: {
+    global: 'globalThis',
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
   },
-  // Vite options tailored for Tauri development and only applied in `tauri dev`
-  // prevent vite from obscuring rust errors
+  // Desktop: keep Rust compiler output visible under `tauri dev`.
   clearScreen: false,
   server: {
     port: 5173,
+    // Desktop: Tauri's devUrl is fixed to 5173, so fail rather than move ports.
     strictPort: true,
     watch: {
-      // Ignore rust files to prevent unnecessary reloads
       ignored: ['**/src-tauri/**'],
     },
+    proxy: {
+      '/api': {
+        target: BACKEND,
+        changeOrigin: true,
+      },
+      '/socket.io': {
+        target: BACKEND,
+        ws: true,
+      },
+      '/auth': {
+        target: BACKEND,
+        changeOrigin: true,
+      },
+      // User indicator modules are served by Flask from strategies/indicators,
+      // never bundled, so the dev server has to pass them through too.
+      '/custom-indicators': {
+        target: BACKEND,
+        changeOrigin: true,
+      },
+      // Desktop: the in-app Server Settings page's endpoint.
+      '/settings/api': {
+        target: BACKEND,
+        changeOrigin: true,
+      },
+    },
   },
-  // Environment variables starting with TAURI_ are exposed to the frontend
-  envPrefix: ['VITE_', 'TAURI_'],
   build: {
     outDir: 'dist',
-    // Tauri uses Chromium on Windows and WebKit on macOS and Linux
-    target: process.env.TAURI_ENV_PLATFORM === 'windows' ? 'chrome105' : 'safari13',
-    // don't minify for debug builds
-    minify: !process.env.TAURI_ENV_DEBUG ? 'esbuild' : false,
-    // produce sourcemaps for debug builds
-    sourcemap: !!process.env.TAURI_ENV_DEBUG,
-    chunkSizeWarningLimit: 600,
+    sourcemap: false,
+    // Plotly core can legitimately produce a large shared chart chunk.
+    // Keep the limit high enough for that known vendor cost while still
+    // flagging any new app-code chunk that drifts above 1MB.
+    chunkSizeWarningLimit: 1100,
     rollupOptions: {
       output: {
-        manualChunks: (id) => {
-          if (id.includes('node_modules')) {
-            // Core React - most stable, cached long-term
-            if (id.includes('/react-dom/') || id.includes('/react/') || id.includes('/scheduler/')) {
-              return 'vendor-react'
-            }
-            // Router
-            if (id.includes('react-router')) {
-              return 'vendor-router'
-            }
-            // Radix UI primitives
-            if (id.includes('@radix-ui')) {
-              return 'vendor-radix'
-            }
-            // Icons - frequently updated
-            if (id.includes('lucide-react')) {
-              return 'vendor-icons'
-            }
-            // Syntax highlighting - only needed on code pages
-            if (id.includes('react-syntax-highlighter') || id.includes('prismjs') || id.includes('refractor')) {
-              return 'vendor-syntax'
-            }
-            // Charts - only needed on chart pages
-            if (id.includes('recharts') || id.includes('d3-') || id.includes('lightweight-charts')) {
-              return 'vendor-charts'
-            }
-            // Tauri
-            if (id.includes('@tauri-apps')) {
-              return 'vendor-tauri'
-            }
+        // Split the stable framework libs into their own long-cached chunk
+        // so an app-code change doesn't bust react/router/query for returning
+        // users, and the browser can fetch vendor + page chunks in parallel.
+        // Vite already splits the heavy charting libs (plotly, lightweight-
+        // charts) automatically, so we only carve out the framework core here.
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+          if (/[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/.test(id)) {
+            return 'react-vendor'
           }
+          if (id.includes('tanstack/react-query')) return 'tanstack'
         },
       },
     },

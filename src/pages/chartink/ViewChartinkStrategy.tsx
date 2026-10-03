@@ -11,8 +11,7 @@ import {
   Webhook,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { toast } from 'sonner'
+import { Link, useNavigate, useParams } from 'react-router'
 import { chartinkApi } from '@/api/chartink'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -37,6 +36,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import type { ChartinkStrategy, ChartinkSymbolMapping } from '@/types/chartink'
+import { showToast } from '@/utils/toast'
 
 export default function ViewChartinkStrategy() {
   const { strategyId } = useParams<{ strategyId: string }>()
@@ -60,9 +60,8 @@ export default function ViewChartinkStrategy() {
       const data = await chartinkApi.getStrategy(Number(strategyId))
       setStrategy(data.strategy)
       setMappings(data.mappings || [])
-    } catch (error) {
-      console.error('Failed to fetch strategy:', error)
-      toast.error('Failed to load strategy')
+    } catch (_error) {
+      showToast.error('Failed to load strategy', 'chartink')
       navigate('/chartink')
     } finally {
       setLoading(false)
@@ -76,8 +75,7 @@ export default function ViewChartinkStrategy() {
         const response = await fetch('/api/config/host', { credentials: 'include' })
         const data = await response.json()
         setHostConfig(data)
-      } catch (error) {
-        console.error('Failed to fetch host config:', error)
+      } catch (_error) {
         // Fallback to window.location.origin if config fetch fails
         setHostConfig({
           host_server: window.location.origin,
@@ -89,6 +87,7 @@ export default function ViewChartinkStrategy() {
     fetchHostConfig()
   }, [])
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: one-time fetch of the strategy on mount; fetchStrategy is recreated each render and adding it would re-run the fetch on every render
   useEffect(() => {
     fetchStrategy()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -98,10 +97,10 @@ export default function ViewChartinkStrategy() {
     try {
       await navigator.clipboard.writeText(text)
       setCopiedField(field)
-      toast.success('Copied to clipboard')
+      showToast.success('Copied to clipboard', 'clipboard')
       setTimeout(() => setCopiedField(null), 2000)
     } catch {
-      toast.error('Failed to copy')
+      showToast.error('Failed to copy', 'clipboard')
     }
   }
 
@@ -112,13 +111,15 @@ export default function ViewChartinkStrategy() {
       const response = await chartinkApi.toggleStrategy(strategy.id)
       if (response.status === 'success') {
         setStrategy({ ...strategy, is_active: response.data?.is_active ?? !strategy.is_active })
-        toast.success(response.data?.is_active ? 'Strategy activated' : 'Strategy deactivated')
+        showToast.success(
+          response.data?.is_active ? 'Strategy activated' : 'Strategy deactivated',
+          'chartink'
+        )
       } else {
-        toast.error(response.message || 'Failed to toggle strategy')
+        showToast.error(response.message || 'Failed to toggle strategy', 'chartink')
       }
-    } catch (error) {
-      console.error('Failed to toggle strategy:', error)
-      toast.error('Failed to toggle strategy')
+    } catch (_error) {
+      showToast.error('Failed to toggle strategy', 'chartink')
     } finally {
       setToggling(false)
     }
@@ -130,14 +131,13 @@ export default function ViewChartinkStrategy() {
       setDeleting(true)
       const response = await chartinkApi.deleteStrategy(strategy.id)
       if (response.status === 'success') {
-        toast.success('Strategy deleted successfully')
+        showToast.success('Strategy deleted successfully', 'chartink')
         navigate('/chartink')
       } else {
-        toast.error(response.message || 'Failed to delete strategy')
+        showToast.error(response.message || 'Failed to delete strategy', 'chartink')
       }
-    } catch (error) {
-      console.error('Failed to delete strategy:', error)
-      toast.error('Failed to delete strategy')
+    } catch (_error) {
+      showToast.error('Failed to delete strategy', 'chartink')
     } finally {
       setDeleting(false)
       setDeleteDialogOpen(false)
@@ -150,13 +150,12 @@ export default function ViewChartinkStrategy() {
       const response = await chartinkApi.deleteSymbolMapping(strategy.id, mappingId)
       if (response.status === 'success') {
         setMappings(mappings.filter((m) => m.id !== mappingId))
-        toast.success('Symbol mapping deleted')
+        showToast.success('Symbol mapping deleted', 'chartink')
       } else {
-        toast.error(response.message || 'Failed to delete mapping')
+        showToast.error(response.message || 'Failed to delete mapping', 'chartink')
       }
-    } catch (error) {
-      console.error('Failed to delete mapping:', error)
-      toast.error('Failed to delete mapping')
+    } catch (_error) {
+      showToast.error('Failed to delete mapping', 'chartink')
     }
   }
 
@@ -297,6 +296,7 @@ export default function ViewChartinkStrategy() {
                   variant="outline"
                   size="icon"
                   onClick={() => copyToClipboard(webhookUrl, 'url')}
+                  aria-label={copiedField === 'url' ? 'Webhook URL copied' : 'Copy webhook URL'}
                 >
                   {copiedField === 'url' ? (
                     <Check className="h-4 w-4 text-green-500" />
@@ -396,6 +396,7 @@ export default function ViewChartinkStrategy() {
                         size="icon"
                         className="text-red-500 hover:text-red-600 hover:bg-red-50"
                         onClick={() => handleDeleteMapping(mapping.id)}
+                        aria-label="Delete symbol mapping"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

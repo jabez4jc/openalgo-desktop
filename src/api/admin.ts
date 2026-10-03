@@ -1,22 +1,26 @@
-/**
- * Admin API stubs for OpenAlgo Desktop
- *
- * Admin features (freeze quantities, holidays, market timings) are not
- * available in the desktop version. These are server-side features.
- */
-
 import type {
   AddFreezeQtyRequest,
   AddHolidayRequest,
   AdminStats,
+  DiagnosticsResponse,
+  ErrorGroupsResponse,
+  ErrorsListResponse,
+  ErrorsStats,
   FreezeQty,
   Holiday,
   HolidaysResponse,
+  MCPAuditResponse,
+  MCPSettingsResponse,
+  MCPSettingsUpdateRequest,
+  MCPSettingsUpdateResponse,
+  OAuthClientsResponse,
+  SystemInfo,
   TimingsResponse,
   TodayTiming,
   UpdateFreezeQtyRequest,
   UpdateTimingRequest,
 } from '@/types/admin'
+import { webClient } from './client'
 
 interface ApiResponse<T = void> {
   status: string
@@ -24,18 +28,19 @@ interface ApiResponse<T = void> {
   data?: T
 }
 
-const NOT_AVAILABLE = 'Admin features are not available in desktop mode'
-
 export const adminApi = {
   // ============================================================================
   // Admin Stats
   // ============================================================================
 
+  /**
+   * Get admin dashboard stats
+   */
   getStats: async (): Promise<AdminStats> => {
-    console.warn(NOT_AVAILABLE)
+    const response = await webClient.get<ApiResponse<void> & AdminStats>('/admin/api/stats')
     return {
-      freeze_count: 0,
-      holiday_count: 0,
+      freeze_count: response.data.freeze_count,
+      holiday_count: response.data.holiday_count,
     }
   },
 
@@ -43,113 +48,235 @@ export const adminApi = {
   // Freeze Quantity APIs
   // ============================================================================
 
+  /**
+   * Get all freeze quantities
+   */
   getFreezeList: async (): Promise<FreezeQty[]> => {
-    console.warn(NOT_AVAILABLE)
-    return []
+    const response = await webClient.get<ApiResponse<FreezeQty[]>>('/admin/api/freeze')
+    return response.data.data || []
   },
 
-  addFreezeQty: async (_data: AddFreezeQtyRequest): Promise<ApiResponse<FreezeQty>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
+  /**
+   * Add a new freeze quantity entry
+   */
+  addFreeze: async (data: AddFreezeQtyRequest): Promise<ApiResponse<FreezeQty>> => {
+    const response = await webClient.post<ApiResponse<FreezeQty>>('/admin/api/freeze', data)
+    return response.data
   },
 
-  // Alias for compatibility
-  addFreeze: async (_data: AddFreezeQtyRequest): Promise<ApiResponse<FreezeQty>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
+  /**
+   * Edit a freeze quantity entry
+   */
+  editFreeze: async (id: number, data: UpdateFreezeQtyRequest): Promise<ApiResponse<FreezeQty>> => {
+    const response = await webClient.put<ApiResponse<FreezeQty>>(`/admin/api/freeze/${id}`, data)
+    return response.data
   },
 
-  updateFreezeQty: async (
-    _id: number,
-    _data: UpdateFreezeQtyRequest
-  ): Promise<ApiResponse<FreezeQty>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
+  /**
+   * Delete a freeze quantity entry
+   */
+  deleteFreeze: async (id: number): Promise<ApiResponse> => {
+    const response = await webClient.delete<ApiResponse>(`/admin/api/freeze/${id}`)
+    return response.data
   },
 
-  // Alias for compatibility
-  editFreeze: async (
-    _id: number,
-    _data: UpdateFreezeQtyRequest
-  ): Promise<ApiResponse<FreezeQty>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
-  },
-
-  deleteFreezeQty: async (_id: number): Promise<ApiResponse<void>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
-  },
-
-  // Alias for compatibility
-  deleteFreeze: async (_id: number): Promise<ApiResponse<void>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
-  },
-
+  /**
+   * Upload CSV file to update freeze quantities
+   */
   uploadFreezeCSV: async (
-    _file: File,
-    _exchange?: string
+    file: File,
+    exchange: string
   ): Promise<ApiResponse<{ count: number }>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
-  },
+    const formData = new FormData()
+    formData.append('csv_file', file)
+    formData.append('exchange', exchange)
 
-  refreshFreezeQty: async (): Promise<ApiResponse<{ count: number }>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
+    const response = await webClient.post<ApiResponse<{ count: number }>>(
+      '/admin/api/freeze/upload',
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    )
+    return response.data
   },
 
   // ============================================================================
   // Holiday APIs
   // ============================================================================
 
-  getHolidays: async (_year?: number): Promise<HolidaysResponse> => {
-    console.warn(NOT_AVAILABLE)
-    return {
-      status: 'success',
-      data: [],
-      current_year: new Date().getFullYear(),
-      years: [],
-      exchanges: [],
-    }
+  /**
+   * Get holidays for a specific year
+   */
+  getHolidays: async (year?: number): Promise<HolidaysResponse> => {
+    const params = year ? `?year=${year}` : ''
+    const response = await webClient.get<HolidaysResponse>(`/admin/api/holidays${params}`)
+    return response.data
   },
 
-  addHoliday: async (_data: AddHolidayRequest): Promise<ApiResponse<Holiday>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
+  /**
+   * Add a new holiday
+   */
+  addHoliday: async (data: AddHolidayRequest): Promise<ApiResponse<Holiday>> => {
+    const response = await webClient.post<ApiResponse<Holiday>>('/admin/api/holidays', data)
+    return response.data
   },
 
-  deleteHoliday: async (_id: number): Promise<ApiResponse<void>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
+  /**
+   * Delete a holiday
+   */
+  deleteHoliday: async (id: number): Promise<ApiResponse> => {
+    const response = await webClient.delete<ApiResponse>(`/admin/api/holidays/${id}`)
+    return response.data
   },
 
   // ============================================================================
   // Market Timings APIs
   // ============================================================================
 
+  /**
+   * Get all market timings
+   */
   getTimings: async (): Promise<TimingsResponse> => {
-    console.warn(NOT_AVAILABLE)
-    return {
-      status: 'success',
-      data: [],
-      today_timings: [],
-      today: new Date().toISOString().split('T')[0],
-      exchanges: [],
+    const response = await webClient.get<TimingsResponse>('/admin/api/timings')
+    return response.data
+  },
+
+  /**
+   * Edit market timing for an exchange
+   */
+  editTiming: async (exchange: string, data: UpdateTimingRequest): Promise<ApiResponse> => {
+    const response = await webClient.put<ApiResponse>(`/admin/api/timings/${exchange}`, data)
+    return response.data
+  },
+
+  /**
+   * Check market timings for a specific date
+   */
+  checkTimings: async (date: string): Promise<{ date: string; timings: TodayTiming[] }> => {
+    const response = await webClient.post<ApiResponse & { date: string; timings: TodayTiming[] }>(
+      '/admin/api/timings/check',
+      { date }
+    )
+    return { date: response.data.date, timings: response.data.timings }
+  },
+
+  // ============================================================================
+  // Diagnostics APIs
+  // ============================================================================
+
+  getErrors: async (params?: {
+    limit?: number
+    level?: string
+    q?: string
+  }): Promise<ErrorsListResponse> => {
+    const search = new URLSearchParams()
+    if (params?.limit) search.set('limit', String(params.limit))
+    if (params?.level) search.set('level', params.level)
+    if (params?.q) search.set('q', params.q)
+    const qs = search.toString() ? `?${search.toString()}` : ''
+    const response = await webClient.get<ErrorsListResponse>(`/admin/api/errors${qs}`)
+    return response.data
+  },
+
+  getErrorStats: async (): Promise<ErrorsStats> => {
+    const response = await webClient.get<ErrorsStats>('/admin/api/errors/stats')
+    return response.data
+  },
+
+  getErrorGroups: async (limit = 50): Promise<ErrorGroupsResponse> => {
+    const response = await webClient.get<ErrorGroupsResponse>(
+      `/admin/api/errors/groups?limit=${limit}`
+    )
+    return response.data
+  },
+
+  getSystemInfo: async (): Promise<SystemInfo> => {
+    const response = await webClient.get<ApiResponse<SystemInfo>>('/admin/api/system')
+    if (!response.data.data) {
+      throw new Error(response.data.message || 'Failed to load system info')
     }
+    return response.data.data
   },
 
-  updateTiming: async (_id: number, _data: UpdateTimingRequest): Promise<ApiResponse<void>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
+  runDiagnostics: async (): Promise<DiagnosticsResponse> => {
+    const response = await webClient.post<DiagnosticsResponse>('/admin/api/system/diagnostics')
+    return response.data
   },
 
-  // Alias for compatibility - takes exchange instead of id
-  editTiming: async (_exchange: string, _data: UpdateTimingRequest): Promise<ApiResponse<void>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
+  /**
+   * Trigger a browser download of the system report.
+   * The server enforces filename and content-disposition; we just navigate to the URL.
+   */
+  downloadReport: (format: 'md' | 'txt' = 'md'): void => {
+    const fmt = format === 'txt' ? 'txt' : 'md'
+    window.location.href = `/admin/api/system/report?format=${fmt}`
   },
 
-  getTodayTimings: async (): Promise<TodayTiming[]> => {
-    console.warn(NOT_AVAILABLE)
-    return []
+  // ============================================================================
+  // Remote MCP admin APIs
+  // ============================================================================
+
+  getOAuthClients: async (): Promise<OAuthClientsResponse> => {
+    const response = await webClient.get<OAuthClientsResponse>('/admin/api/oauth/clients')
+    return response.data
   },
 
-  checkTimings: async (
-    _date?: string
-  ): Promise<{ status: string; timings: TodayTiming[]; message?: string }> => {
-    console.warn(NOT_AVAILABLE)
-    return { status: 'success', timings: [] }
+  approveOAuthClient: async (clientId: string): Promise<{ status: string }> => {
+    const response = await webClient.post<{ status: string }>(
+      `/admin/api/oauth/clients/${clientId}/approve`
+    )
+    return response.data
+  },
+
+  revokeOAuthClient: async (
+    clientId: string
+  ): Promise<{ status: string; tokens_revoked: number }> => {
+    const response = await webClient.post<{ status: string; tokens_revoked: number }>(
+      `/admin/api/oauth/clients/${clientId}/revoke`,
+      { confirm: true }
+    )
+    return response.data
+  },
+
+  getMCPAudit: async (params?: {
+    limit?: number
+    tool?: string
+    scope?: string
+    outcome?: string
+  }): Promise<MCPAuditResponse> => {
+    const search = new URLSearchParams()
+    if (params?.limit) search.set('limit', String(params.limit))
+    if (params?.tool) search.set('tool', params.tool)
+    if (params?.scope) search.set('scope', params.scope)
+    if (params?.outcome) search.set('outcome', params.outcome)
+    const qs = search.toString() ? `?${search.toString()}` : ''
+    const response = await webClient.get<MCPAuditResponse>(`/admin/api/mcp/audit${qs}`)
+    return response.data
+  },
+
+  triggerMCPKillSwitch: async (): Promise<{ status: string; tokens_revoked: number }> => {
+    const response = await webClient.post<{ status: string; tokens_revoked: number }>(
+      '/admin/api/mcp/kill-switch',
+      { confirm: 'REVOKE_ALL_MCP_TOKENS' }
+    )
+    return response.data
+  },
+
+  getMCPSettings: async (): Promise<MCPSettingsResponse> => {
+    const response = await webClient.get<MCPSettingsResponse>('/admin/api/mcp/settings')
+    return response.data
+  },
+
+  updateMCPSettings: async (
+    payload: MCPSettingsUpdateRequest
+  ): Promise<MCPSettingsUpdateResponse> => {
+    const response = await webClient.put<MCPSettingsUpdateResponse>(
+      '/admin/api/mcp/settings',
+      payload
+    )
+    return response.data
   },
 }
-
-export default adminApi

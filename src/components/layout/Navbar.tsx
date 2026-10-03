@@ -1,8 +1,8 @@
 import { BarChart3, BookOpen, LogOut, Menu, Moon, Sun, Zap } from 'lucide-react'
 import { useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { toast } from 'sonner'
+import { Link, useLocation, useNavigate } from 'react-router'
 import { authApi } from '@/api/auth'
+import { LogoutConfirmDialog } from '@/components/auth/LogoutConfirmDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,25 +12,52 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import { isActiveRoute, mobileSheetItems, navItems, profileMenuItems } from '@/config/navigation'
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet'
+import { isActiveRoute, mobileSheetItems, navItems } from '@/config/navigation'
+import { useProfileMenuItems } from '@/hooks/useProfileMenuItems'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { useThemeStore } from '@/stores/themeStore'
+import { showToast } from '@/utils/toast'
 
-export function Navbar() {
+interface NavbarProps {
+  /**
+   * Span the full viewport instead of the centred, width-capped container.
+   *
+   * Pages rendered inside Layout share its `container mx-auto`, so the nav
+   * lines up with the content below it and this stays false. Full-bleed pages
+   * under FullWidthLayout render this navbar themselves and have no such
+   * container, so a capped nav floats inset above edge-to-edge content -- on a
+   * 1920px screen Tailwind caps `container` at 1536px, leaving ~192px of gutter
+   * each side while the page fills the width.
+   */
+  fluid?: boolean
+}
+
+export function Navbar({ fluid = false }: NavbarProps = {}) {
   const location = useLocation()
   const navigate = useNavigate()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false)
   const { mode, appMode, toggleMode, toggleAppMode, isTogglingMode } = useThemeStore()
   const { user, logout } = useAuthStore()
+
+  // Profile menu filtered by broker capabilities (shared hook, issue #1480)
+  const filteredProfileMenuItems = useProfileMenuItems()
 
   const handleLogout = async () => {
     try {
       await authApi.logout()
       logout()
       navigate('/login')
-      toast.success('Logged out successfully')
+      showToast.success('Logged out successfully')
     } catch {
       logout()
       navigate('/login')
@@ -41,18 +68,18 @@ export function Navbar() {
     const result = await toggleAppMode()
     if (result.success) {
       const newMode = useThemeStore.getState().appMode
-      toast.success(`Switched to ${newMode === 'live' ? 'Live' : 'Analyze'} mode`)
+      showToast.success(`Switched to ${newMode === 'live' ? 'Live' : 'Analyze'} mode`)
 
       // Show warning toast when enabling analyzer mode (like old UI)
       if (newMode === 'analyzer') {
         setTimeout(() => {
-          toast.warning('⚠️ Analyzer (Sandbox) mode is for testing purposes only', {
+          showToast.warning('Analyzer (Sandbox) mode is for testing purposes only', undefined, {
             duration: 10000,
           })
         }, 2000)
       }
     } else {
-      toast.error(result.message || 'Failed to toggle mode')
+      showToast.error(result.message || 'Failed to toggle mode')
     }
   }
 
@@ -60,7 +87,10 @@ export function Navbar() {
 
   return (
     <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto px-4 flex h-14 items-center">
+      <div
+        data-testid="navbar-row"
+        className={cn('px-4 flex h-14 items-center', fluid ? 'w-full' : 'container mx-auto')}
+      >
         {/* Mobile Menu */}
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetTrigger asChild className="md:hidden">
@@ -69,7 +99,12 @@ export function Navbar() {
               <span className="sr-only">Toggle menu</span>
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-72">
+          <SheetContent side="left" className="w-72 overflow-y-auto">
+            {/* Visually hidden but accessible for screen readers */}
+            <SheetHeader className="sr-only">
+              <SheetTitle>Navigation Menu</SheetTitle>
+              <SheetDescription>Main navigation and quick access links</SheetDescription>
+            </SheetHeader>
             <div className="flex flex-col gap-4 py-4">
               <Link
                 to="/dashboard"
@@ -79,24 +114,83 @@ export function Navbar() {
                 <img src="/logo.png" alt="OpenAlgo" className="h-8 w-8" />
                 <span className="font-semibold">OpenAlgo</span>
               </Link>
+
+              {/* Secondary nav items (not in bottom nav) */}
               <nav className="flex flex-col gap-1">
-                {/* Show secondary items not in bottom nav */}
-                {mobileSheetItems.map((item) => (
-                  <Link
-                    key={item.href}
-                    to={item.href}
-                    onClick={() => setMobileOpen(false)}
-                    className={cn(
-                      'flex items-center gap-3 rounded-lg px-3 py-3 text-sm transition-colors min-h-[44px] touch-manipulation',
-                      isActive(item.href)
-                        ? 'bg-primary text-primary-foreground'
-                        : 'hover:bg-muted active:bg-muted'
-                    )}
-                  >
-                    <item.icon className="h-4 w-4" />
-                    {item.label}
-                  </Link>
-                ))}
+                <div className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Navigation
+                </div>
+                {mobileSheetItems.map((item) => {
+                  const active = isActive(item.href)
+                  const cls = cn(
+                    'flex items-center gap-3 rounded-lg px-3 py-3 text-sm transition-colors min-h-[44px] touch-manipulation',
+                    active ? 'bg-primary text-primary-foreground' : 'hover:bg-muted active:bg-muted'
+                  )
+                  const inner = (
+                    <>
+                      <item.icon className="h-4 w-4" />
+                      {item.label}
+                    </>
+                  )
+                  return item.external ? (
+                    <a
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMobileOpen(false)}
+                      className={cls}
+                      aria-current={active ? 'page' : undefined}
+                    >
+                      {inner}
+                    </a>
+                  ) : (
+                    <Link
+                      key={item.href}
+                      to={item.href}
+                      onClick={() => setMobileOpen(false)}
+                      className={cls}
+                      aria-current={active ? 'page' : undefined}
+                    >
+                      {inner}
+                    </Link>
+                  )
+                })}
+              </nav>
+
+              {/* Profile menu items for mobile access */}
+              <nav className="flex flex-col gap-1 border-t pt-4">
+                <div className="px-3 py-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  Quick Access
+                </div>
+                {filteredProfileMenuItems.map((item) => {
+                  const active = isActive(item.href)
+                  return (
+                    <Link
+                      key={item.href}
+                      to={item.href}
+                      onClick={() => setMobileOpen(false)}
+                      className={cn(
+                        'flex items-center gap-3 rounded-lg px-3 py-3 text-sm transition-colors min-h-[44px] touch-manipulation',
+                        active
+                          ? 'bg-primary text-primary-foreground'
+                          : 'hover:bg-muted active:bg-muted'
+                      )}
+                      aria-current={active ? 'page' : undefined}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      {item.label}
+                    </Link>
+                  )
+                })}
+                <a
+                  href="https://docs.openalgo.in"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm transition-colors min-h-[44px] touch-manipulation hover:bg-muted active:bg-muted"
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <BookOpen className="h-4 w-4" />
+                  Docs
+                </a>
               </nav>
             </div>
           </SheetContent>
@@ -108,29 +202,72 @@ export function Navbar() {
           <span className="hidden font-semibold sm:inline-block">OpenAlgo</span>
         </Link>
 
-        {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-1">
-          {navItems.map((item) => (
-            <Link
-              key={item.href}
-              to={item.href}
-              className={cn(
-                'flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-                isActive(item.href)
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-              )}
-            >
-              {item.label}
-            </Link>
-          ))}
+        {/* Desktop Navigation.
+            Icon-only between md and xl so all 9 items fit portrait monitors
+            and small laptops (768-1280px wide) without squashing or pushing
+            the profile menu off-screen; full labels from xl up (issue #1384).
+
+            From xl the labels appear but the bar does not grow to match: inside
+            Layout it shares the page `container`, which Tailwind caps at 1280px
+            for every viewport from 1280px to 1535px. Nine labelled items are
+            986px and the logo plus the right-hand controls take 394px, so the
+            row needed 1412px and had 1248px (issue #1507). Below 2xl the items
+            therefore use px-1.5 with tighter gaps, and the right-hand controls
+            keep their tighter gap and the short mode wording already used below
+            lg (203px instead of 255px). The padding is deliberately tighter
+            than it needs to be on the fonts we develop against: this row is
+            laid out with fixed spacing but rendered in whatever the OS resolves
+            for `system-ui`, and the widest common face (DejaVu Sans, a Linux
+            default) runs ~7% wider than macOS. px-2 left only 2px of slack
+            there; px-1.5 leaves ~38px. At 2xl and above nothing changes, and
+            e2e/navbar-fit.spec.ts asserts the row never overflows. */}
+        <nav className="hidden md:flex items-center gap-0.5 2xl:gap-1">
+          {navItems.map((item) => {
+            const active = isActive(item.href)
+            const className = cn(
+              'flex items-center gap-1.5 2xl:gap-2 rounded-md px-1.5 2xl:px-3 py-2 text-sm font-medium transition-colors',
+              active
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+            )
+            const content = (
+              <>
+                <item.icon className="h-4 w-4 shrink-0" />
+                <span className="hidden xl:inline">{item.label}</span>
+              </>
+            )
+            // Flask-served pages (e.g. /trading) need a full page load,
+            // not client-side routing.
+            return item.external ? (
+              <a
+                key={item.href}
+                href={item.href}
+                title={item.label}
+                className={className}
+                aria-current={active ? 'page' : undefined}
+              >
+                {content}
+              </a>
+            ) : (
+              <Link
+                key={item.href}
+                to={item.href}
+                title={item.label}
+                className={className}
+                aria-current={active ? 'page' : undefined}
+              >
+                {content}
+              </Link>
+            )
+          })}
         </nav>
 
         {/* Right Side */}
-        <div className="ml-auto flex items-center gap-1 sm:gap-2">
-          {/* Broker Badge */}
+        <div className="ml-auto flex items-center gap-1 2xl:gap-2">
+          {/* Broker Badge — hidden below lg to keep the bar within narrow
+              (portrait/small-laptop) widths */}
           {user?.broker && (
-            <Badge variant="outline" className="hidden sm:flex text-xs">
+            <Badge variant="outline" className="hidden lg:flex text-xs">
               {user.broker}
             </Badge>
           )}
@@ -143,10 +280,10 @@ export function Navbar() {
               appMode === 'analyzer' && 'bg-purple-500 hover:bg-purple-600 text-white'
             )}
           >
-            <span className="hidden sm:inline">
+            <span className="hidden 2xl:inline">
               {appMode === 'live' ? 'Live Mode' : 'Analyze Mode'}
             </span>
-            <span className="sm:hidden">{appMode === 'live' ? 'Live' : 'Analyze'}</span>
+            <span className="2xl:hidden">{appMode === 'live' ? 'Live' : 'Analyze'}</span>
           </Badge>
 
           {/* Mode Toggle */}
@@ -196,16 +333,25 @@ export function Navbar() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              {profileMenuItems.map((item) => (
-                <DropdownMenuItem
-                  key={item.href}
-                  onSelect={() => navigate(item.href)}
-                  className="cursor-pointer"
-                >
-                  <item.icon className="h-4 w-4 mr-2" />
-                  {item.label}
-                </DropdownMenuItem>
-              ))}
+              {filteredProfileMenuItems.map((item) =>
+                item.external ? (
+                  <DropdownMenuItem key={item.href} asChild className="cursor-pointer">
+                    <a href={item.href} className="flex items-center">
+                      <item.icon className="h-4 w-4 mr-2" />
+                      {item.label}
+                    </a>
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem
+                    key={item.href}
+                    onSelect={() => navigate(item.href)}
+                    className="cursor-pointer"
+                  >
+                    <item.icon className="h-4 w-4 mr-2" />
+                    {item.label}
+                  </DropdownMenuItem>
+                )
+              )}
               <DropdownMenuItem asChild>
                 <a
                   href="https://docs.openalgo.in"
@@ -219,7 +365,7 @@ export function Navbar() {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={handleLogout}
+                onClick={() => setShowLogoutDialog(true)}
                 className="text-destructive focus:text-destructive"
               >
                 <LogOut className="h-4 w-4 mr-2" />
@@ -229,6 +375,12 @@ export function Navbar() {
           </DropdownMenu>
         </div>
       </div>
+
+      <LogoutConfirmDialog
+        open={showLogoutDialog}
+        onOpenChange={setShowLogoutDialog}
+        onConfirm={handleLogout}
+      />
     </nav>
   )
 }

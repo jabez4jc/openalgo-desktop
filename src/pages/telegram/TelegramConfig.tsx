@@ -1,13 +1,13 @@
 import { ArrowLeft, Check, Eye, EyeOff, Key, Save, Settings } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { toast } from 'sonner'
+import { Link } from 'react-router'
 import { webClient } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { showToast } from '@/utils/toast'
 
 interface TelegramConfig {
   has_token: boolean
@@ -28,9 +28,9 @@ export default function TelegramConfig() {
   const [broadcastEnabled, setBroadcastEnabled] = useState(true)
   const [rateLimit, setRateLimit] = useState(10)
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: one-time fetch on mount; fetchConfig should not re-run on every render
   useEffect(() => {
     fetchConfig()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const fetchConfig = async () => {
@@ -42,9 +42,8 @@ export default function TelegramConfig() {
       setConfig(configData)
       setBroadcastEnabled(configData.broadcast_enabled)
       setRateLimit(configData.rate_limit_per_minute)
-    } catch (error) {
-      console.error('Error fetching config:', error)
-      toast.error('Failed to load configuration')
+    } catch (_error) {
+      showToast.error('Failed to load configuration', 'telegram')
     } finally {
       setIsLoading(false)
     }
@@ -72,15 +71,15 @@ export default function TelegramConfig() {
       )
 
       if (response.data.status === 'success') {
-        toast.success('Configuration saved successfully')
+        showToast.success('Configuration saved successfully', 'telegram')
         setToken('') // Clear token field after saving
         fetchConfig() // Refresh config
       } else {
-        toast.error(response.data.message || 'Failed to save configuration')
+        showToast.error(response.data.message || 'Failed to save configuration', 'telegram')
       }
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } }
-      toast.error(err.response?.data?.message || 'Failed to save configuration')
+      showToast.error(err.response?.data?.message || 'Failed to save configuration', 'telegram')
     } finally {
       setIsSaving(false)
     }
@@ -147,6 +146,7 @@ export default function TelegramConfig() {
                     size="icon"
                     className="absolute right-0 top-0 h-full px-3"
                     onClick={() => setShowToken(!showToken)}
+                    aria-label={showToken ? 'Hide bot token' : 'Show bot token'}
                   >
                     {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>

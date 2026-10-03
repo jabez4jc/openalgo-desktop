@@ -1,6 +1,5 @@
 import { AlertTriangle, BookOpen, Copy, ExternalLink, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { toast } from 'sonner'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,6 +14,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useSupportedExchanges } from '@/hooks/useSupportedExchanges'
+import { showToast } from '@/utils/toast'
 
 interface SearchResult {
   symbol: string
@@ -23,14 +24,7 @@ interface SearchResult {
   token: string
 }
 
-const EXCHANGES = [
-  { value: 'NSE', label: 'NSE' },
-  { value: 'NFO', label: 'NFO' },
-  { value: 'BSE', label: 'BSE' },
-  { value: 'BFO', label: 'BFO' },
-  { value: 'CDS', label: 'CDS' },
-  { value: 'MCX', label: 'MCX' },
-]
+// EXCHANGES and PRODUCTS are now dynamic — provided by useSupportedExchanges() hook
 
 const PRODUCTS = [
   { value: 'MIS', label: 'MIS - Intraday' },
@@ -39,11 +33,13 @@ const PRODUCTS = [
 ]
 
 export default function TradingView() {
+  const { tradingExchanges, defaultExchange, isCrypto } = useSupportedExchanges()
+
   // Form state
   const [alertMode, setAlertMode] = useState<'strategy' | 'line'>('strategy')
-  const [symbol, setSymbol] = useState('NHPC')
-  const [exchange, setExchange] = useState('NSE')
-  const [product, setProduct] = useState('MIS')
+  const [symbol, setSymbol] = useState(isCrypto ? 'BTCUSDFUT' : 'NHPC')
+  const [exchange, setExchange] = useState(defaultExchange)
+  const [product, setProduct] = useState(isCrypto ? 'NRML' : 'MIS')
   const [action, setAction] = useState('BUY')
   const [quantity, setQuantity] = useState('1')
 
@@ -52,8 +48,18 @@ export default function TradingView() {
   const [showResults, setShowResults] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
+  // Re-sync exchange when broker capabilities load asynchronously
+  useEffect(() => {
+    setExchange((prev) =>
+      prev && tradingExchanges.some((ex) => ex.value === prev) ? prev : defaultExchange
+    )
+  }, [defaultExchange, tradingExchanges])
+
   // JSON output
   const [generatedJson, setGeneratedJson] = useState<string>('')
+
+  // API key state
+  const [apiKey, setApiKey] = useState<string>('')
 
   // Host config state for webhook URL
   const [hostConfig, setHostConfig] = useState<{
@@ -64,15 +70,14 @@ export default function TradingView() {
   // Refs
   const inputWrapperRef = useRef<HTMLDivElement>(null)
 
-  // Fetch host configuration on mount
+  // Fetch host configuration and API key on mount
   useEffect(() => {
     const fetchHostConfig = async () => {
       try {
         const response = await fetch('/api/config/host', { credentials: 'include' })
         const data = await response.json()
         setHostConfig(data)
-      } catch (error) {
-        console.error('Failed to fetch host config:', error)
+      } catch (_error) {
         // Fallback to window.location.origin if config fetch fails
         setHostConfig({
           host_server: window.location.origin,
@@ -81,13 +86,26 @@ export default function TradingView() {
         })
       }
     }
+    const fetchApiKey = async () => {
+      try {
+        const response = await fetch('/playground/api-key', { credentials: 'include' })
+        if (response.ok) {
+          const data = await response.json()
+          setApiKey(data.api_key || '')
+        }
+      } catch {
+        // Silently fail - API key may not exist yet
+      }
+    }
     fetchHostConfig()
+    fetchApiKey()
   }, [])
 
   // Get webhook URL from host config or fallback to window.location.origin
+  const endpoint = alertMode === 'strategy' ? '/api/v1/placesmartorder' : '/api/v1/placeorder'
   const webhookUrl = hostConfig
-    ? `${hostConfig.host_server}/api/v1/placesmartorder`
-    : `${window.location.origin}/api/v1/placesmartorder`
+    ? `${hostConfig.host_server}${endpoint}`
+    : `${window.location.origin}${endpoint}`
 
   // Debounced search
   const performSearch = useCallback(
@@ -109,8 +127,7 @@ export default function TradingView() {
         const data = await response.json()
         setSearchResults((data.results || []).slice(0, 10))
         setShowResults(true)
-      } catch (error) {
-        console.error('Search error:', error)
+      } catch (_error) {
         setSearchResults([])
       } finally {
         setIsLoading(false)
@@ -146,45 +163,48 @@ export default function TradingView() {
     setShowResults(false)
   }
 
-  const generateJson = (showError = true) => {
-    if (!symbol || !exchange) {
-      if (showError) {
-        toast.error('Please select a symbol and exchange')
+  const generateJson = useCallback(
+    (showError = true) => {
+      if (!symbol || !exchange) {
+        if (showError) {
+          showToast.error('Please select a symbol and exchange', 'clipboard')
+        }
+        return
       }
-      return
-    }
 
-    let json: Record<string, unknown>
+      let json: Record<string, unknown>
 
-    if (alertMode === 'strategy') {
-      // Strategy Alert mode - uses {{strategy.order.action}} placeholder
-      json = {
-        apikey: 'YOUR_API_KEY',
-        strategy: 'TradingView Strategy',
-        symbol: symbol,
-        exchange: exchange,
-        action: '{{strategy.order.action}}',
-        product: product,
-        pricetype: 'MARKET',
-        quantity: '{{strategy.order.contracts}}',
-        position_size: '{{strategy.position_size}}',
+      if (alertMode === 'strategy') {
+        // Strategy Alert mode - uses {{strategy.order.action}} placeholder
+        json = {
+          apikey: apiKey || 'YOUR_API_KEY',
+          strategy: 'TradingView Strategy',
+          symbol: symbol,
+          exchange: exchange,
+          action: '{{strategy.order.action}}',
+          product: product,
+          pricetype: 'MARKET',
+          quantity: '{{strategy.order.contracts}}',
+          position_size: '{{strategy.position_size}}',
+        }
+      } else {
+        // Line Alert mode - uses fixed action and quantity
+        json = {
+          apikey: apiKey || 'YOUR_API_KEY',
+          strategy: 'TradingView Line Alert',
+          symbol: symbol,
+          exchange: exchange,
+          action: action,
+          product: product,
+          pricetype: 'MARKET',
+          quantity: quantity,
+        }
       }
-    } else {
-      // Line Alert mode - uses fixed action and quantity
-      json = {
-        apikey: 'YOUR_API_KEY',
-        strategy: 'TradingView Line Alert',
-        symbol: symbol,
-        exchange: exchange,
-        action: action,
-        product: product,
-        pricetype: 'MARKET',
-        quantity: quantity,
-      }
-    }
 
-    setGeneratedJson(JSON.stringify(json, null, 2))
-  }
+      setGeneratedJson(JSON.stringify(json, null, 2))
+    },
+    [symbol, exchange, apiKey, alertMode, product, action, quantity]
+  )
 
   // Auto-generate JSON when values change
   useEffect(() => {
@@ -194,9 +214,9 @@ export default function TradingView() {
   const copyToClipboard = async (text: string, label: string) => {
     try {
       await navigator.clipboard.writeText(text)
-      toast.success(`${label} copied to clipboard`)
+      showToast.success(`${label} copied to clipboard`, 'clipboard')
     } catch {
-      toast.error('Copy failed - please copy manually')
+      showToast.error('Copy failed - please copy manually', 'clipboard')
     }
   }
 
@@ -211,6 +231,7 @@ export default function TradingView() {
       </div>
 
       {/* Localhost Warning - only show if HOST_SERVER is not configured to external URL */}
+      {/* Desktop: no .env; the external URL is the Host Server URL in Profile. */}
       {hostConfig?.is_localhost && (
         <Alert variant="destructive" className="mb-8">
           <AlertTriangle className="h-5 w-5" />
@@ -218,8 +239,8 @@ export default function TradingView() {
             <strong>Webhook URL not accessible!</strong> TradingView cannot send alerts to
             localhost. Use <strong>ngrok</strong>, <strong>Cloudflare Tunnel</strong>,{' '}
             <strong>VS Code Dev Tunnel</strong>, or a <strong>custom domain</strong> to expose your
-            OpenAlgo instance to the internet. Update <code>HOST_SERVER</code> in your{' '}
-            <code>.env</code> file with your external URL.
+            OpenAlgo Desktop to the internet, then enter that address as the Host Server URL on the
+            Broker tab of your Profile.
           </AlertDescription>
         </Alert>
       )}
@@ -318,7 +339,7 @@ export default function TradingView() {
                     <SelectValue placeholder="Select Exchange" />
                   </SelectTrigger>
                   <SelectContent>
-                    {EXCHANGES.map((ex) => (
+                    {tradingExchanges.map((ex) => (
                       <SelectItem key={ex.value} value={ex.value}>
                         {ex.label}
                       </SelectItem>
@@ -327,22 +348,24 @@ export default function TradingView() {
                 </Select>
               </div>
 
-              {/* Product Type */}
-              <div className="space-y-2">
-                <Label htmlFor="product">Product Type</Label>
-                <Select value={product} onValueChange={setProduct}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PRODUCTS.map((p) => (
-                      <SelectItem key={p.value} value={p.value}>
-                        {p.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Product Type (hidden for crypto — Delta Exchange ignores it) */}
+              {!isCrypto && (
+                <div className="space-y-2">
+                  <Label htmlFor="product">Product Type</Label>
+                  <Select value={product} onValueChange={setProduct}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PRODUCTS.map((p) => (
+                        <SelectItem key={p.value} value={p.value}>
+                          {p.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               {/* Line Alert Mode Fields */}
               {alertMode === 'line' && (

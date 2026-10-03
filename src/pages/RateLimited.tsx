@@ -1,6 +1,6 @@
 import { Clock, Home, RefreshCw } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 
@@ -51,12 +51,10 @@ export default function RateLimited() {
         </p>
 
         {/* Rate Limit Info */}
-        <Alert className="mb-8 text-left border-orange-500 bg-orange-50 dark:bg-orange-950">
-          <Clock className="h-5 w-5 text-orange-600" />
-          <AlertTitle className="text-orange-800 dark:text-orange-200">
-            Rate Limit Exceeded
-          </AlertTitle>
-          <AlertDescription className="text-orange-700 dark:text-orange-300">
+        <Alert variant="warning" className="mb-8 text-left">
+          <Clock className="h-5 w-5" />
+          <AlertTitle>Rate Limit Exceeded</AlertTitle>
+          <AlertDescription>
             To ensure fair usage and protect the system, request limits are enforced.
             <br />
             <br />

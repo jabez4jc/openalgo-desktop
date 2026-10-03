@@ -2,27 +2,37 @@ import {
   BarChart3,
   Bell,
   BookOpen,
+  Bot,
+  Boxes,
+  CandlestickChart,
   ClipboardList,
-  Code2,
   Database,
   FileBarChart,
+  FileStack,
   FileText,
   FlaskConical,
+  Gauge,
   Key,
   Layers,
   LayoutDashboard,
   type LucideIcon,
+  MessageCircle,
   MessageSquare,
   Search,
   Settings,
   TrendingUp,
   User,
+  Wrench,
+  Zap,
 } from 'lucide-react'
+import { desktopProfileMenuItems } from '@/lib/desktop'
 
 export interface NavItem {
   href: string
   label: string
   icon: LucideIcon
+  /** Served by Flask (not a React route): render as a full-page link. */
+  external?: boolean
 }
 
 // Main navigation items shown in desktop navbar
@@ -31,10 +41,11 @@ export const navItems: NavItem[] = [
   { href: '/orderbook', label: 'Orderbook', icon: ClipboardList },
   { href: '/tradebook', label: 'Tradebook', icon: FileText },
   { href: '/positions', label: 'Positions', icon: TrendingUp },
-  { href: '/action-center', label: 'Action Center', icon: Bell },
+  { href: '/trading', label: 'Trading', icon: CandlestickChart },
   { href: '/platforms', label: 'Platforms', icon: Layers },
-  { href: '/strategy', label: 'Strategy', icon: Code2 },
+  { href: '/strategy', label: 'Strategies', icon: Boxes },
   { href: '/logs', label: 'Logs', icon: FileBarChart },
+  { href: '/tools', label: 'Tools', icon: Wrench },
 ]
 
 // Items shown in mobile bottom navigation
@@ -43,7 +54,6 @@ export const bottomNavItems: NavItem[] = [
   { href: '/orderbook', label: 'Orderbook', icon: ClipboardList },
   { href: '/tradebook', label: 'Tradebook', icon: FileText },
   { href: '/positions', label: 'Positions', icon: TrendingUp },
-  { href: '/strategy', label: 'Strategy', icon: Code2 },
 ]
 
 // Paths in bottom nav (for filtering mobile sheet items)
@@ -56,13 +66,28 @@ export const mobileSheetItems = navItems.filter((item) => !bottomNavPaths.includ
 export const profileMenuItems: NavItem[] = [
   { href: '/profile', label: 'Profile', icon: User },
   { href: '/apikey', label: 'API Key', icon: Key },
+  // Action Center stays immediately after API Key. It was moved here out of the
+  // main navbar on that understanding and a test pins the adjacency, so a new
+  // entry goes after it rather than between the two.
+  { href: '/action-center', label: 'Action Center', icon: Bell },
+  // Agent Config is NOT here. It lives under /admin with the other
+  // configuration surfaces. The chat header carries its own settings control,
+  // so a configured /agent still has a route back to its settings without this
+  // menu holding one.
+  { href: '/agent', label: 'Agent', icon: Bot },
+  { href: '/master-contract', label: 'Master Contract', icon: FileStack },
   { href: '/telegram', label: 'Telegram Bot', icon: MessageSquare },
+  { href: '/whatsapp', label: 'WhatsApp Bot', icon: MessageCircle },
   { href: '/holdings', label: 'Holdings', icon: ClipboardList },
-  { href: '/python', label: 'Python Strategies', icon: Code2 },
+  { href: '/scalping', label: 'Scalping', icon: Zap },
+  // Desktop: Flow Editor and Python Strategies entries removed (out of scope).
   { href: '/pnl-tracker', label: 'PnL Tracker', icon: BarChart3 },
   { href: '/historify', label: 'Historify', icon: Database },
   { href: '/search/token', label: 'Search', icon: Search },
   { href: '/sandbox', label: 'Sandbox', icon: FlaskConical },
+  { href: '/leverage', label: 'Leverage', icon: Gauge },
+  // Desktop: desktop-only entries (Server Settings) sit just before Admin.
+  ...desktopProfileMenuItems,
   { href: '/admin', label: 'Admin', icon: Settings },
 ]
 
@@ -71,11 +96,8 @@ export const externalLinks = {
   docs: { href: 'https://docs.openalgo.in', label: 'Docs', icon: BookOpen },
 }
 
-// Shared utility to check if a route is active
-// Uses startsWith for routes with nested pages (like /strategy/*)
+// Shared utility to check if a route is active.
+// Every nav item is a leaf route, so an exact match is all that is needed.
 export function isActiveRoute(pathname: string, href: string): boolean {
-  if (href === '/strategy') {
-    return pathname.startsWith('/strategy')
-  }
   return pathname === href
 }

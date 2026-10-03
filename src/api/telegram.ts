@@ -1,16 +1,14 @@
-/**
- * Telegram API stubs for OpenAlgo Desktop
- *
- * Telegram integration is not available in the desktop version.
- * This requires server-side bot hosting and webhook handling.
- */
-
 import type {
+  BroadcastRequest,
+  BroadcastResponse,
+  CommandStats,
   TelegramAnalytics,
   TelegramBotStatus,
   TelegramConfig,
   TelegramUser,
+  UpdateConfigRequest,
 } from '@/types/telegram'
+import { webClient } from './client'
 
 interface ApiResponse<T = void> {
   status: string
@@ -18,67 +16,121 @@ interface ApiResponse<T = void> {
   data?: T
 }
 
-const NOT_AVAILABLE = 'Telegram integration is not available in desktop mode'
-
 export const telegramApi = {
-  getStatus: async (): Promise<TelegramBotStatus> => {
-    console.warn(NOT_AVAILABLE)
-    return {
-      is_running: false,
-      is_configured: false,
-      bot_username: null,
-      is_active: false,
-    }
+  // ============================================================================
+  // Bot Status & Control
+  // ============================================================================
+
+  /**
+   * Get bot status
+   */
+  getBotStatus: async (): Promise<TelegramBotStatus> => {
+    const response = await webClient.get<ApiResponse<TelegramBotStatus>>('/telegram/bot/status')
+    return response.data.data!
   },
 
+  /**
+   * Start the bot
+   */
+  startBot: async (): Promise<ApiResponse> => {
+    const response = await webClient.post<ApiResponse>('/telegram/bot/start')
+    return response.data
+  },
+
+  /**
+   * Stop the bot
+   */
+  stopBot: async (): Promise<ApiResponse> => {
+    const response = await webClient.post<ApiResponse>('/telegram/bot/stop')
+    return response.data
+  },
+
+  // ============================================================================
+  // Configuration
+  // ============================================================================
+
+  /**
+   * Get bot configuration
+   */
   getConfig: async (): Promise<TelegramConfig> => {
-    console.warn(NOT_AVAILABLE)
-    return {
-      broadcast_enabled: false,
-      rate_limit_per_minute: 0,
-      is_active: false,
-    }
+    const response = await webClient.get<ApiResponse<TelegramConfig>>('/telegram/api/config')
+    return response.data.data!
   },
 
-  updateConfig: async (_config: Partial<TelegramConfig>): Promise<ApiResponse<void>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
+  /**
+   * Update bot configuration
+   */
+  updateConfig: async (data: UpdateConfigRequest): Promise<ApiResponse> => {
+    const response = await webClient.post<ApiResponse>('/telegram/config', data)
+    return response.data
   },
 
-  getUsers: async (): Promise<TelegramUser[]> => {
-    console.warn(NOT_AVAILABLE)
-    return []
+  // ============================================================================
+  // Users
+  // ============================================================================
+
+  /**
+   * Get all telegram users
+   */
+  getUsers: async (): Promise<{ users: TelegramUser[]; stats: CommandStats[] }> => {
+    const response =
+      await webClient.get<ApiResponse<{ users: TelegramUser[]; stats: CommandStats[] }>>(
+        '/telegram/api/users'
+      )
+    return response.data.data!
   },
 
-  addUser: async (_chatId: string, _name?: string): Promise<ApiResponse<TelegramUser>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
+  /**
+   * Unlink a telegram user
+   */
+  unlinkUser: async (telegramId: number): Promise<ApiResponse> => {
+    const response = await webClient.post<ApiResponse>(`/telegram/user/${telegramId}/unlink`)
+    return response.data
   },
 
-  removeUser: async (_chatId: string): Promise<ApiResponse<void>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
-  },
+  // ============================================================================
+  // Analytics
+  // ============================================================================
 
-  toggleUser: async (_chatId: string): Promise<ApiResponse<{ enabled: boolean }>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
-  },
-
+  /**
+   * Get analytics data
+   */
   getAnalytics: async (): Promise<TelegramAnalytics> => {
-    console.warn(NOT_AVAILABLE)
-    return {
-      stats_7d: [],
-      stats_30d: [],
-      total_users: 0,
-      active_users: 0,
-      users: [],
-    }
+    const response = await webClient.get<ApiResponse<TelegramAnalytics>>('/telegram/api/analytics')
+    return response.data.data!
   },
 
-  testConnection: async (): Promise<ApiResponse<{ bot_name: string }>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
+  // ============================================================================
+  // Messaging
+  // ============================================================================
+
+  /**
+   * Send test message
+   */
+  sendTestMessage: async (): Promise<ApiResponse> => {
+    const response = await webClient.post<ApiResponse>('/telegram/test-message')
+    return response.data
   },
 
-  sendTestMessage: async (_chatId: string): Promise<ApiResponse<void>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
+  /**
+   * Send broadcast message
+   */
+  sendBroadcast: async (data: BroadcastRequest): Promise<ApiResponse<BroadcastResponse>> => {
+    const response = await webClient.post<ApiResponse<BroadcastResponse>>(
+      '/telegram/broadcast',
+      data
+    )
+    return response.data
+  },
+
+  /**
+   * Send message to specific user
+   */
+  sendMessage: async (telegramId: number, message: string): Promise<ApiResponse> => {
+    const response = await webClient.post<ApiResponse>('/telegram/send-message', {
+      telegram_id: telegramId,
+      message,
+    })
+    return response.data
   },
 }
-
-export default telegramApi

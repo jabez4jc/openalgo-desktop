@@ -34,6 +34,28 @@ async function fetchCSRFToken(): Promise<string> {
   return data.csrf_token
 }
 
+// Crypto exchanges operate 24/7 - no holidays or weekends
+const CRYPTO_EXCHANGES = new Set(['CRYPTO'])
+
+/**
+ * The exchange whose calendar an instrument actually follows.
+ *
+ * Index feeds are quoted on their own pseudo-exchange (`NSE_INDEX`,
+ * `BSE_INDEX`), but an index has no separate session: NIFTY opens and closes
+ * exactly when NSE does. The timings table stores real exchanges only, so a
+ * lookup on `NSE_INDEX` found nothing and `isMarketOpen` took its conservative
+ * "no timing, assume closed" branch **every minute of every day**.
+ *
+ * Nothing about the subscription was broken by that. Indices are subscribed and
+ * their ticks arrive; it was the consumer that threw them away, because
+ * `useLivePrice` gates a tick on the market being open. Every index row
+ * therefore fell back to the REST snapshot and sat there looking stale while
+ * the stock beside it updated live.
+ */
+function calendarExchange(exchange: string): string {
+  return exchange.endsWith('_INDEX') ? exchange.slice(0, -'_INDEX'.length) : exchange
+}
+
 export function useMarketStatus() {
   const [state, setState] = useState<MarketStatusState>({
     timings: [],
@@ -52,16 +74,18 @@ export function useMarketStatus() {
         }
 
         // Fetch market timings and holidays in parallel
+        // Note: These endpoints are under the admin blueprint (/admin prefix)
         const [timingsRes, holidaysRes] = await Promise.all([
-          fetch('/api/market-timings', { headers, credentials: 'include' }),
-          fetch('/api/holidays', { headers, credentials: 'include' }),
+          fetch('/admin/api/timings', { headers, credentials: 'include' }),
+          fetch('/admin/api/holidays', { headers, credentials: 'include' }),
         ])
 
         const timingsData = await timingsRes.json()
         const holidaysData = await holidaysRes.json()
 
         setState({
-          timings: timingsData.status === 'success' ? timingsData.data || [] : [],
+          // Use market_status field which contains epoch timestamps for market open checks
+          timings: timingsData.status === 'success' ? timingsData.market_status || [] : [],
           holidays: holidaysData.status === 'success' ? holidaysData.data || [] : [],
           isLoading: false,
           error: null,
@@ -80,16 +104,20 @@ export function useMarketStatus() {
 
   // Check if today is a holiday for a specific exchange
   const isHolidayForExchange = useCallback(
-    (exchange: string): boolean => {
+    (rawExchange: string): boolean => {
+      const exchange = calendarExchange(rawExchange)
+      // Crypto exchanges have no holidays
+      if (CRYPTO_EXCHANGES.has(exchange)) return false
+
       const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD format
       const todayHoliday = state.holidays.find((h) => h.date === today)
 
       if (!todayHoliday) return false
 
       // Check if exchange is in closed_exchanges
-      if (todayHoliday.closed_exchanges.includes(exchange)) {
+      if (todayHoliday.closed_exchanges?.includes(exchange)) {
         // Check if there's a special session for this exchange
-        const specialSession = todayHoliday.open_exchanges.find((e) => e.exchange === exchange)
+        const specialSession = todayHoliday.open_exchanges?.find((e) => e.exchange === exchange)
         if (specialSession) {
           // There's a special session - check if we're within it
           const now = Date.now()
@@ -105,7 +133,11 @@ export function useMarketStatus() {
 
   // Check if market is currently open for a specific exchange
   const isMarketOpen = useCallback(
-    (exchange: string): boolean => {
+    (rawExchange: string): boolean => {
+      const exchange = calendarExchange(rawExchange)
+      // Crypto exchanges are always open (24/7)
+      if (CRYPTO_EXCHANGES.has(exchange)) return true
+
       // First check if it's a holiday
       if (isHolidayForExchange(exchange)) {
         return false
@@ -127,6 +159,9 @@ export function useMarketStatus() {
   // Check if any market is open (useful for deciding whether to connect WebSocket)
   const isAnyMarketOpen = useCallback((): boolean => {
     return state.timings.some((timing) => {
+      // Crypto exchanges are always open (24/7)
+      if (CRYPTO_EXCHANGES.has(timing.exchange)) return true
+
       const now = Date.now()
       const isWithinHours = now >= timing.start_time && now <= timing.end_time
       return isWithinHours && !isHolidayForExchange(timing.exchange)
@@ -135,7 +170,11 @@ export function useMarketStatus() {
 
   // Get market status for display
   const getMarketStatus = useCallback(
-    (exchange: string): 'open' | 'closed' | 'pre-market' | 'post-market' => {
+    (rawExchange: string): 'open' | 'closed' | 'pre-market' | 'post-market' => {
+      const exchange = calendarExchange(rawExchange)
+      // Crypto exchanges are always open (24/7)
+      if (CRYPTO_EXCHANGES.has(exchange)) return 'open'
+
       if (isHolidayForExchange(exchange)) {
         return 'closed'
       }
