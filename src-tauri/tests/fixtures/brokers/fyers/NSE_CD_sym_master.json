@@ -1,0 +1,26 @@
+{
+ "NSE:USDINR26OCTFUT": {
+  "fyToken": "101226102712001",
+  "symbolDetails": "USDINR 27 Oct 26 FUT",
+  "symDetails": "USDINR 27 Oct 26 FUT",
+  "symTicker": "NSE:USDINR26OCTFUT",
+  "optType": "XX",
+  "expiryDate": "1793095200",
+  "strikePrice": -1.0,
+  "qtyMultiplier": 1000.0,
+  "tickSize": 0.0025,
+  "minLotSize": 1
+ },
+ "NSE:USDINR26OCT83.25CE": {
+  "fyToken": "101226102712002",
+  "symbolDetails": "USDINR 27 Oct 26 83.25 CE",
+  "symDetails": "USDINR 27 Oct 26 83.25 CE",
+  "symTicker": "NSE:USDINR26OCT83.25CE",
+  "optType": "CE",
+  "expiryDate": "1793095200",
+  "strikePrice": 83.25,
+  "qtyMultiplier": 1000.0,
+  "tickSize": 0.0025,
+  "minLotSize": 1
+ }
+}

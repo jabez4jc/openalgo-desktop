@@ -1,0 +1,28 @@
+{
+  "user-id": "<USER_ID>",
+  "status-code": "200",
+  "order-status": "AB05",
+  "error-message": "",
+  "orderData": {
+    "variety": "NORMAL",
+    "ordertype": "MARKET",
+    "producttype": "INTRADAY",
+    "duration": "DAY",
+    "price": 0.0,
+    "triggerprice": 0.0,
+    "quantity": "100",
+    "disclosedquantity": "0",
+    "tradingsymbol": "CRUDEOIL19OCT26FUT",
+    "transactiontype": "BUY",
+    "exchange": "MCX",
+    "symboltoken": "440001",
+    "averageprice": 9008.0,
+    "filledshares": "100",
+    "unfilledshares": "0",
+    "orderid": "261003000000003",
+    "text": "",
+    "status": "complete",
+    "orderstatus": "complete",
+    "updatetime": "03-Oct-2026 09:42:37"
+  }
+}

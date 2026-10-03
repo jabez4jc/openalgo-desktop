@@ -1,0 +1,30 @@
+{
+ "orders": {
+  "client_id": "<USER_ID>",
+  "id": "26100300000003",
+  "id_fyers": "x",
+  "qty": 100,
+  "qty_remaining": 0,
+  "qty_filled": 100,
+  "price_limit": 9050.0,
+  "price_stop": 0.0,
+  "price_traded": 9050.0,
+  "ord_type": 1,
+  "fy_token": "1120261019445001",
+  "exchange": 11,
+  "segment": 20,
+  "symbol": "MCX:CRUDEOIL26OCTFUT",
+  "instrument": 30,
+  "oms_msg": "TRADE CONFIRMED",
+  "offline_flag": false,
+  "time_oms": "03-Oct-2026 10:11:00",
+  "validity": "DAY",
+  "product_type": "MARGIN",
+  "tran_side": -1,
+  "org_ord_status": 2,
+  "ord_status": 20,
+  "ord_source": "API",
+  "ordertag": "1:openalgo"
+ },
+ "s": "ok"
+}

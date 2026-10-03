@@ -1,0 +1,38 @@
+{
+ "MCX:CRUDEOIL26OCTFUT": {
+  "fyToken": "1120261019445001",
+  "symbolDetails": "CRUDEOIL 19 Oct 26 FUT",
+  "symDetails": "CRUDEOIL 19 Oct 26 FUT",
+  "symTicker": "MCX:CRUDEOIL26OCTFUT",
+  "optType": "XX",
+  "expiryDate": "1792414800",
+  "strikePrice": -1.0,
+  "qtyMultiplier": 100.0,
+  "tickSize": 1.0,
+  "minLotSize": 1
+ },
+ "MCX:NATURALGAS26OCTFUT": {
+  "fyToken": "1120261027445002",
+  "symbolDetails": "NATURALGAS 27 Oct 26 FUT",
+  "symDetails": "NATURALGAS 27 Oct 26 FUT",
+  "symTicker": "MCX:NATURALGAS26OCTFUT",
+  "optType": "XX",
+  "expiryDate": "1793095200",
+  "strikePrice": -1.0,
+  "qtyMultiplier": 1250.0,
+  "tickSize": 0.1,
+  "minLotSize": 1
+ },
+ "MCX:CRUDEOIL26OCT8650CE": {
+  "fyToken": "1120261015445003",
+  "symbolDetails": "CRUDEOIL 15 Oct 26 8650 CE",
+  "symDetails": "CRUDEOIL 15 Oct 26 8650 CE",
+  "symTicker": "MCX:CRUDEOIL26OCT8650CE",
+  "optType": "CE",
+  "expiryDate": "1792069200",
+  "strikePrice": 8650.0,
+  "qtyMultiplier": 100.0,
+  "tickSize": 0.1,
+  "minLotSize": 1
+ }
+}

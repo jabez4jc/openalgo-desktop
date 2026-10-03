@@ -1,0 +1,9 @@
+{
+  "status": true,
+  "message": "SUCCESS",
+  "errorcode": "",
+  "data": [
+    {"exchange":"MCX","producttype":"INTRADAY","tradingsymbol":"CRUDEOIL19OCT26FUT","instrumenttype":"FUTCOM","symbolgroup":"","strikeprice":"-1","optiontype":"","expirydate":"19OCT2026","marketlot":"100","precision":"2","multiplier":"-1","tradevalue":"900800.00","transactiontype":"BUY","fillprice":"9008.00","fillsize":"100","orderid":"261003000000003","fillid":"50001","filltime":"09:42:37"},
+    {"exchange":"NSE","producttype":"DELIVERY","tradingsymbol":"SBIN-EQ","instrumenttype":"","tradevalue":"1908.20","transactiontype":"BUY","fillprice":"954.10","fillsize":"2","orderid":"261003000000010","fillid":"50002","filltime":"10:15:01"}
+  ]
+}

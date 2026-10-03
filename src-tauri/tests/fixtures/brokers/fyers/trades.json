@@ -1,0 +1,39 @@
+{
+ "s": "ok",
+ "code": 200,
+ "message": "",
+ "tradeBook": [
+  {
+   "clientId": "<USER_ID>",
+   "orderDateTime": "03-Oct-2026 09:15:32",
+   "orderNumber": "26100300000001",
+   "exchangeOrderNo": "1100000012345678",
+   "exchange": 10,
+   "side": 1,
+   "segment": 10,
+   "orderType": 2,
+   "fyToken": "10100000003045",
+   "productType": "INTRADAY",
+   "tradedQty": 10,
+   "tradePrice": 954.1,
+   "tradeValue": 9541.0,
+   "tradeNumber": "52605203",
+   "row": 1,
+   "symbol": "NSE:SBIN-EQ",
+   "orderTag": "1:openalgo"
+  },
+  {
+   "orderDateTime": "03-Oct-2026 09:42:37",
+   "orderNumber": "26100300000008",
+   "exchange": 11,
+   "side": -1,
+   "segment": 20,
+   "productType": "MARGIN",
+   "tradedQty": 100,
+   "tradePrice": 9008.0,
+   "tradeValue": 900800.0,
+   "tradeNumber": "52605204",
+   "symbol": "MCX:CRUDEOIL26OCTFUT"
+  }
+ ]
+}

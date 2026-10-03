@@ -1,0 +1,10 @@
+{
+ "s": "ok",
+ "code": 200,
+ "message": "",
+ "data": {
+  "margin_avail": 1999.9,
+  "margin_total": 147738.0563,
+  "margin_new_order": 147738.0563
+ }
+}
