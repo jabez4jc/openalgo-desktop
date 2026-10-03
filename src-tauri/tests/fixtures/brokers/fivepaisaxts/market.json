@@ -1,0 +1,168 @@
+{
+ "quotes_1502": {
+  "type": "success",
+  "code": "s-quotes-0001",
+  "description": "Get quotes successfully!",
+  "result": {
+   "mdp": 1502,
+   "quotesList": [
+    {
+     "exchangeSegment": 1,
+     "exchangeInstrumentID": 2885
+    }
+   ],
+   "listQuotes": [
+    "{\"MessageCode\": 1502, \"MessageVersion\": 4, \"ApplicationType\": 0, \"TokenID\": 0, \"ExchangeSegment\": 1, \"ExchangeInstrumentID\": 2885, \"ExchangeTimeStamp\": 1388056311, \"Bids\": [{\"Size\": 120, \"Price\": 2500.1, \"TotalOrders\": 3, \"BuyBackMarketMaker\": 0}, {\"Size\": 80, \"Price\": 2500.05, \"TotalOrders\": 2, \"BuyBackMarketMaker\": 0}], \"Asks\": [{\"Size\": 95, \"Price\": 2500.4, \"TotalOrders\": 4, \"BuyBackMarketMaker\": 0}], \"Touchline\": {\"BidInfo\": {\"Size\": 120, \"Price\": 2500.1, \"TotalOrders\": 3, \"BuyBackMarketMaker\": 0}, \"AskInfo\": {\"Size\": 95, \"Price\": 2500.4, \"TotalOrders\": 4, \"BuyBackMarketMaker\": 0}, \"LastTradedPrice\": 2500.25, \"LastTradedQunatity\": 7, \"TotalBuyQuantity\": 150000, \"TotalSellQuantity\": 160000, \"TotalTradedQuantity\": 4500123, \"AverageTradedPrice\": 2495.8, \"LastTradedTime\": 1388056311, \"LastUpdateTime\": 1388056311, \"PercentChange\": 0.51, \"Open\": 2490, \"High\": 2510.5, \"Low\": 2485, \"Close\": 2487.6, \"TotalValueTraded\": null, \"BuyBackTotalBuy\": 0, \"BuyBackTotalSell\": 0}, \"BookType\": 1, \"XMarketType\": 1, \"SequenceNumber\": 1}"
+   ]
+  }
+ },
+ "quotes_index": {
+  "type": "success",
+  "result": {
+   "listQuotes": [
+    "{\"MessageCode\": 1502, \"ExchangeSegment\": 1, \"ExchangeInstrumentID\": 26000, \"Bids\": [], \"Asks\": [], \"Touchline\": {\"LastTradedPrice\": 22350.5, \"Open\": 22300, \"High\": 22400, \"Low\": 22250, \"Close\": 22310, \"TotalTradedQuantity\": 0}}"
+   ]
+  }
+ },
+ "quotes_1510": {
+  "type": "success",
+  "result": {
+   "listQuotes": [
+    "{\"MessageCode\": 1510, \"ExchangeSegment\": 2, \"ExchangeInstrumentID\": 43210, \"OpenInterest\": 1234500}"
+   ]
+  }
+ },
+ "quote_payload": {
+  "MessageCode": 1502,
+  "MessageVersion": 4,
+  "ApplicationType": 0,
+  "TokenID": 0,
+  "ExchangeSegment": 1,
+  "ExchangeInstrumentID": 2885,
+  "ExchangeTimeStamp": 1388056311,
+  "Bids": [
+   {
+    "Size": 120,
+    "Price": 2500.1,
+    "TotalOrders": 3,
+    "BuyBackMarketMaker": 0
+   },
+   {
+    "Size": 80,
+    "Price": 2500.05,
+    "TotalOrders": 2,
+    "BuyBackMarketMaker": 0
+   }
+  ],
+  "Asks": [
+   {
+    "Size": 95,
+    "Price": 2500.4,
+    "TotalOrders": 4,
+    "BuyBackMarketMaker": 0
+   }
+  ],
+  "Touchline": {
+   "BidInfo": {
+    "Size": 120,
+    "Price": 2500.1,
+    "TotalOrders": 3,
+    "BuyBackMarketMaker": 0
+   },
+   "AskInfo": {
+    "Size": 95,
+    "Price": 2500.4,
+    "TotalOrders": 4,
+    "BuyBackMarketMaker": 0
+   },
+   "LastTradedPrice": 2500.25,
+   "LastTradedQunatity": 7,
+   "TotalBuyQuantity": 150000,
+   "TotalSellQuantity": 160000,
+   "TotalTradedQuantity": 4500123,
+   "AverageTradedPrice": 2495.8,
+   "LastTradedTime": 1388056311,
+   "LastUpdateTime": 1388056311,
+   "PercentChange": 0.51,
+   "Open": 2490,
+   "High": 2510.5,
+   "Low": 2485,
+   "Close": 2487.6,
+   "TotalValueTraded": null,
+   "BuyBackTotalBuy": 0,
+   "BuyBackTotalSell": 0
+  },
+  "BookType": 1,
+  "XMarketType": 1,
+  "SequenceNumber": 1
+ },
+ "ohlc_minute": {
+  "type": "success",
+  "code": "s-instrument-0002",
+  "description": "Data found",
+  "result": {
+   "exchangeSegment": "NSECM",
+   "exchangeInstrumentID": "2885",
+   "dataReponse": "1704273300|2490|2495|2488|2494|1200,1704273360|2494|2496|2493|2495.5|800,1704273300|2490|2495|2488|2494|1200,bad|row"
+  }
+ },
+ "ohlc_day": {
+  "type": "success",
+  "result": {
+   "dataReponse": "1704240000|2480|2520|2470|2510|5100000,1704326400|2510|2530|2500|2525|4800000"
+  }
+ },
+ "ohlc_empty": {
+  "type": "success",
+  "result": {
+   "dataReponse": ""
+  }
+ },
+ "indexlist_1": {
+  "type": "success",
+  "code": "s-response-0001",
+  "description": "Index List successfully",
+  "result": {
+   "exchangeSegment": 1,
+   "indexList": [
+    "NIFTY 50_26000",
+    "NIFTY BANK_26001",
+    "INDIA VIX_26017",
+    "NIFTY 100_26004",
+    "HANGSENG BEES-NAV_26028"
+   ]
+  }
+ },
+ "indexlist_11": {
+  "type": "success",
+  "result": {
+   "exchangeSegment": 11,
+   "indexList": [
+    "SENSEX_1",
+    "BANKEX_12",
+    "BSE IT_17"
+   ]
+  }
+ },
+ "subscription_ok": {
+  "type": "success",
+  "code": "s-subscription-0001",
+  "description": "Subscribed successfully",
+  "result": {
+   "mdp": 1502,
+   "quotesList": [],
+   "listQuotes": [
+    "{\"MessageCode\": 1502, \"MessageVersion\": 4, \"ApplicationType\": 0, \"TokenID\": 0, \"ExchangeSegment\": 1, \"ExchangeInstrumentID\": 2885, \"ExchangeTimeStamp\": 1388056311, \"Bids\": [{\"Size\": 120, \"Price\": 2500.1, \"TotalOrders\": 3, \"BuyBackMarketMaker\": 0}, {\"Size\": 80, \"Price\": 2500.05, \"TotalOrders\": 2, \"BuyBackMarketMaker\": 0}], \"Asks\": [{\"Size\": 95, \"Price\": 2500.4, \"TotalOrders\": 4, \"BuyBackMarketMaker\": 0}], \"Touchline\": {\"BidInfo\": {\"Size\": 120, \"Price\": 2500.1, \"TotalOrders\": 3, \"BuyBackMarketMaker\": 0}, \"AskInfo\": {\"Size\": 95, \"Price\": 2500.4, \"TotalOrders\": 4, \"BuyBackMarketMaker\": 0}, \"LastTradedPrice\": 2500.25, \"LastTradedQunatity\": 7, \"TotalBuyQuantity\": 150000, \"TotalSellQuantity\": 160000, \"TotalTradedQuantity\": 4500123, \"AverageTradedPrice\": 2495.8, \"LastTradedTime\": 1388056311, \"LastUpdateTime\": 1388056311, \"PercentChange\": 0.51, \"Open\": 2490, \"High\": 2510.5, \"Low\": 2485, \"Close\": 2487.6, \"TotalValueTraded\": null, \"BuyBackTotalBuy\": 0, \"BuyBackTotalSell\": 0}, \"BookType\": 1, \"XMarketType\": 1, \"SequenceNumber\": 1}"
+   ]
+  }
+ },
+ "unsubscription_ok": {
+  "type": "success",
+  "code": "s-subscription-0002",
+  "description": "Unsubscribed successfully",
+  "result": {
+   "mdp": 1502,
+   "listQuotes": []
+  }
+ }
+}
