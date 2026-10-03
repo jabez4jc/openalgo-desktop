@@ -557,11 +557,27 @@ pub async fn dashboard_data(State(ctx): Ctx) -> Response {
             json!({"status": "error", "code": "BROKER_SESSION_EXPIRED", "message": "Broker not connected - please connect your broker"}),
         );
     }
-    match crate::server::api_v1::funds_payload(&ctx).await {
-        Ok((data, _mode)) => ok(json!({"status": "success", "data": data})),
-        Err(e) => {
-            tracing::error!("Dashboard funds failed: {}", e);
-            error(StatusCode::INTERNAL_SERVER_ERROR, e.client_message())
+    // Web: the funds service's own status and message on failure.
+    let r = crate::services::account_service::funds(&ctx).await;
+    if !r.is_success() {
+        let msg = r.message();
+        return json_response(
+            StatusCode::from_u16(r.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
+            json!({"status": "error", "message": if msg.is_empty() { "Failed to get funds".to_string() } else { msg }}),
+        );
+    }
+    match r
+        .body
+        .get("data")
+        .filter(|d| d.as_object().is_some_and(|m| !m.is_empty()))
+    {
+        Some(data) => ok(json!({"status": "success", "data": data})),
+        None => {
+            tracing::error!("Dashboard funds came back empty");
+            error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to get margin data",
+            )
         }
     }
 }
