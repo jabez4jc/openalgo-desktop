@@ -5,18 +5,24 @@
 
 pub mod account;
 pub mod admin;
+pub mod analyzer;
 pub mod app_config;
 pub mod auth;
 pub mod broker;
+pub mod charts;
 pub mod health;
 pub mod latency;
 pub mod leverage;
 pub mod log;
 pub mod market_calendar;
+pub mod orders;
 pub mod playground;
+pub mod sandbox;
+pub mod search;
 pub mod security;
 pub mod settings;
 pub mod traffic;
+pub mod watchlist;
 pub mod websocket_example;
 pub mod webui;
 
@@ -25,7 +31,7 @@ use crate::state::AppState;
 use axum::{
     http::Method,
     middleware,
-    routing::{delete, get, post, put, MethodRouter},
+    routing::{delete, get, patch, post, put, MethodRouter},
     Router,
 };
 use std::sync::Arc;
@@ -62,6 +68,7 @@ macro_rules! r {
     (@route POST, $f:path) => { post($f) };
     (@route PUT, $f:path) => { put($f) };
     (@route DELETE, $f:path) => { delete($f) };
+    (@route PATCH, $f:path) => { patch($f) };
 }
 
 pub fn table() -> Vec<RouteSpec> {
@@ -254,6 +261,101 @@ pub fn table() -> Vec<RouteSpec> {
         r!(GET, "/playground/endpoints", User, playground::endpoints),
         r!(GET, "/leverage/api/current", User, leverage::current),
         r!(POST, "/leverage/api/update", User, leverage::update),
+        // Search (web blueprints/search.py)
+        r!(GET, "/search/api/search", User, search::api_search),
+        r!(GET, "/search/api/expiries", User, search::api_expiries),
+        r!(
+            GET,
+            "/search/api/underlyings",
+            User,
+            search::api_underlyings
+        ),
+        // Order actions from the pages (web blueprints/orders.py)
+        r!(POST, "/close_position", User, orders::close_position),
+        r!(
+            POST,
+            "/close_all_positions",
+            User,
+            orders::close_all_positions
+        ),
+        r!(POST, "/cancel_all_orders", User, orders::cancel_all_orders),
+        r!(POST, "/cancel_order", User, orders::cancel_order),
+        r!(POST, "/modify_order", User, orders::modify_order),
+        r!(POST, "/modify_gtt_order", User, orders::modify_gtt_order),
+        r!(POST, "/cancel_gtt_order", User, orders::cancel_gtt_order),
+        // Action Center
+        r!(POST, "/action-center/approve/{id}", User, orders::approve),
+        r!(POST, "/action-center/reject/{id}", User, orders::reject),
+        r!(DELETE, "/action-center/delete/{id}", User, orders::delete),
+        r!(GET, "/action-center/count", User, orders::count),
+        r!(
+            POST,
+            "/action-center/approve-all",
+            User,
+            orders::approve_all
+        ),
+        r!(GET, "/action-center/api/data", User, orders::data),
+        // Sandbox (web blueprints/sandbox.py)
+        r!(GET, "/sandbox/api/configs", User, sandbox::configs),
+        r!(POST, "/sandbox/update", User, sandbox::update),
+        r!(POST, "/sandbox/reset", User, sandbox::reset),
+        r!(
+            POST,
+            "/sandbox/reload-squareoff",
+            User,
+            sandbox::reload_squareoff
+        ),
+        r!(
+            GET,
+            "/sandbox/squareoff-status",
+            User,
+            sandbox::squareoff_status
+        ),
+        r!(GET, "/sandbox/mypnl/api/data", User, sandbox::mypnl),
+        r!(
+            GET,
+            "/sandbox/mypnl/export/{kind}",
+            User,
+            sandbox::mypnl_export
+        ),
+        // Analyzer log (web blueprints/analyzer.py)
+        r!(GET, "/analyzer/api/data", User, analyzer::data),
+        r!(GET, "/analyzer/export", User, analyzer::export),
+        // Charts (web blueprints/pnltracker.py, chart_test.py)
+        r!(POST, "/pnltracker/api/pnl", User, charts::pnl),
+        r!(GET, "/chart/test/api/history", User, charts::chart_history),
+        // Watchlists and the alert log (web blueprints/watchlist.py, alerts.py)
+        r!(GET, "/watchlist/api/lists", User, watchlist::lists),
+        r!(POST, "/watchlist/api/lists", User, watchlist::create),
+        r!(PATCH, "/watchlist/api/lists/{id}", User, watchlist::rename),
+        r!(DELETE, "/watchlist/api/lists/{id}", User, watchlist::delete),
+        r!(
+            POST,
+            "/watchlist/api/lists/{id}/clear",
+            User,
+            watchlist::clear
+        ),
+        r!(
+            POST,
+            "/watchlist/api/lists/{id}/items",
+            User,
+            watchlist::add_item
+        ),
+        r!(
+            DELETE,
+            "/watchlist/api/lists/{id}/items/{item_id}",
+            User,
+            watchlist::remove_item
+        ),
+        r!(
+            PUT,
+            "/watchlist/api/lists/{id}/items/order",
+            User,
+            watchlist::reorder
+        ),
+        r!(POST, "/alerts/fired", User, watchlist::alert_fired),
+        r!(GET, "/alerts/log", User, watchlist::alert_log_list),
+        r!(DELETE, "/alerts/log", User, watchlist::alert_log_clear),
     ]
 }
 

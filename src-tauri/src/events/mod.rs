@@ -46,6 +46,8 @@ pub enum Topic {
     MasterContractDownload,
     CacheLoaded,
     ForceLogout,
+    PendingOrderCreated,
+    PendingOrderUpdated,
 }
 
 impl Topic {
@@ -82,6 +84,8 @@ impl Topic {
             Topic::MasterContractDownload => "master_contract.download",
             Topic::CacheLoaded => "cache.loaded",
             Topic::ForceLogout => "session.force_logout",
+            Topic::PendingOrderCreated => "action_center.pending_order_created",
+            Topic::PendingOrderUpdated => "action_center.pending_order_updated",
         }
     }
 }
@@ -295,6 +299,16 @@ pub enum Event {
     ForceLogout {
         message: String,
     },
+    /// An order queued for approval in the Action Center (Semi-Auto mode);
+    /// the payload is the web's `pending_order_created` Socket.IO body.
+    PendingOrderCreated {
+        payload: Value,
+    },
+    /// An Action Center order approved, rejected, deleted or returned; the
+    /// payload is the web's `pending_order_updated` Socket.IO body.
+    PendingOrderUpdated {
+        payload: Value,
+    },
 }
 
 impl Event {
@@ -333,6 +347,8 @@ impl Event {
             Event::MasterContractDownload { .. } => Topic::MasterContractDownload,
             Event::CacheLoaded { .. } => Topic::CacheLoaded,
             Event::ForceLogout { .. } => Topic::ForceLogout,
+            Event::PendingOrderCreated { .. } => Topic::PendingOrderCreated,
+            Event::PendingOrderUpdated { .. } => Topic::PendingOrderUpdated,
         }
     }
 

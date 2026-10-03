@@ -34,6 +34,13 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         super::webui::migrate_security_settings,
     )?;
     run_rust_migration(conn, "052_leverage_config", super::webui::migrate_leverage)?;
+    run_rust_migration(
+        conn,
+        "060_action_center_pending_orders",
+        super::action_center::migrate,
+    )?;
+    run_rust_migration(conn, "061_watchlists", super::watchlist::migrate)?;
+    run_rust_migration(conn, "062_alert_log", super::alert_log::migrate)?;
 
     tracing::info!("Database migrations completed");
     Ok(())

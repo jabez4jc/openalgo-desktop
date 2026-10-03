@@ -21,11 +21,14 @@
 //! | [`sandbox_feed`] | the sandbox engine's quote, tick and symbol adapters |
 
 pub mod account_service;
+pub mod action_center_service;
+pub mod analyzer_log_service;
 pub mod analyzer_service;
 pub mod apikey_service;
 pub mod auth_service;
 pub mod batch_order_service;
 pub mod broker_auth_service;
+pub mod chart_test_service;
 pub mod core;
 pub mod error_log;
 pub mod greeks_service;
@@ -36,13 +39,18 @@ pub mod market_data_service;
 pub mod monitor;
 pub mod options_order_service;
 pub mod options_service;
+pub mod order_router;
 pub mod order_service;
+pub mod pnl_tracker_service;
+pub mod sandbox_export_service;
 pub mod sandbox_feed;
 pub mod schema;
 pub mod schemas;
+pub mod search_ui_service;
 pub mod security_service;
 pub mod symbol_service;
 pub mod system_info;
+pub mod ui_order_service;
 
 pub use analyzer_service::{AnalyzerService, AnalyzerStatus};
 pub use core::Reply;

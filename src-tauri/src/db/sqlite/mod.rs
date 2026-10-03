@@ -4,6 +4,8 @@
 //! duration of one synchronous call and returned when it drops; no method
 //! holds a connection across an `.await`.
 
+pub mod action_center;
+pub mod alert_log;
 mod analyzer_logs;
 pub mod api_keys;
 pub mod auth;
@@ -24,6 +26,7 @@ mod strategy;
 mod symbol;
 mod traffic_logs;
 pub mod user;
+pub mod watchlist;
 pub mod webui;
 
 use crate::error::Result;
