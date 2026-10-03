@@ -13,6 +13,7 @@ pub mod fyers;
 #[cfg(any(test, feature = "test-support"))]
 pub mod mock;
 pub mod types;
+pub mod upstox;
 pub mod zerodha;
 
 use crate::error::{AppError, Result};
