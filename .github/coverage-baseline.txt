@@ -1,0 +1,13 @@
+# Rust line-coverage baseline, in percent, for the rust-coverage ratchet in
+# .github/workflows/ci.yml. The first non-comment line is the number.
+#
+# How the ratchet works:
+# - The job measures line coverage of src-tauri with cargo-llvm-cov.
+# - If coverage drops more than 0.1 points below this number the ratchet step
+#   fails and annotates the run. The step is continue-on-error for now, so it
+#   does not block a merge; it becomes a hard gate once the Wave 1 rewrite of
+#   src-tauri has settled.
+# - When the job reports that coverage is at least 1 point above this number,
+#   raise the number in the same PR. Never lower it without a written reason in
+#   the PR description.
+0.00

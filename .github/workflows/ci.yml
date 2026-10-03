@@ -1,0 +1,389 @@
+name: CI
+
+# Job graph
+#
+#   rust-lint --> rust-test (ubuntu x64, ubuntu arm64, macos, windows) --+
+#             \-> rust-coverage (ratchet, not a gate yet)                |
+#   frontend (biome, tsc, vite build) -----------------------------------+--> tauri-build (5 targets)
+#   frontend-test (node 20/22/24) ---------------------------------------+
+#   e2e (Playwright against vite preview)
+#   secret-scan (gitleaks, full history)
+#
+#   ci-ok needs every job above and fails unless all of them succeeded.
+#   Branch protection should require only the "ci-ok" check.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Cancel superseded PR runs; let every main run finish so caches get saved.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_TERM_COLOR: always
+  # Incremental artifacts are useless across CI runs and bloat the cache.
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUST_BACKTRACE: 1
+  # Keep line numbers in backtraces but drop full debuginfo: smaller target
+  # dirs, faster links and caches that fit the 10 GB repository budget.
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
+  CARGO_PROFILE_TEST_DEBUG: line-tables-only
+  NODE_VERSION: "22"
+
+jobs:
+  # ---------------------------------------------------------------- Rust
+  rust-lint:
+    name: rust-lint (fmt + clippy)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    env:
+      RUSTFLAGS: -D warnings
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/linux-tauri-deps
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Frontend dist placeholder
+        # tauri::generate_context!() embeds frontendDist at compile time; an
+        # empty dist/ is enough for clippy and keeps Node out of this job.
+        run: mkdir -p dist && test -f dist/index.html || echo '<!doctype html><title>ci</title>' > dist/index.html
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: rust-lint-ubuntu-22.04
+          cache-on-failure: true
+      - name: cargo fmt --check
+        working-directory: src-tauri
+        run: cargo fmt --all --check
+      - name: cargo clippy
+        working-directory: src-tauri
+        run: cargo clippy --all-targets --locked -- -D warnings
+
+  rust-test:
+    name: rust-test (${{ matrix.os }})
+    needs: rust-lint
+    runs-on: ${{ matrix.os }}
+    # Cold DuckDB (bundled C++) + SQLite builds take 20-40 minutes, longest on
+    # Windows; warm-cache runs are a few minutes.
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-22.04-arm, macos-latest, windows-latest]
+    env:
+      RUSTFLAGS: -D warnings
+    steps:
+      - uses: actions/checkout@v6
+      - if: runner.os == 'Linux'
+        uses: ./.github/actions/linux-tauri-deps
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Frontend dist placeholder
+        run: mkdir -p dist && test -f dist/index.html || echo '<!doctype html><title>ci</title>' > dist/index.html
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: rust-test-${{ matrix.os }}
+          cache-on-failure: true
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - name: Unit and integration tests (nextest)
+        working-directory: src-tauri
+        run: cargo nextest run --locked --all-targets --config-file ../.github/nextest.toml --profile ci
+      - name: Doc tests (nextest does not run them)
+        working-directory: src-tauri
+        run: cargo test --locked --doc
+      - name: Upload JUnit report
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: rust-test-junit-${{ matrix.os }}
+          path: src-tauri/target/nextest/ci/junit.xml
+          if-no-files-found: ignore
+          retention-days: 7
+
+  rust-coverage:
+    name: rust-coverage (llvm-cov)
+    needs: rust-lint
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/linux-tauri-deps
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: llvm-tools-preview
+      - name: Frontend dist placeholder
+        run: mkdir -p dist && test -f dist/index.html || echo '<!doctype html><title>ci</title>' > dist/index.html
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: rust-coverage-ubuntu-22.04
+          cache-on-failure: true
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov,cargo-nextest
+      - name: Run tests with coverage instrumentation
+        working-directory: src-tauri
+        run: cargo llvm-cov nextest --locked --all-targets --no-fail-fast --no-report
+      - name: Build coverage reports
+        working-directory: src-tauri
+        run: |
+          cargo llvm-cov report --lcov --output-path lcov.info
+          cargo llvm-cov report --json --summary-only --output-path coverage-summary.json
+          cargo llvm-cov report --summary-only | tee coverage-summary.txt
+      - name: Coverage summary
+        working-directory: src-tauri
+        run: |
+          lines=$(jq -r '.data[0].totals.lines.percent' coverage-summary.json)
+          functions=$(jq -r '.data[0].totals.functions.percent' coverage-summary.json)
+          regions=$(jq -r '.data[0].totals.regions.percent' coverage-summary.json)
+          {
+            echo "### Rust coverage (src-tauri)"
+            echo
+            echo "| Metric | Percent |"
+            echo "| --- | --- |"
+            printf '| Lines | %.2f |\n' "$lines"
+            printf '| Functions | %.2f |\n' "$functions"
+            printf '| Regions | %.2f |\n' "$regions"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Coverage ratchet against .github/coverage-baseline.txt
+        # Not a hard gate yet (see the baseline file). A drop below the
+        # baseline annotates the run with an error but does not fail CI.
+        continue-on-error: true
+        run: |
+          current=$(jq -r '.data[0].totals.lines.percent' src-tauri/coverage-summary.json)
+          baseline=$(grep -Ev '^[[:space:]]*(#|$)' .github/coverage-baseline.txt | head -n1 | tr -d '[:space:]')
+          printf 'Line coverage: %.2f%% (baseline %s%%)\n' "$current" "$baseline"
+          if awk -v c="$current" -v b="$baseline" 'BEGIN { exit !(c + 0.1 < b) }'; then
+            echo "::error title=Coverage ratchet::Line coverage ${current}% is below the baseline ${baseline}% in .github/coverage-baseline.txt"
+            exit 1
+          fi
+          if awk -v c="$current" -v b="$baseline" 'BEGIN { exit !(c >= b + 1) }'; then
+            echo "::notice title=Coverage ratchet::Line coverage ${current}% is at least 1 point above the baseline ${baseline}%; raise .github/coverage-baseline.txt"
+          fi
+      - name: Upload lcov
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: rust-coverage
+          path: |
+            src-tauri/lcov.info
+            src-tauri/coverage-summary.json
+            src-tauri/coverage-summary.txt
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # ------------------------------------------------------------ Frontend
+  frontend:
+    name: frontend (biome, tsc, build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - name: Biome (lint, format, import order)
+        run: npx biome ci --reporter=github ./src
+      - name: Type check
+        run: npx tsc -b
+      - name: Vite build
+        run: npx vite build
+      - uses: actions/upload-artifact@v6
+        with:
+          name: frontend-dist
+          path: dist/
+          retention-days: 7
+
+  frontend-test:
+    name: frontend-test (node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        # The majors declared in package.json engines.
+        node-version: ["20", "22", "24"]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - name: Vitest with coverage
+        run: npx vitest run --coverage
+      - name: Upload coverage
+        if: always() && matrix.node-version == '22'
+        uses: actions/upload-artifact@v6
+        with:
+          name: frontend-coverage
+          path: coverage/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  e2e:
+    name: e2e (Playwright chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - name: Install Playwright chromium
+        run: npx playwright install --with-deps chromium
+      - name: Build the app for vite preview
+        run: npx vite build
+      - name: Playwright tests
+        # playwright.config.ts starts `vite preview` through its webServer
+        # block; CI=true is set by Actions.
+        run: npx playwright test --project=chromium
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # ------------------------------------------------------------ Secrets
+  secret-scan:
+    name: secret-scan (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/install-gitleaks
+      - name: Scan full git history
+        run: gitleaks git --config .github/gitleaks.toml --redact --verbose --exit-code 1 .
+
+  # ------------------------------------------------------- Tauri bundles
+  tauri-build:
+    name: tauri-build (${{ matrix.name }})
+    needs: [rust-lint, rust-test, frontend, frontend-test]
+    runs-on: ${{ matrix.os }}
+    # Release profile is lto + codegen-units=1 + bundled DuckDB: slow when cold.
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            # Oldest supported Ubuntu: glibc 2.35 and WebKitGTK 4.1, so the
+            # .deb and AppImage run on Debian 12 and newer.
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - name: linux-aarch64
+            # Raspberry Pi 4/5 on 64-bit Raspberry Pi OS (Bookworm, glibc 2.36).
+            # Native arm64 runner, no QEMU.
+            os: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+          - name: windows-x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - name: macos-aarch64
+            os: macos-latest
+            target: aarch64-apple-darwin
+          - name: macos-x86_64
+            # Cross-compiled on the Apple Silicon runner (macos-13 Intel
+            # runners are retired).
+            os: macos-latest
+            target: x86_64-apple-darwin
+    steps:
+      - uses: actions/checkout@v6
+      - if: runner.os == 'Linux'
+        uses: ./.github/actions/linux-tauri-deps
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: tauri-build-${{ matrix.name }}
+          cache-on-failure: true
+          # Release caches are large; only main refreshes them, PRs restore.
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+      - name: Tauri environment report
+        # Informational: prints Rust/JS Tauri versions so a mismatch between
+        # the tauri crate and @tauri-apps/api is visible in the log.
+        continue-on-error: true
+        run: npx tauri info
+      - name: Build bundles (no publishing)
+        uses: tauri-apps/tauri-action@v1
+        with:
+          tauriScript: npx tauri
+          args: --target ${{ matrix.target }} --ci
+      - name: Upload bundles
+        uses: actions/upload-artifact@v6
+        with:
+          name: bundles-${{ matrix.name }}
+          path: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/deb/*.deb
+            src-tauri/target/${{ matrix.target }}/release/bundle/rpm/*.rpm
+            src-tauri/target/${{ matrix.target }}/release/bundle/appimage/*.AppImage
+            src-tauri/target/${{ matrix.target }}/release/bundle/msi/*.msi
+            src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.exe
+            src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 7
+
+  # -------------------------------------------------- Branch protection
+  ci-ok:
+    name: ci-ok
+    if: always()
+    needs:
+      - rust-lint
+      - rust-test
+      - rust-coverage
+      - frontend
+      - frontend-test
+      - e2e
+      - secret-scan
+      - tauri-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: All required jobs passed
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          failed=$(echo "$RESULTS" | jq -r '[to_entries[] | select(.value.result != "success")] | length')
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::One or more required jobs did not succeed."
+            exit 1
+          fi

@@ -1,0 +1,27 @@
+# gitleaks configuration used by ci.yml (secret-scan) and security.yml.
+#
+# Starts from the upstream default rule set. The allowlist below holds only
+# values that are known not to be secrets: fixture placeholders and fake keys
+# used by tests. Never allowlist a real credential; rotate it and rewrite the
+# fixture with the <APIKEY>, <USER_ID>, <EMAIL> placeholders instead.
+
+title = "openalgo-desktop"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Fixture placeholders and fake test keys"
+regexTarget = "match"
+regexes = [
+  # Placeholders required by CLAUDE.md for recorded fixtures.
+  '''<APIKEY>''',
+  '''<USER_ID>''',
+  '''<EMAIL>''',
+  '''<TOKEN>''',
+  '''<SECRET>''',
+  # Deliberately invalid API key used by the invalid-apikey contract fixture.
+  '''invalidkey123''',
+  # Fake 32-hex key used by the api_keys unit tests.
+  '''abcdef0123456789abcdef0123456789''',
+]
