@@ -20,6 +20,11 @@ updates:
       prefix: chore
       include: scope
     labels: [dependencies, rust]
+    # Major bumps (aes-gcm, argon2, rand, keyring, axum...) change crypto and
+    # server APIs; they are taken deliberately, not from a weekly PR.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       tauri:
         patterns: ["tauri", "tauri-*"]
@@ -39,6 +44,10 @@ updates:
       prefix: chore
       include: scope
     labels: [dependencies, javascript]
+    # The frontend tracks OpenAlgo web's versions; majors arrive with web updates.
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       tauri:
         patterns: ["@tauri-apps/*"]

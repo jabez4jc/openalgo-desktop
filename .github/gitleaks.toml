@@ -24,4 +24,6 @@ regexes = [
   '''invalidkey123''',
   # Fake 32-hex key used by the api_keys unit tests.
   '''abcdef0123456789abcdef0123456789''',
+  # Playground message templates are keyed by name, e.g. key: 'subscribe_depth_20'.
+  '''subscribe_[a-z0-9_]+''',
 ]
