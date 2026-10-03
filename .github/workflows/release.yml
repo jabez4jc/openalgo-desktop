@@ -1,0 +1,246 @@
+name: Release
+
+# Builds OpenAlgo Desktop for every supported platform when a v* tag is pushed
+# and attaches the bundles to a DRAFT GitHub release. A maintainer reviews the
+# draft and publishes it by hand. Tag only commits on main whose CI is green;
+# this workflow does not re-run the test suite.
+#
+# Signing is optional. Without the secrets below the bundles are unsigned
+# (macOS Gatekeeper and Windows SmartScreen will warn). Configure them under
+# Settings > Secrets and variables > Actions:
+#
+# macOS code signing (all three together):
+#   APPLE_CERTIFICATE            base64 of the Developer ID Application .p12
+#   APPLE_CERTIFICATE_PASSWORD   password of that .p12
+#   APPLE_SIGNING_IDENTITY       e.g. "Developer ID Application: Name (TEAMID)"
+# macOS notarization, needs signing above plus ONE of:
+#   APPLE_ID, APPLE_PASSWORD (app-specific password), APPLE_TEAM_ID
+#   or
+#   APPLE_API_ISSUER, APPLE_API_KEY (key id), APPLE_API_PRIVATE_KEY (contents
+#   of the AuthKey_<id>.p8 file)
+# Windows code signing (Authenticode, both together):
+#   WINDOWS_CERTIFICATE          base64 of the code-signing .pfx
+#   WINDOWS_CERTIFICATE_PASSWORD password of that .pfx
+# Tauri updater artifacts (only once the updater plugin is enabled):
+#   TAURI_SIGNING_PRIVATE_KEY, TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+#
+# Empty secrets are never exported: Tauri treats a present-but-empty
+# APPLE_CERTIFICATE or APPLE_ID as "configured" and would fail the build.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  NODE_VERSION: "22"
+
+jobs:
+  create-release:
+    name: create draft release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    outputs:
+      release_id: ${{ steps.release.outputs.release_id }}
+    steps:
+      - name: Create or reuse the draft release for this tag
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          prerelease=false
+          case "$TAG" in *-*) prerelease=true ;; esac
+          # Drafts are not reachable through /releases/tags/<tag>, so list.
+          existing=$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            | jq -r --arg tag "$TAG" '[.[] | select(.tag_name == $tag)][0].id // empty')
+          if [ -n "$existing" ]; then
+            echo "Reusing release ${existing} for ${TAG}"
+            id="$existing"
+          else
+            id=$(gh api -X POST "repos/${GITHUB_REPOSITORY}/releases" \
+              -f tag_name="$TAG" \
+              -f name="OpenAlgo Desktop ${TAG}" \
+              -f body="Installers for Windows, macOS (Apple Silicon and Intel), Linux x64 and Raspberry Pi (Linux arm64)." \
+              -F draft=true \
+              -F prerelease="$prerelease" \
+              -F generate_release_notes=true \
+              --jq .id)
+            echo "Created draft release ${id} for ${TAG}"
+          fi
+          echo "release_id=${id}" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: build (${{ matrix.name }})
+    needs: create-release
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 180
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - name: linux-aarch64
+            # Raspberry Pi 4/5, 64-bit Raspberry Pi OS.
+            os: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+          - name: windows-x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - name: macos-aarch64
+            os: macos-latest
+            target: aarch64-apple-darwin
+          - name: macos-x86_64
+            os: macos-latest
+            target: x86_64-apple-darwin
+    steps:
+      - uses: actions/checkout@v6
+      - if: runner.os == 'Linux'
+        uses: ./.github/actions/linux-tauri-deps
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          # Same key as ci.yml tauri-build, so a tag restores main's cache.
+          shared-key: tauri-build-${{ matrix.name }}
+          save-if: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci
+
+      - name: Export configured signing secrets
+        env:
+          RUNNER_OS_NAME: ${{ runner.os }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          export_if_set() {
+            local name="$1"
+            local value="${!name:-}"
+            if [ -n "$value" ]; then
+              {
+                printf '%s<<__OPENALGO_SECRET_EOF__\n' "$name"
+                printf '%s\n' "$value"
+                printf '__OPENALGO_SECRET_EOF__\n'
+              } >> "$GITHUB_ENV"
+              echo "${name}: configured"
+            else
+              echo "${name}: not set"
+            fi
+          }
+          if [ "$RUNNER_OS_NAME" = "macOS" ]; then
+            if [ -n "${APPLE_CERTIFICATE:-}" ]; then
+              for v in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_SIGNING_IDENTITY; do
+                export_if_set "$v"
+              done
+              for v in APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID APPLE_API_ISSUER APPLE_API_KEY; do
+                export_if_set "$v"
+              done
+              if [ -n "${APPLE_API_PRIVATE_KEY:-}" ]; then
+                key_path="${RUNNER_TEMP}/AuthKey_${APPLE_API_KEY:-notary}.p8"
+                printf '%s\n' "$APPLE_API_PRIVATE_KEY" > "$key_path"
+                chmod 600 "$key_path"
+                echo "APPLE_API_KEY_PATH=${key_path}" >> "$GITHUB_ENV"
+                echo "APPLE_API_KEY_PATH: configured"
+              fi
+            else
+              echo "macOS signing not configured; building an unsigned app."
+            fi
+          fi
+          export_if_set TAURI_SIGNING_PRIVATE_KEY
+          export_if_set TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+
+      - name: Import Windows code-signing certificate
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if (-not $env:WINDOWS_CERTIFICATE) {
+            Write-Host "Windows signing not configured; building unsigned installers."
+            exit 0
+          }
+          $pfx = Join-Path $env:RUNNER_TEMP 'signing.pfx'
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE))
+          $password = ConvertTo-SecureString -String $env:WINDOWS_CERTIFICATE_PASSWORD -Force -AsPlainText
+          $cert = Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\CurrentUser\My -Password $password
+          Remove-Item $pfx
+          # Merge the thumbprint into tauri.conf.json at build time instead of
+          # committing it: tauri build --config <file>.
+          $config = Join-Path $env:RUNNER_TEMP 'windows-signing.json'
+          @{
+            bundle = @{
+              windows = @{
+                certificateThumbprint = $cert.Thumbprint
+                digestAlgorithm       = 'sha256'
+                timestampUrl          = 'http://timestamp.digicert.com'
+              }
+            }
+          } | ConvertTo-Json -Depth 5 | Set-Content -Path $config -Encoding utf8
+          $configArg = $config -replace '\\', '/'
+          "TAURI_EXTRA_ARGS=--config $configArg" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "Windows signing configured."
+
+      - name: Build and upload to the draft release
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tauriScript: npx tauri
+          args: --target ${{ matrix.target }} --ci ${{ env.TAURI_EXTRA_ARGS }}
+          releaseId: ${{ needs.create-release.outputs.release_id }}
+          tagName: ${{ github.ref_name }}
+
+      - name: Remove notarization key
+        if: always() && runner.os == 'macOS'
+        run: rm -f "${RUNNER_TEMP}"/AuthKey_*.p8
+
+      - name: Upload bundles as workflow artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-${{ matrix.name }}
+          path: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/deb/*.deb
+            src-tauri/target/${{ matrix.target }}/release/bundle/rpm/*.rpm
+            src-tauri/target/${{ matrix.target }}/release/bundle/appimage/*.AppImage
+            src-tauri/target/${{ matrix.target }}/release/bundle/msi/*.msi
+            src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*.exe
+            src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 30
