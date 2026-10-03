@@ -385,6 +385,12 @@ mod tests {
         // A second start is a no-op (idempotent). Close the first one first:
         // DuckDB holds an exclusive file lock, and Windows refuses a second
         // open of the same file even from the same process.
+        ctx.shutdown().await;
+        assert_eq!(
+            Arc::strong_count(&ctx),
+            1,
+            "app state must not outlive shutdown"
+        );
         drop(ctx);
         let ctx2 = AppState::open(
             dir.path(),
@@ -402,7 +408,6 @@ mod tests {
             .unwrap();
         assert_eq!(creds.api_key.expose(), "brokerkey");
         drop(conn);
-        ctx.shutdown().await;
         ctx2.shutdown().await;
     }
 
