@@ -1,14 +1,14 @@
-//! WebSocket module for real-time market data
+//! Outbound broker market-data feed.
 //!
-//! Supports three broker WebSocket protocols:
-//! - Angel One SmartAPI: wss://smartapisocket.angelone.in
-//! - Zerodha Kite: wss://ws.kite.trade
-//! - Fyers HSM: wss://socket.fyers.in
+//! `WebSocketManager` owns the broker socket and publishes normalised
+//! `FeedEvent`s; the client-facing feed server (`crate::feed`) subscribes
+//! with `subscribe_ticks()` and maps them to the web's `market_data` frames.
+//! Broker specifics live in each adapter's `BrokerFeed`.
 
-mod handlers;
 mod manager;
 
-pub use handlers::*;
-pub use manager::{
-    DepthLevel, MarketDepth, MarketTick, SubscriptionMode, SubscriptionRequest, WebSocketManager,
+pub use crate::brokers::common::streaming::{
+    BrokerFeed, FeedEvent, FeedMode, FeedSubscription, MarketEvent, NormalizedDepth,
+    NormalizedTick, OrderUpdate,
 };
+pub use manager::{FeedConfig, FeedStats, FeedStatus, WebSocketManager, TICK_CHANNEL_CAP};
