@@ -1,16 +1,8 @@
-/**
- * Theme Store for OpenAlgo Desktop
- *
- * Manages light/dark mode, theme colors, and app mode (live/analyzer).
- * App mode is persisted via Tauri settings for desktop.
- */
-
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { settingsCommands } from '@/api/client'
 
 export type ThemeMode = 'light' | 'dark'
-export type AppMode = 'live' | 'analyzer' | 'sandbox'
+export type AppMode = 'live' | 'analyzer'
 export type ThemeColor =
   | 'zinc'
   | 'slate'
@@ -70,9 +62,6 @@ export const useThemeStore = create<ThemeStore>()(
         if (typeof document !== 'undefined') {
           document.documentElement.classList.toggle('dark', mode === 'dark')
         }
-
-        // Persist to Tauri settings
-        settingsCommands.updateSettings({ theme: mode }).catch(console.error)
       },
 
       setColor: (color) => {
@@ -96,12 +85,9 @@ export const useThemeStore = create<ThemeStore>()(
             // Restore the saved light/dark mode when returning to live
             const savedMode = get().mode
             document.documentElement.classList.toggle('dark', savedMode === 'dark')
-          } else if (appMode === 'analyzer') {
+          } else {
             // Analyzer mode uses its own dark purple theme (like dracula)
             document.documentElement.classList.add('analyzer')
-          } else if (appMode === 'sandbox') {
-            // Sandbox mode uses amber/yellow theme
-            document.documentElement.classList.add('sandbox')
           }
         }
         // Notify listeners if mode changed
@@ -119,101 +105,89 @@ export const useThemeStore = create<ThemeStore>()(
         if (typeof document !== 'undefined') {
           document.documentElement.classList.toggle('dark', newMode === 'dark')
         }
-
-        // Persist to Tauri settings
-        settingsCommands.updateSettings({ theme: newMode }).catch(console.error)
       },
 
-      // Toggle app mode via Tauri settings (persisted to SQLite)
+      // Toggle app mode via backend API
       toggleAppMode: async (): Promise<{ success: boolean; message?: string }> => {
         if (get().isTogglingMode) return { success: false, message: 'Already toggling' }
 
         set({ isTogglingMode: true })
         try {
-          const currentMode = get().appMode
-          let newMode: AppMode
+          // First fetch CSRF token
+          const csrfResponse = await fetch('/auth/csrf-token', {
+            credentials: 'include',
+          })
+          const csrfData = await csrfResponse.json()
 
-          // Cycle through modes: live -> analyzer -> live
-          // (sandbox is accessed separately via sandbox page)
-          if (currentMode === 'live') {
-            newMode = 'analyzer'
+          const response = await fetch('/auth/analyzer-toggle', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': csrfData.csrf_token,
+            },
+          })
+
+          const data = await response.json()
+
+          if (response.ok && data.status === 'success') {
+            const newMode: AppMode = data.data.analyze_mode ? 'analyzer' : 'live'
+            get().setAppMode(newMode)
+            return { success: true, message: data.data.message }
           } else {
-            newMode = 'live'
+            return { success: false, message: data.message || 'Failed to toggle mode' }
           }
-
-          // Update backend SQLite analyze_mode - this controls order routing
-          const result = await settingsCommands.setAnalyzeMode(newMode === 'analyzer')
-          console.log('Backend analyze mode updated:', result)
-
-          // Update frontend state
-          get().setAppMode(newMode)
-
-          const modeMessage =
-            newMode === 'analyzer'
-              ? 'Switched to Analyzer mode. All trades will be paper traded.'
-              : 'Switched to Live mode. All trades will be executed with real money.'
-
-          return { success: true, message: modeMessage }
-        } catch (error) {
-          console.error('Failed to toggle app mode:', error)
-          return { success: false, message: 'Failed to toggle mode' }
+        } catch (_error) {
+          return { success: false, message: 'Network error' }
         } finally {
           set({ isTogglingMode: false })
         }
       },
 
-      // Sync app mode from Tauri settings (reads from SQLite backend)
+      // Sync app mode from backend
       syncAppMode: async () => {
         try {
-          // Sync analyzer mode from backend - this is the source of truth
-          const analyzerStatus = await settingsCommands.getAnalyzeMode()
-          console.log('Backend analyzer mode status:', analyzerStatus)
+          const response = await fetch('/auth/analyzer-mode', {
+            credentials: 'include',
+          })
 
-          const backendAppMode: AppMode = analyzerStatus.analyze_mode ? 'analyzer' : 'live'
-          const currentAppMode = get().appMode
-
-          // If backend and frontend disagree, sync frontend to backend
-          if (backendAppMode !== currentAppMode && currentAppMode !== 'sandbox') {
-            console.log(`Syncing app mode: frontend=${currentAppMode} -> backend=${backendAppMode}`)
-            get().setAppMode(backendAppMode)
-          }
-
-          // Theme sync - apply saved theme from settings
-          const settings = await settingsCommands.getSettings()
-          if (settings.theme) {
-            const savedMode = settings.theme as ThemeMode
-            if (savedMode === 'light' || savedMode === 'dark') {
-              set({ mode: savedMode })
-              if (typeof document !== 'undefined' && get().appMode === 'live') {
-                document.documentElement.classList.toggle('dark', savedMode === 'dark')
+          if (response.ok) {
+            const data = await response.json()
+            if (data.status === 'success') {
+              const backendMode: AppMode = data.data.analyze_mode ? 'analyzer' : 'live'
+              const currentMode = get().appMode
+              if (currentMode !== backendMode) {
+                get().setAppMode(backendMode)
               }
             }
+            // If backend returns error status but response.ok, keep current appMode
           }
-        } catch (error) {
-          console.error('Failed to sync app mode:', error)
+          // If request fails (401, etc.) - user is logged out, keep current appMode
+          // This preserves the theme across logout for visual continuity
+        } catch (_error) {
+          // On error, keep current appMode - preserves theme across logout
         }
       },
     }),
     {
-      name: 'openalgo-desktop-theme',
+      name: 'openalgo-theme',
       partialize: (state) => ({
         mode: state.mode,
         color: state.color,
-        appMode: state.appMode,
+        appMode: state.appMode, // Persist appMode for visual continuity across logout
       }),
       onRehydrateStorage: () => (state) => {
         // Apply theme on rehydration
         if (state && typeof document !== 'undefined') {
           document.documentElement.classList.remove('analyzer', 'sandbox', 'dark')
 
-          if (state.appMode === 'live') {
-            document.documentElement.classList.toggle('dark', state.mode === 'dark')
-          } else if (state.appMode === 'analyzer') {
+          // Apply persisted appMode for visual continuity
+          if (state.appMode === 'analyzer') {
             document.documentElement.classList.add('analyzer')
-          } else if (state.appMode === 'sandbox') {
-            document.documentElement.classList.add('sandbox')
+          } else {
+            // Live mode - apply light/dark preference
+            document.documentElement.classList.toggle('dark', state.mode === 'dark')
           }
-
           document.documentElement.setAttribute('data-theme', state.color)
         }
       },

@@ -1,8 +1,6 @@
 import { BarChart3, RotateCcw, Save, Settings } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { toast } from 'sonner'
-import { sandboxCommands, type SandboxConfig } from '@/api/tauri-client'
+import { Link } from 'react-router'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -23,6 +21,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { showToast } from '@/utils/toast'
+
+async function fetchCSRFToken(): Promise<string> {
+  const response = await fetch('/auth/csrf-token', {
+    credentials: 'include',
+  })
+  const data = await response.json()
+  return data.csrf_token
+}
+
+interface ConfigItem {
+  value: string
+  description: string
+}
+
+interface ConfigCategory {
+  title: string
+  configs: Record<string, ConfigItem>
+}
+
+type Configs = Record<string, ConfigCategory>
 
 const DAYS_OF_WEEK = [
   'Never',
@@ -44,153 +63,157 @@ const CAPITAL_OPTIONS = [
   { value: '10000000', label: '1,00,00,000 (1 Crore)' },
 ]
 
-// Config key to display name mapping
-const CONFIG_LABELS: Record<string, string> = {
-  starting_capital: 'Starting Capital',
-  reset_day: 'Reset Day',
-  reset_time: 'Reset Time',
-  order_check_interval: 'Order Check Interval (s)',
-  mtm_update_interval: 'MTM Update Interval (s)',
-  nse_mis_leverage: 'NSE MIS Leverage',
-  nfo_mis_leverage: 'NFO MIS Leverage',
-  cds_mis_leverage: 'CDS MIS Leverage',
-  mcx_mis_leverage: 'MCX MIS Leverage',
-  nse_cnc_leverage: 'NSE CNC Leverage',
-  nfo_nrml_leverage: 'NFO NRML Leverage',
-  cds_nrml_leverage: 'CDS NRML Leverage',
-  mcx_nrml_leverage: 'MCX NRML Leverage',
-  nse_square_off_time: 'NSE Square Off Time',
-  nfo_square_off_time: 'NFO Square Off Time',
-  cds_square_off_time: 'CDS Square Off Time',
-  mcx_square_off_time: 'MCX Square Off Time',
-}
-
-// Config key to description mapping
-const CONFIG_DESCRIPTIONS: Record<string, string> = {
-  starting_capital: 'Initial capital for paper trading',
-  reset_day: 'Day of week to reset sandbox data',
-  reset_time: 'Time to reset sandbox data (HH:MM)',
-  order_check_interval: 'Interval to check pending orders (seconds)',
-  mtm_update_interval: 'Interval to update MTM (seconds, 0 to disable)',
-  nse_mis_leverage: 'Leverage for NSE MIS orders',
-  nfo_mis_leverage: 'Leverage for NFO MIS orders',
-  cds_mis_leverage: 'Leverage for CDS MIS orders',
-  mcx_mis_leverage: 'Leverage for MCX MIS orders',
-  nse_cnc_leverage: 'Leverage for NSE CNC orders',
-  nfo_nrml_leverage: 'Leverage for NFO NRML orders',
-  cds_nrml_leverage: 'Leverage for CDS NRML orders',
-  mcx_nrml_leverage: 'Leverage for MCX NRML orders',
-  nse_square_off_time: 'Auto square off time for NSE',
-  nfo_square_off_time: 'Auto square off time for NFO',
-  cds_square_off_time: 'Auto square off time for CDS',
-  mcx_square_off_time: 'Auto square off time for MCX',
-}
-
-// Group configs into categories
-const CONFIG_CATEGORIES = {
-  general: {
-    title: 'General Settings',
-    keys: ['starting_capital', 'reset_day', 'reset_time', 'order_check_interval', 'mtm_update_interval'],
-  },
-  leverage: {
-    title: 'Leverage Settings',
-    keys: [
-      'nse_mis_leverage',
-      'nfo_mis_leverage',
-      'cds_mis_leverage',
-      'mcx_mis_leverage',
-      'nse_cnc_leverage',
-      'nfo_nrml_leverage',
-      'cds_nrml_leverage',
-      'mcx_nrml_leverage',
-    ],
-  },
-  squareOff: {
-    title: 'Square Off Times',
-    keys: ['nse_square_off_time', 'nfo_square_off_time', 'cds_square_off_time', 'mcx_square_off_time'],
-  },
+function formatConfigLabel(key: string): string {
+  return key
+    .split('_')
+    .map((word) => {
+      const upper = word.toUpperCase()
+      if (
+        ['NSE', 'BSE', 'CDS', 'BCD', 'MCX', 'NCDEX', 'NCO', 'MIS', 'CNC', 'NRML'].includes(upper)
+      ) {
+        return upper
+      }
+      return word.charAt(0).toUpperCase() + word.slice(1)
+    })
+    .join(' ')
 }
 
 export default function Sandbox() {
-  const [config, setConfig] = useState<SandboxConfig | null>(null)
-  const [localConfig, setLocalConfig] = useState<Record<string, string>>({})
-  const [modifiedKeys, setModifiedKeys] = useState<Set<string>>(new Set())
+  const [configs, setConfigs] = useState<Configs>({})
+  const [modifiedConfigs, setModifiedConfigs] = useState<Set<string>>(new Set())
   const [isLoading, setIsLoading] = useState(true)
   const [isResetting, setIsResetting] = useState(false)
   const [showResetDialog, setShowResetDialog] = useState(false)
 
-  // Fetch config on mount
+  // Fetch configs on mount
+  // biome-ignore lint/correctness/useExhaustiveDependencies: one-time config load on mount; fetchConfigs has no reactive inputs
   useEffect(() => {
-    fetchConfig()
+    fetchConfigs()
   }, [])
 
-  const fetchConfig = async () => {
+  const fetchConfigs = async () => {
     try {
-      const data = await sandboxCommands.getSandboxConfig()
-      setConfig(data)
-      // Convert config to local string values for editing
-      const localValues: Record<string, string> = {}
-      for (const [key, value] of Object.entries(data)) {
-        localValues[key] = String(value)
+      const response = await fetch('/sandbox/api/configs', {
+        credentials: 'include',
+      })
+      if (response.ok) {
+        const data = await response.json()
+        if (data.status === 'success') {
+          setConfigs(data.configs)
+        }
       }
-      setLocalConfig(localValues)
-      setModifiedKeys(new Set())
-    } catch (error) {
-      console.error('Error fetching config:', error)
-      toast.error('Failed to load configuration')
+    } catch (_error) {
+      showToast.error('Failed to load configuration', 'analyzer')
     } finally {
       setIsLoading(false)
     }
   }
 
-  const updateLocalValue = (key: string, value: string) => {
-    setLocalConfig((prev) => ({ ...prev, [key]: value }))
-    setModifiedKeys((prev) => new Set(prev).add(key))
+  const updateConfig = (configKey: string, value: string) => {
+    // Update local state
+    setConfigs((prev) => {
+      const updated = { ...prev }
+      for (const categoryKey in updated) {
+        if (updated[categoryKey].configs[configKey]) {
+          updated[categoryKey].configs[configKey] = {
+            ...updated[categoryKey].configs[configKey],
+            value,
+          }
+          break
+        }
+      }
+      return updated
+    })
+    setModifiedConfigs((prev) => new Set(prev).add(configKey))
   }
 
-  const saveConfig = async (key: string) => {
-    const value = localConfig[key]
-    if (!value) return
+  const saveConfig = async (configKey: string) => {
+    // Find the value
+    let value = ''
+    for (const categoryKey in configs) {
+      if (configs[categoryKey].configs[configKey]) {
+        value = configs[categoryKey].configs[configKey].value
+        break
+      }
+    }
 
     try {
-      await sandboxCommands.updateSandboxConfig(key, value)
-      toast.success(`${CONFIG_LABELS[key]} updated`)
-      setModifiedKeys((prev) => {
-        const updated = new Set(prev)
-        updated.delete(key)
-        return updated
+      const csrfToken = await fetchCSRFToken()
+
+      const response = await fetch('/sandbox/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken,
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          config_key: configKey,
+          config_value: value,
+        }),
       })
-    } catch (error) {
-      console.error('Error saving config:', error)
-      toast.error('Failed to save configuration')
+
+      const data = await response.json()
+
+      if (data.status === 'success') {
+        showToast.success(data.message, 'analyzer')
+        setModifiedConfigs((prev) => {
+          const updated = new Set(prev)
+          updated.delete(configKey)
+          return updated
+        })
+      } else {
+        showToast.error(data.message, 'analyzer')
+      }
+    } catch (_error) {
+      showToast.error('Failed to save configuration', 'analyzer')
     }
   }
 
   const resetConfiguration = async () => {
     setIsResetting(true)
     try {
-      await sandboxCommands.resetSandbox()
-      toast.success('Sandbox reset successfully')
-      setShowResetDialog(false)
-      // Reload config after reset
-      setTimeout(fetchConfig, 500)
-    } catch (error) {
-      console.error('Error resetting sandbox:', error)
-      toast.error('Failed to reset sandbox')
+      const csrfToken = await fetchCSRFToken()
+
+      const response = await fetch('/sandbox/reset', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken,
+        },
+        credentials: 'include',
+      })
+
+      const data = await response.json()
+
+      if (data.status === 'success') {
+        showToast.success(data.message, 'analyzer')
+        setShowResetDialog(false)
+        // Reload configs
+        setTimeout(() => {
+          fetchConfigs()
+        }, 1000)
+      } else {
+        showToast.error(data.message, 'analyzer')
+      }
+    } catch (_error) {
+      showToast.error('Failed to reset configuration', 'analyzer')
     } finally {
       setIsResetting(false)
     }
   }
 
-  const renderConfigInput = (key: string) => {
-    const value = localConfig[key] || ''
-    const isModified = modifiedKeys.has(key)
+  const renderConfigInput = (configKey: string, configData: ConfigItem) => {
+    const isModified = modifiedConfigs.has(configKey)
 
     // Reset Day selector
-    if (key === 'reset_day') {
+    if (configKey === 'reset_day') {
       return (
         <div className="flex gap-2">
-          <Select value={value} onValueChange={(v) => updateLocalValue(key, v)}>
+          <Select
+            value={configData.value}
+            onValueChange={(value) => updateConfig(configKey, value)}
+          >
             <SelectTrigger className="flex-1">
               <SelectValue />
             </SelectTrigger>
@@ -205,7 +228,48 @@ export default function Sandbox() {
           <Button
             size="sm"
             variant={isModified ? 'default' : 'secondary'}
-            onClick={() => saveConfig(key)}
+            onClick={() => saveConfig(configKey)}
+          >
+            <Save className="h-4 w-4 mr-1" />
+            Set
+          </Button>
+        </div>
+      )
+    }
+
+    // F&O expiry settlement selectors
+    if (configKey === 'expiry_settlement_timing' || configKey === 'option_expiry_settlement') {
+      const options =
+        configKey === 'expiry_settlement_timing'
+          ? [
+              { value: 'expiry_day_close', label: 'On expiry day at market close' },
+              { value: 'next_day', label: 'Next day after expiry (legacy)' },
+            ]
+          : [
+              { value: 'ltp', label: 'Last traded price (keeps ITM value)' },
+              { value: 'zero', label: 'Zero - all options expire worthless' },
+            ]
+      return (
+        <div className="flex gap-2">
+          <Select
+            value={configData.value}
+            onValueChange={(value) => updateConfig(configKey, value)}
+          >
+            <SelectTrigger className="flex-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {options.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            size="sm"
+            variant={isModified ? 'default' : 'secondary'}
+            onClick={() => saveConfig(configKey)}
           >
             <Save className="h-4 w-4 mr-1" />
             Set
@@ -215,19 +279,19 @@ export default function Sandbox() {
     }
 
     // Time inputs
-    if (key === 'reset_time' || key.endsWith('_square_off_time')) {
+    if (configKey === 'reset_time' || configKey.endsWith('_square_off_time')) {
       return (
         <div className="flex gap-2">
           <Input
             type="time"
-            value={value}
-            onChange={(e) => updateLocalValue(key, e.target.value)}
+            value={configData.value || ''}
+            onChange={(e) => updateConfig(configKey, e.target.value)}
             className="flex-1"
           />
           <Button
             size="sm"
             variant={isModified ? 'default' : 'secondary'}
-            onClick={() => saveConfig(key)}
+            onClick={() => saveConfig(configKey)}
           >
             <Save className="h-4 w-4 mr-1" />
             Set
@@ -237,13 +301,13 @@ export default function Sandbox() {
     }
 
     // Leverage inputs
-    if (key.endsWith('_leverage')) {
+    if (configKey.endsWith('_leverage')) {
       return (
         <div className="flex gap-2">
           <Input
             type="number"
-            value={value}
-            onChange={(e) => updateLocalValue(key, e.target.value)}
+            value={configData.value || ''}
+            onChange={(e) => updateConfig(configKey, e.target.value)}
             min="1"
             max="50"
             step="0.1"
@@ -252,7 +316,7 @@ export default function Sandbox() {
           <Button
             size="sm"
             variant={isModified ? 'default' : 'secondary'}
-            onClick={() => saveConfig(key)}
+            onClick={() => saveConfig(configKey)}
           >
             <Save className="h-4 w-4 mr-1" />
             Set
@@ -262,11 +326,11 @@ export default function Sandbox() {
     }
 
     // Starting capital selector
-    if (key === 'starting_capital') {
-      const currentValue = parseFloat(value || '10000000').toFixed(0)
+    if (configKey === 'starting_capital') {
+      const currentValue = parseFloat(configData.value || '10000000').toFixed(0)
       return (
         <div className="flex gap-2">
-          <Select value={currentValue} onValueChange={(v) => updateLocalValue(key, v)}>
+          <Select value={currentValue} onValueChange={(value) => updateConfig(configKey, value)}>
             <SelectTrigger className="flex-1">
               <SelectValue />
             </SelectTrigger>
@@ -281,7 +345,7 @@ export default function Sandbox() {
           <Button
             size="sm"
             variant={isModified ? 'default' : 'secondary'}
-            onClick={() => saveConfig(key)}
+            onClick={() => saveConfig(configKey)}
           >
             <Save className="h-4 w-4 mr-1" />
             Set
@@ -290,23 +354,23 @@ export default function Sandbox() {
       )
     }
 
-    // Interval inputs
-    if (key === 'order_check_interval' || key === 'mtm_update_interval') {
+    // Order check interval / MTM update interval
+    if (configKey === 'order_check_interval' || configKey === 'mtm_update_interval') {
       return (
         <div className="flex gap-2">
           <Input
             type="number"
-            value={value}
-            onChange={(e) => updateLocalValue(key, e.target.value)}
-            min={key === 'mtm_update_interval' ? 0 : 1}
-            max={key === 'mtm_update_interval' ? 60 : 30}
+            value={configData.value || ''}
+            onChange={(e) => updateConfig(configKey, e.target.value)}
+            min={configKey === 'mtm_update_interval' ? 0 : 1}
+            max={configKey === 'mtm_update_interval' ? 60 : 30}
             step="1"
             className="flex-1"
           />
           <Button
             size="sm"
             variant={isModified ? 'default' : 'secondary'}
-            onClick={() => saveConfig(key)}
+            onClick={() => saveConfig(configKey)}
           >
             <Save className="h-4 w-4 mr-1" />
             Set
@@ -320,14 +384,14 @@ export default function Sandbox() {
       <div className="flex gap-2">
         <Input
           type="text"
-          value={value}
-          onChange={(e) => updateLocalValue(key, e.target.value)}
+          value={configData.value || ''}
+          onChange={(e) => updateConfig(configKey, e.target.value)}
           className="flex-1"
         />
         <Button
           size="sm"
           variant={isModified ? 'default' : 'secondary'}
-          onClick={() => saveConfig(key)}
+          onClick={() => saveConfig(configKey)}
         >
           <Save className="h-4 w-4 mr-1" />
           Set
@@ -353,7 +417,7 @@ export default function Sandbox() {
             <Settings className="h-8 w-8" />
             Sandbox Configuration
           </h1>
-          <p className="text-muted-foreground mt-1">Configure paper trading environment settings</p>
+          <p className="text-muted-foreground mt-1">Configure sandbox environment settings</p>
         </div>
         <div className="flex gap-3">
           <Button asChild>
@@ -371,7 +435,7 @@ export default function Sandbox() {
 
       {/* Configuration Sections */}
       <div className="space-y-6">
-        {Object.entries(CONFIG_CATEGORIES).map(([categoryKey, category]) => (
+        {Object.entries(configs).map(([categoryKey, category]) => (
           <Card key={categoryKey}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -381,13 +445,13 @@ export default function Sandbox() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {category.keys.map((key) => (
-                  <div key={key} className="space-y-2">
-                    <Label htmlFor={key} className="font-semibold">
-                      {CONFIG_LABELS[key]}
+                {Object.entries(category.configs).map(([configKey, configData]) => (
+                  <div key={configKey} className="space-y-2">
+                    <Label htmlFor={configKey} className="font-semibold">
+                      {formatConfigLabel(configKey)}
                     </Label>
-                    {renderConfigInput(key)}
-                    <p className="text-xs text-muted-foreground">{CONFIG_DESCRIPTIONS[key]}</p>
+                    {renderConfigInput(configKey, configData)}
+                    <p className="text-xs text-muted-foreground">{configData.description}</p>
                   </div>
                 ))}
               </div>
@@ -415,6 +479,7 @@ export default function Sandbox() {
                   <ul className="list-disc list-inside space-y-1 ml-4 text-sm">
                     <li>Delete all orders, trades, positions, and holdings</li>
                     <li>Reset funds to starting capital (1.00 Crore)</li>
+                    <li>Reset all configuration values to defaults</li>
                     <li>Clear all historical data</li>
                   </ul>
                 </div>

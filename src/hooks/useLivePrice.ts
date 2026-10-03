@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { type QuotesData, tradingApi } from '@/api/trading'
 import { useMarketData } from '@/hooks/useMarketData'
 import { useMarketStatus } from '@/hooks/useMarketStatus'
+import { usePageVisibility } from '@/hooks/usePageVisibility'
 import { useAuthStore } from '@/stores/authStore'
 
 /**
@@ -15,6 +16,8 @@ export interface PriceableItem {
   pnlpercent?: number
   quantity?: number
   average_price?: number
+  today_realized_pnl?: number // Sandbox: today's realized P&L from closed partial trades
+  lot_size?: number // Contract multiplier (e.g. 0.01 for Delta Exchange ETHUSD.P)
 }
 
 /**
@@ -29,6 +32,10 @@ export interface UseLivePriceOptions {
   useMultiQuotesFallback?: boolean
   /** Interval in ms to refresh MultiQuotes data (default: 30000) */
   multiQuotesRefreshInterval?: number
+  /** Pause WebSocket and polling when tab is hidden (default: true) */
+  pauseWhenHidden?: boolean
+  /** Time in ms to wait before pausing when hidden (default: 5000) */
+  pauseDelay?: number
 }
 
 /**
@@ -41,6 +48,10 @@ export interface UseLivePriceResult<T extends PriceableItem> {
   isLive: boolean
   /** Whether WebSocket is connected */
   isConnected: boolean
+  /** Whether WebSocket is paused due to tab being hidden */
+  isPaused: boolean
+  /** Whether using REST API fallback instead of WebSocket */
+  isFallbackMode: boolean
   /** Whether any market is currently open */
   isAnyMarketOpen: boolean
   /** Map of MultiQuotes data for external access if needed */
@@ -74,14 +85,19 @@ export function useLivePrice<T extends PriceableItem>(
     staleThreshold = 5000,
     useMultiQuotesFallback = true,
     multiQuotesRefreshInterval = 30000,
+    pauseWhenHidden = true,
   } = options
 
   const { apiKey } = useAuthStore()
   const { isMarketOpen, isAnyMarketOpen } = useMarketStatus()
+  const { isVisible, wasHidden, timeSinceHidden } = usePageVisibility()
   const anyMarketOpen = isAnyMarketOpen()
 
   // State for MultiQuotes fallback data
   const [multiQuotes, setMultiQuotes] = useState<Map<string, QuotesData>>(new Map())
+
+  // Track last fetch time for visibility-aware refresh
+  const lastFetchRef = useRef<number>(Date.now())
 
   // Extract symbols for WebSocket subscription
   const symbols = useMemo(
@@ -93,15 +109,20 @@ export function useLivePrice<T extends PriceableItem>(
     [items]
   )
 
-  // WebSocket market data - only enable when market is open
-  const { data: marketData, isConnected: wsConnected } = useMarketData({
+  // WebSocket market data - connect when enabled, with visibility awareness
+  const {
+    data: marketData,
+    isConnected: wsConnected,
+    isPaused: wsPaused,
+    isFallbackMode,
+  } = useMarketData({
     symbols,
     mode: 'LTP',
-    enabled: enabled && items.length > 0 && anyMarketOpen,
+    enabled: enabled && items.length > 0,
   })
 
   // Effective live status
-  const isLive = wsConnected && anyMarketOpen
+  const isLive = wsConnected && anyMarketOpen && !wsPaused
 
   /**
    * Fetch MultiQuotes data from API
@@ -129,29 +150,63 @@ export function useLivePrice<T extends PriceableItem>(
       }
     } catch {
       // Silently fail - MultiQuotes is a fallback mechanism
-      console.debug('MultiQuotes fetch failed, using cached/REST data')
     }
   }, [apiKey, items, useMultiQuotesFallback])
 
   // Fetch MultiQuotes on mount and when items change
+  // Visibility-aware: pause polling when tab is hidden
   useEffect(() => {
     if (!enabled || items.length === 0 || !useMultiQuotesFallback) return
 
+    // Don't poll when hidden (if pauseWhenHidden is true)
+    if (pauseWhenHidden && !isVisible) return
+
     // Initial fetch
     fetchMultiQuotes()
+    lastFetchRef.current = Date.now()
 
     // Set up periodic refresh
-    const interval = setInterval(fetchMultiQuotes, multiQuotesRefreshInterval)
+    const interval = setInterval(() => {
+      fetchMultiQuotes()
+      lastFetchRef.current = Date.now()
+    }, multiQuotesRefreshInterval)
 
     return () => clearInterval(interval)
-  }, [enabled, items.length, useMultiQuotesFallback, fetchMultiQuotes, multiQuotesRefreshInterval])
+  }, [
+    enabled,
+    items.length,
+    useMultiQuotesFallback,
+    fetchMultiQuotes,
+    multiQuotesRefreshInterval,
+    pauseWhenHidden,
+    isVisible,
+  ])
+
+  // Refresh MultiQuotes immediately when tab becomes visible after being hidden
+  useEffect(() => {
+    if (!wasHidden || !isVisible || !useMultiQuotesFallback || !enabled) return
+
+    // If we were hidden for more than the refresh interval, fetch immediately
+    if (timeSinceHidden > multiQuotesRefreshInterval) {
+      fetchMultiQuotes()
+      lastFetchRef.current = Date.now()
+    }
+  }, [
+    wasHidden,
+    isVisible,
+    timeSinceHidden,
+    multiQuotesRefreshInterval,
+    useMultiQuotesFallback,
+    enabled,
+    fetchMultiQuotes,
+  ])
 
   /**
-   * Enhance items with real-time LTP and calculated average_price
+   * Enhance items with real-time LTP and recalculated P&L
    * Priority: WebSocket (fresh + market open) → MultiQuotes → REST API
    *
-   * Note: pnl and pnlpercent always come from REST API (not recalculated)
-   * average_price is calculated backwards from: avgPrice = currentLtp - (pnl / qty)
+   * For open positions (qty != 0): P&L and P&L% are recalculated using live LTP
+   * For closed positions (qty = 0): P&L and P&L% from REST API (realized values)
    */
   const enhancedData = useMemo(() => {
     return items.map((item) => {
@@ -160,7 +215,7 @@ export function useLivePrice<T extends PriceableItem>(
       const mqData = multiQuotes.get(key)
 
       const qty = item.quantity || 0
-      const originalPnl = item.pnl || 0
+      const avgPrice = item.average_price || 0
 
       // Check if market is open for this exchange
       const exchangeMarketOpen = isMarketOpen(item.exchange)
@@ -190,29 +245,59 @@ export function useLivePrice<T extends PriceableItem>(
         dataSource = 'rest'
       }
 
-      // For closed positions (qty=0), preserve all REST API values
-      if (qty === 0) {
+      // For closed positions (qty=0), preserve ALL REST API values including LTP
+      // This ensures P&L% calculation remains stable (realized values don't change)
+      //
+      // Gated on the field being PRESENT, not just falsy. `quantity` is optional
+      // on PriceableItem, and an item that never carried one is not a position
+      // at all -- a watchlist row, say. Those must still take live prices, and
+      // `item.quantity || 0` reads the same 0 for both cases.
+      if (item.quantity !== undefined && qty === 0) {
         return {
           ...item,
-          ltp: currentLtp,
-          _dataSource: dataSource,
+          // Keep item.ltp from REST API - don't update with live data
+          // This prevents P&L% from recalculating with changing LTP
+          _dataSource: 'rest',
         } as T & { _dataSource: string }
       }
 
-      // Calculate average price from REST data if not provided
-      // Formula: AvgPrice = LTP - (PnL / Qty)
-      let avgPrice = item.average_price
-      if (!avgPrice && currentLtp && qty !== 0) {
-        avgPrice = currentLtp - originalPnl / qty
+      // For open positions: recalculate P&L and P&L% using live LTP
+      // This ensures real-time updates as LTP changes
+      let calculatedPnl = item.pnl || 0
+      let calculatedPnlPercent = item.pnlpercent || 0
+
+      // Get today's realized P&L if available (from sandbox mode)
+      // This ensures cumulative P&L (realized + unrealized) is shown correctly
+      const todayRealizedPnl = item.today_realized_pnl || 0
+
+      if (currentLtp && avgPrice > 0) {
+        // Contract multiplier: e.g. 0.01 for Delta Exchange ETHUSD.P (1 lot = 0.01 ETH)
+        // Defaults to 1 for all standard brokers where qty is already in underlying units
+        const lotSize = item.lot_size ?? 1
+
+        // Calculate unrealized P&L based on position direction
+        // Long (qty > 0): profit when ltp > avgPrice
+        // Short (qty < 0): profit when ltp < avgPrice
+        let unrealizedPnl: number
+        if (qty > 0) {
+          unrealizedPnl = (currentLtp - avgPrice) * qty * lotSize
+        } else {
+          unrealizedPnl = (avgPrice - currentLtp) * Math.abs(qty) * lotSize
+        }
+
+        // Total P&L = today's realized (from partial closes) + current unrealized
+        calculatedPnl = todayRealizedPnl + unrealizedPnl
+
+        // P&L% based on total P&L and investment
+        const investment = Math.abs(avgPrice * qty)
+        calculatedPnlPercent = investment > 0 ? (calculatedPnl / investment) * 100 : 0
       }
 
-      // Return with updated LTP and calculated avgPrice
-      // pnl and pnlpercent always from REST API
       return {
         ...item,
         ltp: currentLtp,
-        average_price: avgPrice,
-        // pnl and pnlpercent preserved from REST API via spread
+        pnl: calculatedPnl,
+        pnlpercent: calculatedPnlPercent,
         _dataSource: dataSource,
       } as T & { _dataSource: string }
     })
@@ -222,6 +307,8 @@ export function useLivePrice<T extends PriceableItem>(
     data: enhancedData,
     isLive,
     isConnected: wsConnected,
+    isPaused: wsPaused,
+    isFallbackMode,
     isAnyMarketOpen: anyMarketOpen,
     multiQuotes,
     refreshMultiQuotes: fetchMultiQuotes,

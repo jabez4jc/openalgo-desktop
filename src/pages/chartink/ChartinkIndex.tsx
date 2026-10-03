@@ -11,8 +11,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { toast } from 'sonner'
+import { Link, useNavigate } from 'react-router'
 import { chartinkApi } from '@/api/chartink'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -20,6 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { ChartinkStrategy } from '@/types/chartink'
+import { showToast } from '@/utils/toast'
 
 export default function ChartinkIndex() {
   const navigate = useNavigate()
@@ -36,9 +36,8 @@ export default function ChartinkIndex() {
       setLoading(true)
       const data = await chartinkApi.getStrategies()
       setStrategies(data)
-    } catch (error) {
-      console.error('Failed to fetch strategies:', error)
-      toast.error('Failed to load Chartink strategies')
+    } catch (_error) {
+      showToast.error('Failed to load Chartink strategies', 'chartink')
     } finally {
       setLoading(false)
     }
@@ -51,8 +50,7 @@ export default function ChartinkIndex() {
         const response = await fetch('/api/config/host', { credentials: 'include' })
         const data = await response.json()
         setHostConfig(data)
-      } catch (error) {
-        console.error('Failed to fetch host config:', error)
+      } catch (_error) {
         // Fallback to window.location.origin if config fetch fails
         setHostConfig({
           host_server: window.location.origin,
@@ -64,6 +62,7 @@ export default function ChartinkIndex() {
     fetchHostConfig()
   }, [])
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: one-time fetch of strategies on mount; fetchStrategies is recreated each render and adding it would re-run the fetch on every render
   useEffect(() => {
     fetchStrategies()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -80,10 +79,10 @@ export default function ChartinkIndex() {
     try {
       await navigator.clipboard.writeText(url)
       setCopiedId(webhookId)
-      toast.success('Webhook URL copied to clipboard')
+      showToast.success('Webhook URL copied to clipboard', 'clipboard')
       setTimeout(() => setCopiedId(null), 2000)
     } catch {
-      toast.error('Failed to copy URL')
+      showToast.error('Failed to copy URL', 'clipboard')
     }
   }
 

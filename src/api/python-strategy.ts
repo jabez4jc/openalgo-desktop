@@ -1,158 +1,226 @@
-/**
- * Python Strategy API stubs for OpenAlgo Desktop
- *
- * Python strategy execution is not available in the desktop version.
- * This requires a server-side Python runtime environment.
- */
-
 import type {
   EnvironmentVariables,
   LogContent,
+  LogFile,
+  MasterContractStatus,
   PythonStrategy,
   PythonStrategyContent,
   ScheduleConfig,
+  StrategyExchange,
 } from '@/types/python-strategy'
-
-interface ApiResponse<T = void> {
-  status: string
-  message?: string
-  data?: T
-}
-
-const NOT_AVAILABLE = 'Python strategies are not available in desktop mode'
+import type { ApiResponse } from '@/types/trading'
+import { webClient } from './client'
 
 export const pythonStrategyApi = {
+  /**
+   * Get the exchange options for the strategy selector.
+   *
+   * Session windows come from the market calendar DB, never from a constant
+   * in the frontend, so an exchange timing change reaches the UI on its own.
+   */
+  getExchanges: async (): Promise<StrategyExchange[]> => {
+    const response = await webClient.get<{ exchanges: StrategyExchange[] }>('/python/api/exchanges')
+    return response.data.exchanges || []
+  },
+
+  /**
+   * Get all Python strategies
+   */
   getStrategies: async (): Promise<PythonStrategy[]> => {
-    console.warn(NOT_AVAILABLE)
-    return []
+    const response = await webClient.get<{ strategies: PythonStrategy[] }>('/python/api/strategies')
+    return response.data.strategies || []
   },
 
-  getStrategy: async (_strategyId: string): Promise<PythonStrategy> => {
-    throw new Error(NOT_AVAILABLE)
+  /**
+   * Get a single strategy
+   */
+  getStrategy: async (strategyId: string): Promise<PythonStrategy> => {
+    const response = await webClient.get<{ strategy: PythonStrategy }>(
+      `/python/api/strategy/${strategyId}`
+    )
+    return response.data.strategy
   },
 
-  getStrategyContent: async (_strategyId: string): Promise<PythonStrategyContent> => {
-    throw new Error(NOT_AVAILABLE)
+  /**
+   * Get strategy content for editing
+   */
+  getStrategyContent: async (strategyId: string): Promise<PythonStrategyContent> => {
+    const response = await webClient.get<PythonStrategyContent>(
+      `/python/api/strategy/${strategyId}/content`
+    )
+    return response.data
   },
 
-  createStrategy: async (
-    _data: Partial<PythonStrategy> & { code?: string }
-  ): Promise<ApiResponse<{ strategy_id: string }>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
-  },
-
-  saveStrategy: async (_strategyId: string, _code: string): Promise<ApiResponse<void>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
-  },
-
-  updateStrategy: async (
-    _strategyId: string,
-    _data: Partial<PythonStrategy> & { code?: string }
-  ): Promise<ApiResponse<void>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
-  },
-
+  /**
+   * Upload a new strategy with mandatory schedule
+   */
   uploadStrategy: async (
-    _name: string,
-    _file: File,
-    _schedule?: ScheduleConfig
+    name: string,
+    file: File,
+    schedule: {
+      start_time: string
+      stop_time: string
+      days: string[]
+      exchange?: string
+    }
   ): Promise<ApiResponse<{ strategy_id: string }>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
+    const formData = new FormData()
+    formData.append('strategy_name', name)
+    formData.append('strategy_file', file)
+    formData.append('exchange', schedule.exchange || 'NSE')
+    // Add schedule fields
+    formData.append('schedule_start', schedule.start_time)
+    formData.append('schedule_stop', schedule.stop_time)
+    formData.append('schedule_days', JSON.stringify(schedule.days))
+
+    const response = await webClient.post<ApiResponse<{ strategy_id: string }>>(
+      '/python/new',
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      }
+    )
+    return response.data
   },
 
-  exportStrategy: async (_strategyId: string, _version?: 'saved' | 'current'): Promise<Blob> => {
-    throw new Error(NOT_AVAILABLE)
+  /**
+   * Save strategy content
+   */
+  saveStrategy: async (strategyId: string, content: string): Promise<ApiResponse<void>> => {
+    const response = await webClient.post<ApiResponse<void>>(`/python/save/${strategyId}`, {
+      content,
+    })
+    return response.data
   },
 
-  downloadStrategy: async (_strategyId: string): Promise<Blob> => {
-    throw new Error(NOT_AVAILABLE)
+  /**
+   * Export strategy file
+   */
+  exportStrategy: async (
+    strategyId: string,
+    version: 'saved' | 'current' = 'saved'
+  ): Promise<Blob> => {
+    const response = await webClient.get(`/python/export/${strategyId}?version=${version}`, {
+      responseType: 'blob',
+    })
+    return response.data
   },
 
-  deleteStrategy: async (_strategyId: string): Promise<ApiResponse<void>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
+  /**
+   * Delete a strategy
+   */
+  deleteStrategy: async (strategyId: string): Promise<ApiResponse<void>> => {
+    const response = await webClient.post<ApiResponse<void>>(`/python/delete/${strategyId}`)
+    return response.data
   },
 
-  getMasterContractStatus: async (): Promise<{
-    ready: boolean
-    message: string
-    last_updated: string | null
-  }> => {
-    return { ready: true, message: 'Not available in desktop mode', last_updated: null }
+  /**
+   * Start a strategy
+   */
+  startStrategy: async (strategyId: string): Promise<ApiResponse<{ process_id: number }>> => {
+    const response = await webClient.post<ApiResponse<{ process_id: number }>>(
+      `/python/start/${strategyId}`
+    )
+    return response.data
   },
 
-  clearError: async (_strategyId: string): Promise<ApiResponse<void>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
+  /**
+   * Stop a strategy
+   */
+  stopStrategy: async (strategyId: string): Promise<ApiResponse<void>> => {
+    const response = await webClient.post<ApiResponse<void>>(`/python/stop/${strategyId}`)
+    return response.data
   },
 
-  checkAndStartPending: async (): Promise<ApiResponse<{ started: number }>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
+  /**
+   * Clear error state
+   */
+  clearError: async (strategyId: string): Promise<ApiResponse<void>> => {
+    const response = await webClient.post<ApiResponse<void>>(`/python/clear-error/${strategyId}`)
+    return response.data
   },
 
-  getLogFiles: async (
-    _strategyId: string
-  ): Promise<{ name: string; path: string; size_kb: number; last_modified: string }[]> => {
-    return []
-  },
-
-  getLogContent: async (_strategyId: string, _logFile: string): Promise<LogContent> => {
-    return { content: '', lines: 0, size_kb: 0, last_updated: new Date().toISOString() }
-  },
-
+  /**
+   * Schedule a strategy
+   */
   scheduleStrategy: async (
-    _strategyId: string,
-    _schedule: ScheduleConfig
+    strategyId: string,
+    config: ScheduleConfig
   ): Promise<ApiResponse<void>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
+    const response = await webClient.post<ApiResponse<void>>(
+      `/python/schedule/${strategyId}`,
+      config
+    )
+    return response.data
   },
 
-  startStrategy: async (
-    _strategyId: string
-  ): Promise<ApiResponse<{ process_id: number; started?: boolean }>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
+  /**
+   * Unschedule a strategy
+   */
+  unscheduleStrategy: async (strategyId: string): Promise<ApiResponse<void>> => {
+    const response = await webClient.post<ApiResponse<void>>(`/python/unschedule/${strategyId}`)
+    return response.data
   },
 
-  stopStrategy: async (_strategyId: string): Promise<ApiResponse<void>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
+  /**
+   * Get log files for a strategy
+   */
+  getLogFiles: async (strategyId: string): Promise<LogFile[]> => {
+    const response = await webClient.get<{ logs: LogFile[] }>(`/python/api/logs/${strategyId}`)
+    return response.data.logs || []
   },
 
-  restartStrategy: async (_strategyId: string): Promise<ApiResponse<void>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
+  /**
+   * Get log file content
+   */
+  getLogContent: async (strategyId: string, logName: string): Promise<LogContent> => {
+    const response = await webClient.get<LogContent>(`/python/api/logs/${strategyId}/${logName}`)
+    return response.data
   },
 
-  updateSchedule: async (
-    _strategyId: string,
-    _schedule: ScheduleConfig
+  /**
+   * Clear all logs for a strategy
+   */
+  clearLogs: async (strategyId: string): Promise<ApiResponse<void>> => {
+    const response = await webClient.post<ApiResponse<void>>(`/python/logs/${strategyId}/clear`)
+    return response.data
+  },
+
+  /**
+   * Get environment variables
+   */
+  getEnvVariables: async (strategyId: string): Promise<EnvironmentVariables> => {
+    const response = await webClient.get<EnvironmentVariables>(`/python/env/${strategyId}`)
+    return response.data
+  },
+
+  /**
+   * Save environment variables
+   */
+  saveEnvVariables: async (
+    strategyId: string,
+    variables: EnvironmentVariables
   ): Promise<ApiResponse<void>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
+    const response = await webClient.post<ApiResponse<void>>(`/python/env/${strategyId}`, variables)
+    return response.data
   },
 
-  clearSchedule: async (_strategyId: string): Promise<ApiResponse<void>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
+  /**
+   * Get master contract status
+   */
+  getMasterContractStatus: async (): Promise<MasterContractStatus> => {
+    const response = await webClient.get<MasterContractStatus>('/python/status')
+    return response.data
   },
 
-  getRunningStrategies: async (): Promise<string[]> => {
-    console.warn(NOT_AVAILABLE)
-    return []
-  },
-
-  getLogs: async (_strategyId: string, _lines?: number): Promise<LogContent> => {
-    return { content: '', lines: 0, size_kb: 0, last_updated: new Date().toISOString() }
-  },
-
-  clearLogs: async (_strategyId: string): Promise<ApiResponse<void>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
-  },
-
-  getEnvironmentVariables: async (_strategyId: string): Promise<EnvironmentVariables> => {
-    return { regular: {}, secure: {} }
-  },
-
-  setEnvironmentVariables: async (
-    _strategyId: string,
-    _variables: EnvironmentVariables
-  ): Promise<ApiResponse<void>> => {
-    return { status: 'error', message: NOT_AVAILABLE }
+  /**
+   * Check and start pending strategies (after master contract download)
+   */
+  checkAndStartPending: async (): Promise<ApiResponse<{ started: number }>> => {
+    const response =
+      await webClient.post<ApiResponse<{ started: number }>>('/python/check-contracts')
+    return response.data
   },
 }
-
-export default pythonStrategyApi

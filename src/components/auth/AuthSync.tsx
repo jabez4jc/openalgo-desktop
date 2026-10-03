@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useAutoLogout } from '@/hooks/useAutoLogout'
 import { useAuthStore } from '@/stores/authStore'
+import { useBrokerStore } from '@/stores/brokerStore'
+import { useSessionStore } from '@/stores/sessionStore'
 import { useThemeStore } from '@/stores/themeStore'
 
 interface AuthSyncProps {
@@ -8,31 +9,67 @@ interface AuthSyncProps {
 }
 
 /**
- * AuthSync component that synchronizes Tauri backend session with Zustand store.
- * This ensures the React app knows about authentication state on startup.
- * Also syncs app mode (live/analyzer) from the settings.
- * Handles auto-logout at 3:00 AM IST for broker compliance.
+ * AuthSync component that synchronizes Flask session with Zustand store.
+ * This ensures the React app knows about authentication state from OAuth callbacks.
+ * Also syncs app mode (live/analyzer) from the backend.
  */
 export function AuthSync({ children }: AuthSyncProps) {
   const [isChecking, setIsChecking] = useState(true)
-  const { checkSession, isAuthenticated } = useAuthStore()
+  const { setUser, setApiKey, logout } = useAuthStore()
+  const { fetchCapabilities, clearCapabilities } = useBrokerStore()
+  const { setActiveSessionCount } = useSessionStore()
   const { syncAppMode } = useThemeStore()
-
-  // Initialize auto-logout listener (3:00 AM IST compliance)
-  useAutoLogout(isAuthenticated)
 
   useEffect(() => {
     const syncSession = async () => {
       try {
-        // Check session with Tauri backend
-        const isAuthenticated = await checkSession()
+        const response = await fetch('/auth/session-status', {
+          credentials: 'include',
+        })
 
-        if (isAuthenticated) {
-          // Also sync app mode from settings
-          await syncAppMode()
+        if (response.ok) {
+          const data = await response.json()
+
+          if (data.status === 'success' && data.logged_in && data.broker) {
+            // Flask session is authenticated with broker - sync to Zustand
+            setUser({
+              username: data.user,
+              broker: data.broker,
+              isLoggedIn: true,
+              loginTime: new Date().toISOString(),
+            })
+            // Store the API key for trading API calls
+            if (data.api_key) {
+              setApiKey(data.api_key)
+            }
+            // Fetch broker capabilities (exchanges, type, features)
+            await fetchCapabilities()
+            // Also sync app mode from backend
+            await syncAppMode()
+            // Sync active session count
+            if (data.active_sessions !== undefined) {
+              setActiveSessionCount(data.active_sessions)
+            }
+          } else if (data.status === 'success' && data.authenticated && !data.logged_in) {
+            // User is logged in but hasn't connected broker yet
+            setUser({
+              username: data.user,
+              broker: null,
+              isLoggedIn: false,
+              loginTime: null,
+            })
+            clearCapabilities()
+          } else {
+            // Not authenticated or status is not success - clear Zustand store
+            logout()
+            clearCapabilities()
+          }
+        } else {
+          // Any non-OK response (401, 500, etc.) - clear Zustand store
+          logout()
+          clearCapabilities()
         }
-      } catch (error) {
-        console.error('Failed to sync session:', error)
+      } catch (_error) {
         // On error, don't change auth state - let existing state persist
       } finally {
         setIsChecking(false)
@@ -40,7 +77,7 @@ export function AuthSync({ children }: AuthSyncProps) {
     }
 
     syncSession()
-  }, [checkSession, syncAppMode])
+  }, [setUser, setApiKey, logout, fetchCapabilities, clearCapabilities, syncAppMode, setActiveSessionCount])
 
   // Show nothing while checking - prevents flash of wrong content
   if (isChecking) {

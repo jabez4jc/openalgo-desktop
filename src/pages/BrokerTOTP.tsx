@@ -1,27 +1,15 @@
-import { invoke } from '@tauri-apps/api/core'
 import { AlertTriangle, ArrowLeft, ExternalLink, Loader2, Shield } from 'lucide-react'
 import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { toast } from 'sonner'
+import { Link, useNavigate, useParams } from 'react-router'
+import { fetchCSRFToken } from '@/api/client'
+import { BrokerAuthSignOut } from '@/components/auth/BrokerAuthSignOut'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuthStore } from '@/stores/authStore'
-
-interface RawBrokerCredentials {
-  api_key: string
-  api_secret: string | null
-  client_id: string | null
-}
-
-interface BrokerLoginResponse {
-  success: boolean
-  broker_id: string
-  user_id: string
-  user_name: string | null
-}
+import { showToast } from '@/utils/toast'
 
 // Field configuration type
 interface FieldConfig {
@@ -125,6 +113,31 @@ const brokerFields: Record<string, BrokerConfig> = {
     ],
     callbackUrl: '/firstock/callback',
   },
+  indmoney: {
+    fields: [
+      {
+        name: 'mpin',
+        label: 'MPIN',
+        type: 'password',
+        placeholder: 'Enter your account MPIN',
+        inputMode: 'numeric',
+        hint: 'The MPIN you use to log in to INDstocks',
+      },
+      {
+        name: 'totp',
+        label: 'TOTP Code',
+        type: 'text',
+        placeholder: 'Enter 6-digit TOTP',
+        maxLength: 6,
+        pattern: '[0-9]{6}',
+        inputMode: 'numeric',
+        hint: 'Get TOTP from your authenticator app. Use a fresh code - a code that has already been submitted will be rejected.',
+      },
+    ],
+    callbackUrl: '/indmoney/callback',
+    warning:
+      'Set up TOTP once at indstocks.com > API Trading > Access Tokens, and put the Client ID shown there in BROKER_API_KEY. Token generation is limited to 1 request per 60 seconds, and 5 wrong codes in 15 minutes locks it for 15 minutes.',
+  },
   kotak: {
     fields: [
       {
@@ -202,14 +215,14 @@ const brokerFields: Record<string, BrokerConfig> = {
   nubra: {
     fields: [
       {
-        name: 'totp',
-        label: 'TOTP Code',
+        name: 'otp',
+        label: 'OTP',
         type: 'text',
-        placeholder: 'Enter 6-digit TOTP',
+        placeholder: 'Enter 6-digit OTP',
         maxLength: 6,
         pattern: '[0-9]{6}',
         inputMode: 'numeric',
-        hint: 'Enter the 6-digit code from your authenticator app',
+        hint: 'An OTP has been sent to your registered mobile number. For a new code, start the Nubra login again from the broker page.',
       },
     ],
     callbackUrl: '/nubra/callback',
@@ -248,7 +261,13 @@ const brokerFields: Record<string, BrokerConfig> = {
   },
   tradejini: {
     fields: [
-      { name: 'password', label: 'Password', type: 'password', placeholder: 'Enter your Password' },
+      {
+        name: 'password',
+        label: 'PIN',
+        type: 'password',
+        placeholder: 'Enter your login PIN',
+        hint: 'The PIN you use to log in to CubePlus, not your account password',
+      },
       {
         name: 'twofa',
         label: '2FA Code / TOTP',
@@ -298,6 +317,7 @@ const brokerNames: Record<string, string> = {
   angel: 'Angel One',
   definedge: 'Definedge Securities',
   firstock: 'Firstock',
+  indmoney: 'IndMoney (INDstocks)',
   kotak: 'Kotak NEO',
   motilal: 'Motilal Oswal',
   mstock: 'MStock',
@@ -306,13 +326,12 @@ const brokerNames: Record<string, string> = {
   shoonya: 'Shoonya',
   tradejini: 'Tradejini',
   zebu: 'Zebu',
-  jmfinancial: 'JM Financial',
 }
 
 export default function BrokerTOTP() {
   const { broker } = useParams<{ broker: string }>()
   const navigate = useNavigate()
-  const { user } = useAuthStore()
+  const { login } = useAuthStore()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [formData, setFormData] = useState<Record<string, string>>({})
@@ -349,85 +368,49 @@ export default function BrokerTOTP() {
     }
 
     try {
-      // Get stored credentials from keychain
-      const storedCreds = await invoke<RawBrokerCredentials | null>('get_raw_broker_credentials', {
-        brokerId: broker,
+      const csrfToken = await fetchCSRFToken()
+
+      const form = new FormData()
+
+      // Add form fields
+      Object.entries(formData).forEach(([key, value]) => {
+        // Special handling for Kotak mobile - add +91 prefix
+        if (normalizedBroker === 'kotak' && key === 'mobile') {
+          form.append(key, `+91${value.trim()}`)
+        } else {
+          form.append(key, value.trim())
+        }
       })
 
-      if (!storedCreds) {
-        setError('No credentials found for this broker. Please configure credentials first.')
-        setIsLoading(false)
-        return
-      }
-
-      // Build credentials object for broker login
-      // Different brokers need different fields
-      const credentials: Record<string, string | null> = {
-        api_key: storedCreds.api_key,
-        api_secret: storedCreds.api_secret,
-        client_id: storedCreds.client_id || formData.userid || formData.mobile || null,
-        password: formData.password || formData.pin || formData.mpin || null,
-        totp: formData.totp || formData.twofa || formData.otp || null,
-        request_token: null,
-        auth_code: null,
-      }
-
-      // Call broker_login command
-      const response = await invoke<BrokerLoginResponse>('broker_login', {
-        request: {
-          broker_id: broker,
-          credentials,
-        },
-      })
-
-      if (response.success) {
-        // broker = URL param (e.g., "angel", "fyers")
-        // brokerName = display name from brokerNames map (e.g., "Angel One", "Fyers")
-        // response.user_id = user's broker account ID (e.g., "MLOPGOWJ0F")
-        const brokerId_ = response.broker_id || broker || ''
-
-        // Update auth store with broker info - preserve OpenAlgo username, set broker display name
-        useAuthStore.setState({
-          user: user ? {
-            ...user,
-            broker: brokerName,  // Display name like "Angel One", not user's broker account ID
-            brokerId: brokerId_,
-          } : {
-            // Fallback case (shouldn't happen - user should be logged in to OpenAlgo first)
-            username: 'user',  // Default fallback
-            broker: brokerName,
-            brokerId: brokerId_,
-            isLoggedIn: true,
-            loginTime: new Date().toISOString(),
-          },
-          isAuthenticated: true,
-          brokerConnected: true,
+      // Add hidden fields if any
+      if (config.hiddenFields) {
+        Object.entries(config.hiddenFields).forEach(([key, value]) => {
+          form.append(key, value)
         })
-
-        // Show broker account info (user's broker ID) in the toast for confirmation
-        toast.success(`Connected to ${brokerName} (${response.user_name || response.user_id}). Loading symbols...`)
-
-        // Navigate immediately, download master contracts in background
-        navigate('/dashboard')
-
-        // Trigger master contract download in background (fire and forget, silent)
-        invoke<number>('refresh_symbol_master')
-          .then((count) => {
-            console.log(`Master contracts loaded: ${count} symbols`)
-          })
-          .catch((err) => {
-            console.error('Failed to download master contracts:', err)
-          })
-      } else {
-        setError('Authentication failed. Please check your credentials and try again.')
       }
-    } catch (err) {
-      console.error('Broker login error:', err)
-      const errorMessage =
-        err && typeof err === 'object' && 'message' in err
-          ? (err as { message: string }).message
-          : 'Authentication failed. Please check your credentials and try again.'
-      setError(errorMessage)
+
+      form.append('csrf_token', csrfToken)
+
+      // Use custom callback URL or default pattern
+      const callbackUrl = config.callbackUrl || `/${broker}/callback`
+
+      const response = await fetch(callbackUrl, {
+        method: 'POST',
+        body: form,
+        credentials: 'include',
+      })
+
+      const data = await response.json()
+
+      if (data.status === 'success' || response.ok) {
+        login(formData.userid || formData.mobile || '', broker || '')
+        showToast.success('Authentication successful')
+        navigate('/dashboard')
+      } else {
+        setError(data.message || 'Authentication failed. Please try again.')
+      }
+    } catch {
+      setError('Authentication failed. Please check your credentials and try again.')
     } finally {
       setIsLoading(false)
     }
@@ -475,11 +458,9 @@ export default function BrokerTOTP() {
           <CardContent>
             {/* Warning Alert if present */}
             {config.warning && (
-              <Alert className="mb-4 border-yellow-500 bg-yellow-50 dark:bg-yellow-950">
-                <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                <AlertDescription className="text-yellow-800 dark:text-yellow-200">
-                  {config.warning}
-                </AlertDescription>
+              <Alert variant="warning" className="mb-4">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>{config.warning}</AlertDescription>
               </Alert>
             )}
 
@@ -563,6 +544,7 @@ export default function BrokerTOTP() {
                   Documentation
                   <ExternalLink className="h-3 w-3" />
                 </a>
+                <BrokerAuthSignOut />
               </div>
             </div>
           </CardContent>

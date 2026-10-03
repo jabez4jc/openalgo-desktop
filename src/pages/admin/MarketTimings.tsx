@@ -1,7 +1,6 @@
 import { ArrowLeft, Clock, Pencil, Save, Search, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { toast } from 'sonner'
+import { Link } from 'react-router'
 import { adminApi } from '@/api/admin'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -16,6 +15,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import type { MarketTiming, TodayTiming } from '@/types/admin'
+import { showToast } from '@/utils/toast'
 
 export default function MarketTimingsPage() {
   const [timings, setTimings] = useState<MarketTiming[]>([])
@@ -34,6 +34,7 @@ export default function MarketTimingsPage() {
   const [checkTimings, setCheckTimings] = useState<TodayTiming[] | null>(null)
   const [isChecking, setIsChecking] = useState(false)
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: one-time fetch of timings on mount; fetchTimings is recreated each render and adding it would re-run the fetch on every render
   useEffect(() => {
     fetchTimings()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -45,9 +46,8 @@ export default function MarketTimingsPage() {
       setTimings(response.data)
       setTodayTimings(response.today_timings)
       setToday(response.today)
-    } catch (error) {
-      console.error('Error fetching timings:', error)
-      toast.error('Failed to load market timings')
+    } catch (_error) {
+      showToast.error('Failed to load market timings', 'admin')
     } finally {
       setIsLoading(false)
     }
@@ -61,14 +61,14 @@ export default function MarketTimingsPage() {
 
   const handleSaveEdit = async (exchange: string) => {
     if (!editStartTime || !editEndTime) {
-      toast.error('Please enter both start and end times')
+      showToast.error('Please enter both start and end times', 'admin')
       return
     }
 
     // Validate time format
     const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/
     if (!timeRegex.test(editStartTime) || !timeRegex.test(editEndTime)) {
-      toast.error('Invalid time format. Use HH:MM')
+      showToast.error('Invalid time format. Use HH:MM', 'admin')
       return
     }
 
@@ -80,15 +80,15 @@ export default function MarketTimingsPage() {
       })
 
       if (response.status === 'success') {
-        toast.success(response.message || 'Timing updated successfully')
+        showToast.success(response.message || 'Timing updated successfully', 'admin')
         setEditingExchange(null)
         fetchTimings()
       } else {
-        toast.error(response.message || 'Failed to update timing')
+        showToast.error(response.message || 'Failed to update timing', 'admin')
       }
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } }
-      toast.error(err.response?.data?.message || 'Failed to update timing')
+      showToast.error(err.response?.data?.message || 'Failed to update timing', 'admin')
     } finally {
       setIsSaving(false)
     }
@@ -96,7 +96,7 @@ export default function MarketTimingsPage() {
 
   const handleCheckTimings = async () => {
     if (!checkDate) {
-      toast.error('Please select a date')
+      showToast.error('Please select a date', 'admin')
       return
     }
 
@@ -106,7 +106,7 @@ export default function MarketTimingsPage() {
       setCheckTimings(response.timings)
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } }
-      toast.error(err.response?.data?.message || 'Failed to check timings')
+      showToast.error(err.response?.data?.message || 'Failed to check timings', 'admin')
     } finally {
       setIsChecking(false)
     }
@@ -119,6 +119,7 @@ export default function MarketTimingsPage() {
       NFO: 'bg-green-500',
       BFO: 'bg-yellow-500',
       MCX: 'bg-purple-500',
+      NCO: 'bg-emerald-500',
       CDS: 'bg-orange-500',
       BCD: 'bg-pink-500',
     }
@@ -184,6 +185,7 @@ export default function MarketTimingsPage() {
                             value={editStartTime}
                             onChange={(e) => setEditStartTime(e.target.value)}
                             className="w-28 h-8"
+                            aria-label={`Start time for ${timing.exchange}`}
                           />
                         ) : (
                           <span className="font-mono">{timing.start_time}</span>
@@ -196,6 +198,7 @@ export default function MarketTimingsPage() {
                             value={editEndTime}
                             onChange={(e) => setEditEndTime(e.target.value)}
                             className="w-28 h-8"
+                            aria-label={`End time for ${timing.exchange}`}
                           />
                         ) : (
                           <span className="font-mono">{timing.end_time}</span>
@@ -210,6 +213,8 @@ export default function MarketTimingsPage() {
                               className="h-8 w-8"
                               onClick={() => handleSaveEdit(timing.exchange)}
                               disabled={isSaving}
+                              title="Save changes"
+                              aria-label={`Save timing changes for ${timing.exchange}`}
                             >
                               <Save className="h-4 w-4" />
                             </Button>
@@ -218,6 +223,8 @@ export default function MarketTimingsPage() {
                               variant="ghost"
                               className="h-8 w-8"
                               onClick={() => setEditingExchange(null)}
+                              title="Cancel editing"
+                              aria-label={`Cancel editing ${timing.exchange}`}
                             >
                               <X className="h-4 w-4" />
                             </Button>
@@ -228,6 +235,8 @@ export default function MarketTimingsPage() {
                             variant="ghost"
                             className="h-8 w-8"
                             onClick={() => handleEdit(timing)}
+                            title="Edit timing"
+                            aria-label={`Edit timing for ${timing.exchange}`}
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>

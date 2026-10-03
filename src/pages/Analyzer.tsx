@@ -68,6 +68,10 @@ const EXCHANGE_COLORS: Record<string, string> = {
   BCD: 'bg-red-500/10 text-red-600 border-red-500/30',
   MCX: 'bg-primary/10 text-primary border-primary/30',
   NCDEX: 'bg-green-500/10 text-green-600 border-green-500/30',
+  NCO: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30',
+  NSE_INDEX: 'bg-cyan-500/10 text-cyan-600 border-cyan-500/30',
+  BSE_INDEX: 'bg-gray-500/10 text-gray-600 border-gray-500/30',
+  GLOBAL_INDEX: 'bg-indigo-500/10 text-indigo-600 border-indigo-500/30',
 }
 
 export default function Analyzer() {
@@ -78,9 +82,9 @@ export default function Analyzer() {
   const [selectedRequest, setSelectedRequest] = useState<ApiRequest | null>(null)
   const [showDetailsDialog, setShowDetailsDialog] = useState(false)
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: one-time data load on mount; subsequent fetches are triggered explicitly by the filter form
   useEffect(() => {
     fetchData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const fetchData = async (start?: string, end?: string) => {
@@ -102,8 +106,7 @@ export default function Analyzer() {
           setData(result.data)
         }
       }
-    } catch (error) {
-      console.error('Error fetching analyzer data:', error)
+    } catch (_error) {
     } finally {
       setIsLoading(false)
     }

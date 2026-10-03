@@ -1,7 +1,16 @@
-import { ArrowLeft, Clock, FileText, HardDrive, RefreshCw, ScrollText, Trash2 } from 'lucide-react'
+import {
+  ArrowLeft,
+  Clock,
+  Copy,
+  Download,
+  FileText,
+  HardDrive,
+  RefreshCw,
+  ScrollText,
+  Trash2,
+} from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { toast } from 'sonner'
+import { Link, useParams } from 'react-router'
 import { pythonStrategyApi } from '@/api/python-strategy'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -20,6 +29,7 @@ import { LogViewer } from '@/components/ui/log-viewer'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { LogContent, LogFile, PythonStrategy } from '@/types/python-strategy'
+import { showToast } from '@/utils/toast'
 
 export default function PythonStrategyLogs() {
   const { strategyId } = useParams<{ strategyId: string }>()
@@ -48,9 +58,8 @@ export default function PythonStrategyLogs() {
       if (logsData.length > 0 && !selectedLog) {
         setSelectedLog(logsData[0].name)
       }
-    } catch (error) {
-      console.error('Failed to fetch data:', error)
-      toast.error('Failed to load logs')
+    } catch (_error) {
+      showToast.error('Failed to load logs', 'pythonStrategy')
     } finally {
       setLoading(false)
     }
@@ -65,11 +74,10 @@ export default function PythonStrategyLogs() {
       }
       const content = await pythonStrategyApi.getLogContent(strategyId, logName)
       setLogContent(content)
-    } catch (error) {
-      console.error('Failed to fetch log content:', error)
+    } catch (_error) {
       // Only show toast for manual fetch, not auto-refresh
       if (showLoading) {
-        toast.error('Failed to load log content')
+        showToast.error('Failed to load log content', 'pythonStrategy')
       }
     } finally {
       if (showLoading) {
@@ -78,19 +86,20 @@ export default function PythonStrategyLogs() {
     }
   }
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: one-time initial load on mount; fetchData is recreated every render and must not retrigger this effect
   useEffect(() => {
     fetchData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-fetch only when the selected log changes; fetchLogContent is recreated every render and adding it would refetch on every render
   useEffect(() => {
     if (selectedLog) {
       fetchLogContent(selectedLog)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedLog])
 
   // Auto-refresh if strategy is running and auto-refresh is enabled
+  // biome-ignore lint/correctness/useExhaustiveDependencies: interval should reset only on status/selection/autoRefresh changes; fetchLogContent is recreated every render and adding it would tear down and recreate the 3s interval each render
   useEffect(() => {
     if (strategy?.status === 'running' && selectedLog && autoRefresh) {
       const interval = setInterval(() => {
@@ -99,7 +108,6 @@ export default function PythonStrategyLogs() {
       }, 3000)
       return () => clearInterval(interval)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [strategy?.status, selectedLog, autoRefresh])
 
   const handleClearLogs = async () => {
@@ -111,22 +119,44 @@ export default function PythonStrategyLogs() {
 
       const response = await pythonStrategyApi.clearLogs(strategyId)
       if (response.status === 'success') {
-        toast.success('Logs cleared')
+        showToast.success('Logs cleared', 'pythonStrategy')
         setLogFiles([])
         setSelectedLog(null)
         setLogContent(null)
       } else {
-        toast.error(response.message || 'Failed to clear logs')
+        showToast.error(response.message || 'Failed to clear logs', 'pythonStrategy')
       }
-    } catch (error) {
-      console.error('Failed to clear logs:', error)
-      toast.error('Failed to clear logs')
+    } catch (_error) {
+      showToast.error('Failed to clear logs', 'pythonStrategy')
     } finally {
       setClearing(false)
       setClearDialogOpen(false)
       // Re-enable auto-refresh after operation completes
       setAutoRefresh(true)
     }
+  }
+
+  const handleCopyLog = async () => {
+    if (!logContent?.content) return
+    try {
+      await navigator.clipboard.writeText(logContent.content)
+      showToast.success('Log content copied to clipboard', 'pythonStrategy')
+    } catch {
+      showToast.error('Failed to copy to clipboard', 'pythonStrategy')
+    }
+  }
+
+  const handleDownloadLog = () => {
+    if (!logContent?.content || !selectedLog) return
+    const blob = new Blob([logContent.content], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = selectedLog
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
   }
 
   const formatLogName = (name: string) => {
@@ -220,6 +250,7 @@ export default function PythonStrategyLogs() {
                 <div className="space-y-2">
                   {logFiles.map((log) => (
                     <button
+                      type="button"
                       key={log.name}
                       onClick={() => setSelectedLog(log.name)}
                       className={`w-full text-left p-3 rounded-lg transition-colors ${
@@ -258,9 +289,33 @@ export default function PythonStrategyLogs() {
                 <ScrollText className="h-4 w-4" />
                 Log Content
               </span>
-              {strategy.status === 'running' && (
-                <Badge className="bg-green-500 animate-pulse">Live</Badge>
-              )}
+              <span className="flex items-center gap-2">
+                {logContent && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCopyLog}
+                      title="Copy log content"
+                    >
+                      <Copy className="h-3.5 w-3.5 mr-1.5" />
+                      Copy
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleDownloadLog}
+                      title="Download log file"
+                    >
+                      <Download className="h-3.5 w-3.5 mr-1.5" />
+                      Download
+                    </Button>
+                  </>
+                )}
+                {strategy.status === 'running' && (
+                  <Badge className="bg-green-500 animate-pulse">Live</Badge>
+                )}
+              </span>
             </CardTitle>
             {logContent && (
               <CardDescription>

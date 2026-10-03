@@ -15,8 +15,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { toast } from 'sonner'
+import { Link, useNavigate } from 'react-router'
 import { pythonStrategyApi } from '@/api/python-strategy'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -41,6 +40,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { MasterContractStatus, PythonStrategy } from '@/types/python-strategy'
 import { SCHEDULE_DAYS, STATUS_COLORS, STATUS_LABELS } from '@/types/python-strategy'
+import { showToast } from '@/utils/toast'
 
 export default function PythonStrategyIndex() {
   const navigate = useNavigate()
@@ -61,14 +61,14 @@ export default function PythonStrategyIndex() {
       ])
       setStrategies(strategiesData)
       setMasterStatus(statusData)
-    } catch (error) {
-      console.error('Failed to fetch data:', error)
-      if (!silent) toast.error('Failed to load strategies')
+    } catch (_error) {
+      if (!silent) showToast.error('Failed to load strategies', 'pythonStrategy')
     } finally {
       if (!silent) setLoading(false)
     }
   }
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: mount-only init of the 1s timer and SSE subscription; adding fetchData would tear down and recreate the EventSource on every render
   useEffect(() => {
     fetchData()
     // Update current time every second
@@ -81,29 +81,24 @@ export default function PythonStrategyIndex() {
       try {
         const data = JSON.parse(event.data)
         if (data.type === 'connected') {
-          console.log('SSE connected for strategy status updates')
           return
         }
 
         // Refresh data silently when we receive a status update
         if (data.strategy_id && data.status) {
-          console.log(`Strategy ${data.strategy_id} status: ${data.status}`)
           fetchData(true) // Silent refresh
         }
-      } catch (e) {
+      } catch (_e) {
         // Ignore parse errors (heartbeat messages)
       }
     }
 
-    eventSource.onerror = () => {
-      console.log('SSE connection error, will auto-reconnect')
-    }
+    eventSource.onerror = () => {}
 
     return () => {
       clearInterval(timer)
       eventSource.close()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleStart = async (strategy: PythonStrategy) => {
@@ -112,17 +107,16 @@ export default function PythonStrategyIndex() {
       const response = await pythonStrategyApi.startStrategy(strategy.id)
       if (response.status === 'success') {
         // Use response message which differs for immediate start vs armed for schedule
-        toast.success(response.message || `Strategy ${strategy.name} started`)
+        showToast.success(response.message || `Strategy ${strategy.name} started`, 'pythonStrategy')
         fetchData()
       } else {
-        toast.error(response.message || 'Failed to start strategy')
+        showToast.error(response.message || 'Failed to start strategy', 'pythonStrategy')
       }
     } catch (error: unknown) {
-      console.error('Failed to start strategy:', error)
       // Extract error message from Axios response
       const axiosError = error as { response?: { data?: { message?: string } } }
       const errorMessage = axiosError.response?.data?.message || 'Failed to start strategy'
-      toast.error(errorMessage)
+      showToast.error(errorMessage, 'pythonStrategy')
     } finally {
       setActionLoading(null)
     }
@@ -134,14 +128,13 @@ export default function PythonStrategyIndex() {
       const response = await pythonStrategyApi.stopStrategy(strategy.id)
       if (response.status === 'success') {
         // Use response message which differs for running vs scheduled strategies
-        toast.success(response.message || `Strategy ${strategy.name} stopped`)
+        showToast.success(response.message || `Strategy ${strategy.name} stopped`, 'pythonStrategy')
         fetchData()
       } else {
-        toast.error(response.message || 'Failed to stop strategy')
+        showToast.error(response.message || 'Failed to stop strategy', 'pythonStrategy')
       }
-    } catch (error) {
-      console.error('Failed to stop strategy:', error)
-      toast.error('Failed to stop strategy')
+    } catch (_error) {
+      showToast.error('Failed to stop strategy', 'pythonStrategy')
     } finally {
       setActionLoading(null)
     }
@@ -152,14 +145,13 @@ export default function PythonStrategyIndex() {
       setActionLoading(strategy.id)
       const response = await pythonStrategyApi.clearError(strategy.id)
       if (response.status === 'success') {
-        toast.success('Error cleared')
+        showToast.success('Error cleared', 'pythonStrategy')
         fetchData()
       } else {
-        toast.error(response.message || 'Failed to clear error')
+        showToast.error(response.message || 'Failed to clear error', 'pythonStrategy')
       }
-    } catch (error) {
-      console.error('Failed to clear error:', error)
-      toast.error('Failed to clear error')
+    } catch (_error) {
+      showToast.error('Failed to clear error', 'pythonStrategy')
     } finally {
       setActionLoading(null)
     }
@@ -171,14 +163,13 @@ export default function PythonStrategyIndex() {
       setActionLoading(strategyToDelete.id)
       const response = await pythonStrategyApi.deleteStrategy(strategyToDelete.id)
       if (response.status === 'success') {
-        toast.success('Strategy deleted')
+        showToast.success('Strategy deleted', 'pythonStrategy')
         setStrategies(strategies.filter((s) => s.id !== strategyToDelete.id))
       } else {
-        toast.error(response.message || 'Failed to delete strategy')
+        showToast.error(response.message || 'Failed to delete strategy', 'pythonStrategy')
       }
-    } catch (error) {
-      console.error('Failed to delete strategy:', error)
-      toast.error('Failed to delete strategy')
+    } catch (_error) {
+      showToast.error('Failed to delete strategy', 'pythonStrategy')
     } finally {
       setActionLoading(null)
       setDeleteDialogOpen(false)
@@ -197,10 +188,9 @@ export default function PythonStrategyIndex() {
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
-      toast.success('Strategy exported')
-    } catch (error) {
-      console.error('Failed to export strategy:', error)
-      toast.error('Failed to export strategy')
+      showToast.success('Strategy exported', 'pythonStrategy')
+    } catch (_error) {
+      showToast.error('Failed to export strategy', 'pythonStrategy')
     }
   }
 
@@ -210,14 +200,13 @@ export default function PythonStrategyIndex() {
       const response = await pythonStrategyApi.checkAndStartPending()
       if (response.status === 'success') {
         const started = response.data?.started || 0
-        toast.success(`Started ${started} pending strategies`)
+        showToast.success(`Started ${started} pending strategies`, 'pythonStrategy')
         fetchData()
       } else {
-        toast.error(response.message || 'Failed to check contracts')
+        showToast.error(response.message || 'Failed to check contracts', 'pythonStrategy')
       }
-    } catch (error) {
-      console.error('Failed to check contracts:', error)
-      toast.error('Failed to check contracts')
+    } catch (_error) {
+      showToast.error('Failed to check contracts', 'pythonStrategy')
     } finally {
       setActionLoading(null)
     }
@@ -384,19 +373,19 @@ export default function PythonStrategyIndex() {
               />
 
               <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1">
-                    <CardTitle className="text-lg">{strategy.name}</CardTitle>
-                    <CardDescription className="font-mono text-xs">
+                <div className="flex items-start justify-between gap-2 overflow-hidden">
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <CardTitle className="text-lg truncate">{strategy.name}</CardTitle>
+                    <CardDescription className="font-mono text-xs truncate">
                       {strategy.file_name}
                     </CardDescription>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 shrink-0">
                     <Tooltip>
                       <TooltipTrigger>
                         <Badge
                           variant={strategy.status === 'running' ? 'default' : 'secondary'}
-                          className={STATUS_COLORS[strategy.status] || ''}
+                          className={`${STATUS_COLORS[strategy.status] || ''} whitespace-nowrap`}
                         >
                           {STATUS_LABELS[strategy.status] || strategy.status}
                         </Badge>
@@ -407,7 +396,7 @@ export default function PythonStrategyIndex() {
                     </Tooltip>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" aria-label="Strategy actions menu">
                           <MoreVertical className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
@@ -444,6 +433,11 @@ export default function PythonStrategyIndex() {
                       {' - '}
                       {strategy.schedule_stop_time || '16:00'}
                     </span>
+                    {strategy.exchange && (
+                      <span className="ml-auto px-1.5 py-0.5 text-[10px] font-medium rounded bg-blue-500/20 text-blue-700 dark:text-blue-300">
+                        {strategy.exchange}
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
                     {formatScheduleDays(

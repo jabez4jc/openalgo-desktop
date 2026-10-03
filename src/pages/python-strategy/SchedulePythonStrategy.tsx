@@ -1,16 +1,16 @@
 import { ArrowLeft, Calendar, Clock } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { toast } from 'sonner'
+import { Link, useNavigate, useParams } from 'react-router'
 import { pythonStrategyApi } from '@/api/python-strategy'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useStrategyExchanges } from '@/hooks/useStrategyExchanges'
 import type { PythonStrategy } from '@/types/python-strategy'
-import { SCHEDULE_DAYS } from '@/types/python-strategy'
+import { CRYPTO_EXCHANGE_VALUE, SCHEDULE_DAYS } from '@/types/python-strategy'
+import { showToast } from '@/utils/toast'
 
 export default function SchedulePythonStrategy() {
   const { strategyId } = useParams<{ strategyId: string }>()
@@ -18,9 +18,14 @@ export default function SchedulePythonStrategy() {
   const [strategy, setStrategy] = useState<PythonStrategy | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [exchange, setExchange] = useState<string>('NSE')
   const [startTime, setStartTime] = useState('09:15')
   const [stopTime, setStopTime] = useState('15:30')
   const [selectedDays, setSelectedDays] = useState<string[]>(['mon', 'tue', 'wed', 'thu', 'fri'])
+
+  const { exchanges, getWindow } = useStrategyExchanges()
+  const isCrypto = exchange === CRYPTO_EXCHANGE_VALUE
+  const sessionWindow = getWindow(exchange)
 
   useEffect(() => {
     const fetchStrategy = async () => {
@@ -30,20 +35,19 @@ export default function SchedulePythonStrategy() {
         const data = await pythonStrategyApi.getStrategy(strategyId)
         setStrategy(data)
         // Pre-fill with existing schedule (schedule is always enabled)
+        if (data.exchange) setExchange(data.exchange)
         if (data.schedule_start_time) setStartTime(data.schedule_start_time)
         if (data.schedule_stop_time) setStopTime(data.schedule_stop_time)
         if (data.schedule_days?.length) setSelectedDays(data.schedule_days)
-      } catch (error) {
-        console.error('Failed to fetch strategy:', error)
-        toast.error('Failed to load strategy')
+      } catch (_error) {
+        showToast.error('Failed to load strategy', 'pythonStrategy')
         navigate('/python')
       } finally {
         setLoading(false)
       }
     }
     fetchStrategy()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [strategyId])
+  }, [strategyId, navigate])
 
   const handleDayToggle = (day: string) => {
     setSelectedDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]))
@@ -54,15 +58,15 @@ export default function SchedulePythonStrategy() {
 
     if (!strategyId) return
     if (selectedDays.length === 0) {
-      toast.error('Please select at least one day')
+      showToast.error('Please select at least one day', 'pythonStrategy')
       return
     }
     if (!startTime) {
-      toast.error('Start time is required')
+      showToast.error('Start time is required', 'pythonStrategy')
       return
     }
     if (!stopTime) {
-      toast.error('Stop time is required')
+      showToast.error('Stop time is required', 'pythonStrategy')
       return
     }
 
@@ -72,17 +76,17 @@ export default function SchedulePythonStrategy() {
         start_time: startTime,
         stop_time: stopTime,
         days: selectedDays,
+        exchange,
       })
 
       if (response.status === 'success') {
-        toast.success('Schedule saved successfully')
+        showToast.success('Schedule saved successfully', 'pythonStrategy')
         navigate('/python')
       } else {
-        toast.error(response.message || 'Failed to save schedule')
+        showToast.error(response.message || 'Failed to save schedule', 'pythonStrategy')
       }
-    } catch (error) {
-      console.error('Failed to schedule:', error)
-      toast.error('Failed to save schedule')
+    } catch (_error) {
+      showToast.error('Failed to save schedule', 'pythonStrategy')
     } finally {
       setSaving(false)
     }
@@ -151,34 +155,64 @@ export default function SchedulePythonStrategy() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Exchange */}
+            <div className="space-y-2">
+              <Label htmlFor="exchange">Exchange</Label>
+              <select
+                id="exchange"
+                value={exchange}
+                onChange={(e) => setExchange(e.target.value)}
+                className="w-full px-3 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                {exchanges.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                {isCrypto
+                  ? 'CRYPTO is 24/7 — the schedule below merely limits when this script runs.'
+                  : 'Drives holiday awareness for this strategy. Each exchange has its own holiday list and per-date session timings (e.g. on 14-Apr-2026 NSE/BSE are closed but MCX runs 17:00-23:55 per the calendar DB). SPECIAL_SESSION entries also override weekend rejects (e.g. Sunday Muhurat).'}
+              </p>
+            </div>
+
             {/* Time Inputs */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="start_time" className="flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  Start Time (IST)
-                </Label>
-                <Input
-                  id="start_time"
-                  type="time"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  required
-                />
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="start_time" className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Start Time (IST)
+                  </Label>
+                  <Input
+                    id="start_time"
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="stop_time" className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Stop Time (IST)
+                  </Label>
+                  <Input
+                    id="stop_time"
+                    type="time"
+                    value={stopTime}
+                    onChange={(e) => setStopTime(e.target.value)}
+                    required
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="stop_time" className="flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  Stop Time (IST)
-                </Label>
-                <Input
-                  id="stop_time"
-                  type="time"
-                  value={stopTime}
-                  onChange={(e) => setStopTime(e.target.value)}
-                  required
-                />
-              </div>
+              {sessionWindow && !isCrypto && (
+                <p className="text-xs text-muted-foreground">
+                  {exchange} trades {sessionWindow.start} - {sessionWindow.stop} IST today. The
+                  strategy is stopped at whichever comes first, your stop time or the session close.
+                </p>
+              )}
             </div>
 
             {/* Days Selection */}
@@ -186,21 +220,37 @@ export default function SchedulePythonStrategy() {
               <Label>Days to Run</Label>
               <div className="flex flex-wrap gap-2">
                 {SCHEDULE_DAYS.map((day) => (
-                  <label
+                  <button
+                    type="button"
                     key={day.value}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
                       selectedDays.includes(day.value)
                         ? 'bg-primary text-primary-foreground border-primary'
                         : 'bg-background hover:bg-muted'
                     }`}
+                    onClick={() => handleDayToggle(day.value)}
                   >
-                    <Checkbox
-                      checked={selectedDays.includes(day.value)}
-                      onCheckedChange={() => handleDayToggle(day.value)}
-                      className="hidden"
-                    />
+                    <div
+                      className={`h-4 w-4 rounded border flex items-center justify-center ${
+                        selectedDays.includes(day.value)
+                          ? 'bg-primary-foreground border-primary-foreground'
+                          : 'border-current'
+                      }`}
+                    >
+                      {selectedDays.includes(day.value) && (
+                        <svg
+                          className="h-3 w-3 text-primary"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="3"
+                        >
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </div>
                     <span className="text-sm font-medium">{day.label}</span>
-                  </label>
+                  </button>
                 ))}
               </div>
             </div>

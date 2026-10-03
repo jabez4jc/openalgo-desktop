@@ -1,7 +1,6 @@
 import { Activity, ArrowLeft, Download, Filter, RefreshCw } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { toast } from 'sonner'
+import { Link } from 'react-router'
 import { webClient } from '@/api/client'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -22,6 +21,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { showToast } from '@/utils/toast'
 
 interface TrafficLog {
   timestamp: string
@@ -63,6 +63,7 @@ export default function TrafficDashboard() {
   const [filter, setFilter] = useState<'all' | 'error' | 'success'>('all')
   const [isRefreshing, setIsRefreshing] = useState(false)
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: mount-only initial fetch + fixed 30s auto-refresh interval; fetchData is recreated each render and adding it would tear down/recreate the interval on every render
   useEffect(() => {
     fetchData()
     // Auto-refresh every 30 seconds
@@ -80,9 +81,8 @@ export default function TrafficDashboard() {
 
       setLogs(Array.isArray(logsResponse.data) ? logsResponse.data : [])
       setStats(statsResponse.data)
-    } catch (error) {
-      console.error('Error fetching traffic data:', error)
-      toast.error('Failed to load traffic data')
+    } catch (_error) {
+      showToast.error('Failed to load traffic data', 'monitoring')
     } finally {
       setIsLoading(false)
     }
@@ -92,7 +92,7 @@ export default function TrafficDashboard() {
     setIsRefreshing(true)
     await fetchData()
     setIsRefreshing(false)
-    toast.success('Data refreshed')
+    showToast.success('Data refreshed', 'monitoring')
   }
 
   const handleExport = () => {

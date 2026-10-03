@@ -1,16 +1,16 @@
 import { ArrowLeft, Clock, FileCode, Info, Upload } from 'lucide-react'
 import { useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { toast } from 'sonner'
+import { Link, useNavigate } from 'react-router'
 import { pythonStrategyApi } from '@/api/python-strategy'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { SCHEDULE_DAYS } from '@/types/python-strategy'
+import { useStrategyExchanges } from '@/hooks/useStrategyExchanges'
+import { CRYPTO_EXCHANGE_VALUE, SCHEDULE_DAYS } from '@/types/python-strategy'
+import { showToast } from '@/utils/toast'
 
 const EXAMPLE_STRATEGY = `"""
 Example OpenAlgo Strategy
@@ -59,10 +59,34 @@ export default function NewPythonStrategy() {
   const [showExample, setShowExample] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
+  // Exchange drives the holiday/session calendar
+  const [exchange, setExchange] = useState<string>('NSE')
+
   // Schedule fields with defaults (Mon-Fri, 9:00 AM - 4:00 PM IST)
   const [startTime, setStartTime] = useState('09:00')
   const [stopTime, setStopTime] = useState('16:00')
   const [selectedDays, setSelectedDays] = useState<string[]>(['mon', 'tue', 'wed', 'thu', 'fri'])
+
+  const { exchanges, getWindow } = useStrategyExchanges()
+  const isCrypto = exchange === CRYPTO_EXCHANGE_VALUE
+
+  // When exchange changes, prefill the schedule with that exchange's session
+  // window from the market calendar DB. Never hardcode a window here: a stale
+  // constant would silently cut a strategy short (an NFO script stopped at
+  // 15:30 misses the last ten minutes of the F&O session, which runs to 15:40).
+  const handleExchangeChange = (value: string) => {
+    setExchange(value)
+    const session = getWindow(value)
+    if (session) {
+      setStartTime(session.start)
+      setStopTime(session.stop)
+    }
+    setSelectedDays(
+      value === CRYPTO_EXCHANGE_VALUE
+        ? ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
+        : ['mon', 'tue', 'wed', 'thu', 'fri']
+    )
+  }
 
   const handleDayToggle = (day: string) => {
     setSelectedDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]))
@@ -105,13 +129,13 @@ export default function NewPythonStrategy() {
     if (selectedFile) {
       // Validate file extension
       if (!selectedFile.name.endsWith('.py')) {
-        toast.error('Please select a Python file (.py)')
+        showToast.error('Please select a Python file (.py)', 'pythonStrategy')
         return
       }
       // Validate file size (max 1MB for Python scripts)
       const maxSizeBytes = 1024 * 1024 // 1MB
       if (selectedFile.size > maxSizeBytes) {
-        toast.error('File size must be less than 1MB')
+        showToast.error('File size must be less than 1MB', 'pythonStrategy')
         return
       }
       setFile(selectedFile)
@@ -127,7 +151,7 @@ export default function NewPythonStrategy() {
     e.preventDefault()
 
     if (!validateForm()) {
-      toast.error('Please fix the form errors')
+      showToast.error('Please fix the form errors', 'pythonStrategy')
       return
     }
 
@@ -138,18 +162,18 @@ export default function NewPythonStrategy() {
         start_time: startTime,
         stop_time: stopTime,
         days: selectedDays,
+        exchange,
       })
 
       if (response.status === 'success') {
-        toast.success('Strategy uploaded with schedule')
+        showToast.success('Strategy uploaded with schedule', 'pythonStrategy')
         navigate('/python')
       } else {
-        toast.error(response.message || 'Failed to upload strategy')
+        showToast.error(response.message || 'Failed to upload strategy', 'pythonStrategy')
       }
     } catch (error: unknown) {
-      console.error('Failed to upload strategy:', error)
       const errorMessage = error instanceof Error ? error.message : 'Failed to upload strategy'
-      toast.error(errorMessage)
+      showToast.error(errorMessage, 'pythonStrategy')
     } finally {
       setLoading(false)
     }
@@ -247,6 +271,30 @@ export default function NewPythonStrategy() {
               {errors.file && <p className="text-sm text-red-500">{errors.file}</p>}
             </div>
 
+            {/* Exchange Section */}
+            <div className="space-y-2 border-t pt-6">
+              <Label htmlFor="exchange">Exchange</Label>
+              <select
+                id="exchange"
+                value={exchange}
+                onChange={(e) => handleExchangeChange(e.target.value)}
+                className="w-full px-3 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                {exchanges.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground">
+                Drives the holiday calendar and effective trading window for this strategy. Each
+                exchange has its own holiday list and per-date session timings (e.g. MCX may run a
+                partial 17:00-23:55 session on a date when NSE/BSE are fully closed — the host
+                follows whatever the calendar DB says, not a hardcoded "evening" rule). CRYPTO
+                ignores holidays entirely.
+              </p>
+            </div>
+
             {/* Schedule Section */}
             <div className="space-y-4 border-t pt-6">
               <div className="flex items-center gap-2">
@@ -254,7 +302,9 @@ export default function NewPythonStrategy() {
                 <h3 className="font-medium">Schedule</h3>
               </div>
               <p className="text-sm text-muted-foreground">
-                Configure when this strategy should run. All times are in IST.
+                {isCrypto
+                  ? 'CRYPTO runs 24/7. The schedule below limits when this script is allowed to run.'
+                  : 'Configure when this strategy should run. All times are in IST.'}
               </p>
 
               {/* Time Inputs */}
@@ -288,7 +338,8 @@ export default function NewPythonStrategy() {
                 <Label>Schedule Days</Label>
                 <div className="flex flex-wrap gap-2">
                   {SCHEDULE_DAYS.map((day) => (
-                    <div
+                    <button
+                      type="button"
                       key={day.value}
                       className={`flex items-center gap-2 px-3 py-2 border rounded-lg cursor-pointer transition-colors ${
                         selectedDays.includes(day.value)
@@ -297,13 +348,27 @@ export default function NewPythonStrategy() {
                       }`}
                       onClick={() => handleDayToggle(day.value)}
                     >
-                      <Checkbox
-                        checked={selectedDays.includes(day.value)}
-                        onCheckedChange={() => handleDayToggle(day.value)}
-                        className="pointer-events-none"
-                      />
+                      <div
+                        className={`h-4 w-4 rounded border flex items-center justify-center ${
+                          selectedDays.includes(day.value)
+                            ? 'bg-primary-foreground border-primary-foreground'
+                            : 'border-current'
+                        }`}
+                      >
+                        {selectedDays.includes(day.value) && (
+                          <svg
+                            className="h-3 w-3 text-primary"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="3"
+                          >
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                      </div>
                       <span className="text-sm">{day.label}</span>
-                    </div>
+                    </button>
                   ))}
                 </div>
                 {errors.days && <p className="text-sm text-red-500">{errors.days}</p>}
@@ -357,7 +422,7 @@ export default function NewPythonStrategy() {
                 className="mt-4"
                 onClick={() => {
                   navigator.clipboard.writeText(EXAMPLE_STRATEGY)
-                  toast.success('Copied to clipboard')
+                  showToast.success('Copied to clipboard', 'clipboard')
                 }}
               >
                 Copy Template

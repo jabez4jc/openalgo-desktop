@@ -13,8 +13,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { toast } from 'sonner'
+import { Link } from 'react-router'
 import { webClient } from '@/api/client'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -22,6 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Input } from '@/components/ui/input'
 import { JsonEditor } from '@/components/ui/json-editor'
+import { showToast } from '@/utils/toast'
 
 interface LogEntry {
   id: number
@@ -71,9 +71,8 @@ export default function LogsPage() {
         setLogs(Array.isArray(response.data.logs) ? response.data.logs : [])
         setTotalPages(response.data.total_pages || 1)
         setCurrentPage(response.data.current_page || 1)
-      } catch (error) {
-        console.error('Error fetching logs:', error)
-        toast.error('Failed to load logs')
+      } catch (_error) {
+        showToast.error('Failed to load logs', 'monitoring')
       } finally {
         setIsLoading(false)
         setIsRefreshing(false)
@@ -102,7 +101,7 @@ export default function LogsPage() {
   const handleRefresh = async () => {
     setIsRefreshing(true)
     await fetchLogs(currentPage)
-    toast.success('Logs refreshed')
+    showToast.success('Logs refreshed', 'monitoring')
   }
 
   const handleExport = () => {
@@ -187,6 +186,7 @@ export default function LogsPage() {
           size="icon"
           onClick={() => fetchLogs(currentPage - 1)}
           disabled={currentPage <= 1}
+          aria-label="Previous page"
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
@@ -206,6 +206,7 @@ export default function LogsPage() {
           size="icon"
           onClick={() => fetchLogs(currentPage + 1)}
           disabled={currentPage >= totalPages}
+          aria-label="Next page"
         >
           <ChevronRight className="h-4 w-4" />
         </Button>

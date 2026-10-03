@@ -1,95 +1,75 @@
-import { invoke } from '@tauri-apps/api/core'
-import { Clock, Eye, EyeOff, Github, Info, Loader2, LogIn, MessageCircle, RefreshCcw } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { toast } from 'sonner'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+  ArrowLeft,
+  Eye,
+  EyeOff,
+  Github,
+  Info,
+  Loader2,
+  LogIn,
+  MessageCircle,
+  ShieldCheck,
+} from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuthStore } from '@/stores/authStore'
-
-interface SetupCheckResponse {
-  status: string
-  needs_setup: boolean
-}
-
-interface LoginResponse {
-  success: boolean
-  user_id: number
-  username: string
-}
-
-interface LocationState {
-  reason?: 'auto_logout'
-}
+import { showToast } from '@/utils/toast'
 
 export default function Login() {
   const navigate = useNavigate()
-  const location = useLocation()
   const { login: setLogin } = useAuthStore()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [totpCode, setTotpCode] = useState('')
+  const [step, setStep] = useState<'password' | 'totp'>('password')
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isCheckingSetup, setIsCheckingSetup] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [showResetDialog, setShowResetDialog] = useState(false)
-  const [isResetting, setIsResetting] = useState(false)
-  const [loginFailCount, setLoginFailCount] = useState(0)
-
-  // Check if user was logged out due to auto-logout
-  const locationState = location.state as LocationState | null
-  const isAutoLogout = locationState?.reason === 'auto_logout'
 
   // Check if setup is required or already logged in on page load
   useEffect(() => {
     const checkSetup = async () => {
       try {
-        // First check if setup is needed (no users exist)
-        const setupData = await invoke<SetupCheckResponse>('check_setup')
+        // First check if setup is needed
+        const setupResponse = await fetch('/auth/check-setup', {
+          credentials: 'include',
+        })
+        const setupData = await setupResponse.json()
         if (setupData.needs_setup) {
           navigate('/setup', { replace: true })
           return
         }
 
-        // Check if already logged in via Tauri command
-        const isLoggedIn = await invoke<boolean>('check_session')
-        if (isLoggedIn) {
-          // Get user info to see if broker is connected
-          const userInfo = await invoke<{ user_id: number; username: string } | null>(
-            'get_current_user'
-          )
-          if (userInfo) {
-            // Check broker status
-            const brokerStatus = await invoke<{ connected: boolean; broker_id: string | null }>(
-              'get_broker_status'
-            )
-            if (brokerStatus.connected && brokerStatus.broker_id) {
-              // Fully logged in with broker, go to dashboard
-              navigate('/dashboard', { replace: true })
-              return
-            } else {
-              // Logged in but no broker, go to broker selection
-              navigate('/broker', { replace: true })
-              return
-            }
+        // Check if already logged in
+        const sessionResponse = await fetch('/auth/session-status', {
+          credentials: 'include',
+        })
+
+        // Only process if response is successful (not 401 etc.)
+        if (sessionResponse.ok) {
+          const sessionData = await sessionResponse.json()
+
+          if (sessionData.status === 'success' && sessionData.logged_in && sessionData.broker) {
+            // Already fully logged in with broker, go to dashboard
+            navigate('/dashboard', { replace: true })
+            return
+          } else if (
+            sessionData.status === 'success' &&
+            sessionData.authenticated &&
+            !sessionData.logged_in
+          ) {
+            // Logged in but no broker, go to broker selection
+            navigate('/broker', { replace: true })
+            return
           }
         }
-        // Not logged in, stay on login page
-      } catch (err) {
-        console.error('Failed to check setup status:', err)
+        // If session check fails (401, etc.), just stay on login page
+      } catch (_err) {
       } finally {
         setIsCheckingSetup(false)
       }
@@ -103,54 +83,126 @@ export default function Login() {
     setError(null)
 
     try {
-      // Use Tauri command for login
-      const response = await invoke<LoginResponse>('login', {
-        request: {
-          username,
-          password,
-        },
+      // First, fetch CSRF token
+      const csrfResponse = await fetch('/auth/csrf-token', {
+        credentials: 'include',
       })
 
-      if (response.success) {
-        // Set login state (broker will be set after broker selection)
-        setLogin(response.username, '')
-        toast.success('Login successful')
-        // Go to broker selection
-        navigate('/broker')
-      } else {
-        setError('Login failed. Please try again.')
+      if (!csrfResponse.ok) {
+        setError('Failed to initialize login. Please refresh the page.')
+        setIsLoading(false)
+        return
       }
-    } catch (err: unknown) {
-      console.error('Login error:', err)
-      // Handle Tauri error format
-      const errorMessage =
-        err && typeof err === 'object' && 'message' in err
-          ? (err as { message: string }).message
-          : 'Invalid username or password'
-      setError(errorMessage)
-      setLoginFailCount((prev) => prev + 1)
+
+      const csrfData = await csrfResponse.json()
+
+      // Create form data with CSRF token (matches original Flask template approach)
+      const formData = new FormData()
+      formData.append('username', username)
+      formData.append('password', password)
+      formData.append('csrf_token', csrfData.csrf_token)
+
+      // Use native fetch like the original template
+      const response = await fetch('/auth/login', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      })
+
+      // Check content type before parsing
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        // If redirected to setup page, inform user
+        if (response.url.includes('/setup')) {
+          setError('Please complete initial setup first.')
+          navigate('/setup')
+        } else {
+          setError('Login failed. Please try again.')
+        }
+        setIsLoading(false)
+        return
+      }
+
+      const data = await response.json()
+
+      if (!response.ok || data.status === 'error') {
+        setError(data.message || 'Login failed. Please try again.')
+        if (data.redirect) {
+          navigate(data.redirect)
+        }
+      } else if (data.status === 'totp_required') {
+        // Server has accepted the password but won't issue a session
+        // until TOTP verifies. Switch to the second-factor step.
+        setStep('totp')
+        setError(null)
+      } else {
+        // Set login state (broker from response if session was resumed, empty otherwise)
+        setLogin(username, data.broker || '')
+        showToast.success('Login successful', 'system')
+        // Use redirect from response if provided, otherwise go to broker
+        navigate(data.redirect || '/broker')
+      }
+    } catch (_err) {
+      setError('Login failed. Please try again.')
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleResetAccount = async () => {
-    setIsResetting(true)
+  const handleTotpSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setError(null)
+
     try {
-      await invoke('reset_user_data')
-      toast.success('Account reset. Please set up a new account.')
-      setShowResetDialog(false)
-      navigate('/setup', { replace: true })
-    } catch (err) {
-      console.error('Reset error:', err)
-      const errorMessage =
-        err && typeof err === 'object' && 'message' in err
-          ? (err as { message: string }).message
-          : 'Failed to reset account'
-      toast.error(errorMessage)
+      const csrfResponse = await fetch('/auth/csrf-token', { credentials: 'include' })
+      if (!csrfResponse.ok) {
+        setError('Failed to verify TOTP. Please refresh the page.')
+        setIsLoading(false)
+        return
+      }
+      const { csrf_token } = await csrfResponse.json()
+
+      const response = await fetch('/auth/login/totp', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrf_token,
+        },
+        body: JSON.stringify({ totp_code: totpCode }),
+      })
+
+      const data = await response.json()
+
+      if (response.status === 401 && data.message?.toLowerCase().includes('expired')) {
+        // Pending login window timed out — bounce back to password step.
+        setError(data.message)
+        setStep('password')
+        setTotpCode('')
+        return
+      }
+
+      if (!response.ok || data.status === 'error') {
+        setError(data.message || 'Invalid TOTP code.')
+        setTotpCode('')
+        return
+      }
+
+      setLogin(username, data.broker || '')
+      showToast.success('Login successful', 'system')
+      navigate(data.redirect || '/broker')
+    } catch (_err) {
+      setError('Failed to verify TOTP. Please try again.')
     } finally {
-      setIsResetting(false)
+      setIsLoading(false)
     }
+  }
+
+  const handleBackToPassword = () => {
+    setStep('password')
+    setTotpCode('')
+    setError(null)
   }
 
   // Show loading while checking setup
@@ -176,109 +228,142 @@ export default function Login() {
               <CardDescription>Sign in to your OpenAlgo account</CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {isAutoLogout && (
-                  <Alert>
-                    <Clock className="h-4 w-4" />
-                    <AlertTitle>Session Expired</AlertTitle>
-                    <AlertDescription>
-                      You were logged out at 3:00 AM IST as part of daily broker compliance. Please
-                      sign in again to continue trading.
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                <div className="space-y-2">
-                  <Label htmlFor="username">Username</Label>
-                  <Input
-                    id="username"
-                    type="text"
-                    placeholder="Enter your username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    required
-                    disabled={isLoading}
-                    autoComplete="username"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <div className="relative">
+              {step === 'password' ? (
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="username">Username</Label>
                     <Input
-                      id="password"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="Enter your password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
+                      id="username"
+                      type="text"
+                      placeholder="Enter your username"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
                       required
                       disabled={isLoading}
-                      autoComplete="current-password"
-                      className="pr-10"
+                      autoComplete="username"
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="Enter your password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        disabled={isLoading}
+                        autoComplete="current-password"
+                        className="pr-10"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                        onClick={() => setShowPassword(!showPassword)}
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <Eye className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </Button>
+                    </div>
+                    <div className="text-right">
+                      <Link
+                        to="/reset-password"
+                        className="text-sm text-muted-foreground hover:text-primary"
+                      >
+                        Forgot password?
+                      </Link>
+                    </div>
+                  </div>
+
+                  {error && (
+                    <Alert variant="destructive">
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Signing in...
+                      </>
+                    ) : (
+                      <>
+                        <LogIn className="mr-2 h-4 w-4" />
+                        Sign in
+                      </>
+                    )}
+                  </Button>
+                </form>
+              ) : (
+                <form onSubmit={handleTotpSubmit} className="space-y-4">
+                  <Alert>
+                    <ShieldCheck className="h-4 w-4" />
+                    <AlertTitle>Two-factor authentication</AlertTitle>
+                    <AlertDescription>
+                      Enter the 6-digit code from your authenticator app to complete sign-in.
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="totp_code">Authentication code</Label>
+                    <Input
+                      id="totp_code"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      pattern="[0-9]{6}"
+                      maxLength={6}
+                      placeholder="123456"
+                      value={totpCode}
+                      onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      disabled={isLoading}
+                      autoFocus
+                      required
+                      className="font-mono text-center text-lg tracking-widest"
+                    />
+                  </div>
+
+                  {error && (
+                    <Alert variant="destructive">
+                      <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  <div className="flex gap-2">
                     <Button
                       type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                      onClick={() => setShowPassword(!showPassword)}
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      variant="outline"
+                      onClick={handleBackToPassword}
+                      disabled={isLoading}
                     >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                      <ArrowLeft className="mr-1 h-4 w-4" />
+                      Back
+                    </Button>
+                    <Button
+                      type="submit"
+                      className="flex-1"
+                      disabled={isLoading || totpCode.length !== 6}
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Verifying...
+                        </>
                       ) : (
-                        <Eye className="h-4 w-4 text-muted-foreground" />
+                        'Verify code'
                       )}
                     </Button>
                   </div>
-                  <div className="text-right">
-                    <Link
-                      to="/reset-password"
-                      className="text-sm text-muted-foreground hover:text-primary"
-                    >
-                      Forgot password?
-                    </Link>
-                  </div>
-                </div>
-
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-
-                {loginFailCount >= 2 && (
-                  <Alert>
-                    <RefreshCcw className="h-4 w-4" />
-                    <AlertTitle>Can't sign in?</AlertTitle>
-                    <AlertDescription className="space-y-2">
-                      <p>If you forgot your password or the app was recently reinstalled, you can reset your account.</p>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowResetDialog(true)}
-                      >
-                        Reset Account
-                      </Button>
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Signing in...
-                    </>
-                  ) : (
-                    <>
-                      <LogIn className="mr-2 h-4 w-4" />
-                      Sign in
-                    </>
-                  )}
-                </Button>
-              </form>
+                </form>
+              )}
             </CardContent>
           </Card>
 
@@ -327,36 +412,6 @@ export default function Login() {
           </div>
         </div>
       </div>
-
-      {/* Reset Account Confirmation Dialog */}
-      <AlertDialog open={showResetDialog} onOpenChange={setShowResetDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Reset Account?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will delete your account and all stored credentials. You will need to set up a new account.
-              This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isResetting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleResetAccount}
-              disabled={isResetting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {isResetting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Resetting...
-                </>
-              ) : (
-                'Reset Account'
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }

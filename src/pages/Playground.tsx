@@ -1,4 +1,3 @@
-import { invoke } from '@tauri-apps/api/core'
 import {
   BarChart3,
   BookOpen,
@@ -9,6 +8,7 @@ import {
   Download,
   Eye,
   EyeOff,
+  Globe,
   Home,
   Key,
   LogOut,
@@ -24,9 +24,10 @@ import {
   Zap,
 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { toast } from 'sonner'
+import { Link, useNavigate } from 'react-router'
 import { authApi } from '@/api/auth'
+import { LogoutConfirmDialog } from '@/components/auth/LogoutConfirmDialog'
+import { WebSocketTesterPanel } from '@/components/playground/WebSocketTesterPanel'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -40,15 +41,24 @@ import { Input } from '@/components/ui/input'
 import { JsonEditor } from '@/components/ui/json-editor'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { profileMenuItems } from '@/config/navigation'
-import type { PlaygroundEndpoint, PlaygroundEndpointsByCategory } from '@/config/playgroundEndpoints'
-import { playgroundEndpoints } from '@/config/playgroundEndpoints'
+import { useProfileMenuItems } from '@/hooks/useProfileMenuItems'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { useThemeStore } from '@/stores/themeStore'
+import { showToast } from '@/utils/toast'
 
-type Endpoint = PlaygroundEndpoint
-type EndpointsByCategory = PlaygroundEndpointsByCategory
+interface Endpoint {
+  name: string
+  path: string
+  method: 'GET' | 'POST' | 'WS'
+  body?: Record<string, unknown>
+  params?: Record<string, unknown>
+  description?: string
+}
+
+interface EndpointsByCategory {
+  [category: string]: Endpoint[]
+}
 
 interface OpenTab {
   id: string
@@ -57,10 +67,12 @@ interface OpenTab {
   modified: boolean
 }
 
-interface GetApiKeyResponse {
-  status: string
-  has_api_key: boolean
-  api_key: string | null
+async function fetchCSRFToken(): Promise<string> {
+  const response = await fetch('/auth/csrf-token', {
+    credentials: 'include',
+  })
+  const data = await response.json()
+  return data.csrf_token
 }
 
 interface SyntaxToken {
@@ -127,7 +139,12 @@ function getTokenClassName(type: SyntaxToken['type']): string {
   }
 }
 
-function isValidApiUrl(url: string): { valid: boolean; error?: string } {
+function isValidApiUrl(url: string, method?: string): { valid: boolean; error?: string } {
+  // Allow WebSocket URLs for WS method
+  if (method === 'WS' && (url.startsWith('ws://') || url.startsWith('wss://'))) {
+    return { valid: true }
+  }
+
   if (url.startsWith('/api/') || url.startsWith('/playground/')) {
     return { valid: true }
   }
@@ -140,7 +157,10 @@ function isValidApiUrl(url: string): { valid: boolean; error?: string } {
     }
 
     if (!parsed.pathname.startsWith('/api/') && !parsed.pathname.startsWith('/playground/')) {
-      return { valid: false, error: 'Only /api/ and /playground/ endpoints are allowed' }
+      return {
+        valid: false,
+        error: 'Only /api/ and /playground/ endpoints are allowed',
+      }
     }
 
     return { valid: true }
@@ -154,13 +174,15 @@ export default function Playground() {
   // Theme store
   const { mode, appMode, toggleMode, toggleAppMode, isTogglingMode } = useThemeStore()
   const { user, logout } = useAuthStore()
+  // Filtered by broker capabilities (hides crypto-only Leverage on Indian brokers, issue #1480)
+  const profileMenuItems = useProfileMenuItems()
 
   const handleLogout = async () => {
     try {
       await authApi.logout()
       logout()
       navigate('/login')
-      toast.success('Logged out successfully')
+      showToast.success('Logged out successfully', 'analyzer')
     } catch {
       logout()
       navigate('/login')
@@ -169,8 +191,11 @@ export default function Playground() {
 
   const [apiKey, setApiKey] = useState('')
   const [showApiKey, setShowApiKey] = useState(false)
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false)
   const [endpoints, setEndpoints] = useState<EndpointsByCategory>({})
-  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set())
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(
+    new Set(['data', 'utilities', 'websocket'])
+  )
   const [searchQuery, setSearchQuery] = useState('')
 
   // Tabs state
@@ -178,7 +203,7 @@ export default function Playground() {
   const [activeTabId, setActiveTabId] = useState<string | null>(null)
 
   // Request state
-  const [method, setMethod] = useState<'GET' | 'POST'>('POST')
+  const [method, setMethod] = useState<'GET' | 'POST' | 'WS'>('POST')
   const [url, setUrl] = useState('')
   const [requestBody, setRequestBody] = useState('')
 
@@ -193,21 +218,59 @@ export default function Playground() {
   // Mobile sidebar
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
 
+  // Host server URL for display
+  const [hostServer, setHostServer] = useState(window.location.origin)
+
+  // Playground mode - REST API or WebSocket
+  const [playgroundMode, setPlaygroundMode] = useState<'rest' | 'websocket'>('rest')
+  const [wsInitialMessage, setWsInitialMessage] = useState<string>('')
+
+  useEffect(() => {
+    // Fetch host server config
+    fetch('/api/config/host', { credentials: 'include' })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.host_server) {
+          setHostServer(data.host_server)
+        }
+      })
+      .catch(() => {
+        // Fallback to window.location.origin (already set as default)
+      })
+  }, [])
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: one-time load on mount; loadApiKey/loadEndpoints are stable per-render fetchers and must not refire when their closures are recreated.
   useEffect(() => {
     loadApiKey()
-    // Load endpoints from static config
-    setEndpoints(playgroundEndpoints)
+    loadEndpoints()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const loadApiKey = async () => {
     try {
-      const response = await invoke<GetApiKeyResponse>('get_user_api_key')
-      if (response.api_key) {
-        setApiKey(response.api_key)
+      const response = await fetch('/playground/api-key', {
+        credentials: 'include',
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setApiKey(data.api_key || '')
       }
     } catch {
       // Silently fail - API key may not exist yet
+    }
+  }
+
+  const loadEndpoints = async () => {
+    try {
+      const response = await fetch('/playground/endpoints', {
+        credentials: 'include',
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setEndpoints(data)
+      }
+    } catch {
+      showToast.error('Failed to load endpoints', 'analyzer')
     }
   }
 
@@ -230,6 +293,16 @@ export default function Playground() {
   )
 
   const selectEndpoint = (endpoint: Endpoint) => {
+    // Handle WebSocket endpoints - switch to WebSocket mode
+    if (endpoint.method === 'WS') {
+      const body = endpoint.body ? JSON.stringify(endpoint.body, null, 2) : ''
+      // Replace apikey placeholder with actual API key
+      const bodyWithApiKey = apiKey ? body.replace(/"apikey":\s*""/, `"apikey": "${apiKey}"`) : body
+      setWsInitialMessage(bodyWithApiKey)
+      setPlaygroundMode('websocket')
+      return
+    }
+
     // Check if tab already exists (match by both path AND name for endpoints sharing same path)
     const existingTab = openTabs.find(
       (t) => t.endpoint.path === endpoint.path && t.endpoint.name === endpoint.name
@@ -302,7 +375,11 @@ export default function Playground() {
       setOpenTabs((prev) =>
         prev.map((t) =>
           t.id === activeTabId
-            ? { ...t, requestBody: newBody, modified: newBody !== getDefaultBody(t.endpoint) }
+            ? {
+                ...t,
+                requestBody: newBody,
+                modified: newBody !== getDefaultBody(t.endpoint),
+              }
             : t
         )
       )
@@ -326,21 +403,21 @@ export default function Playground() {
       const parsed = JSON.parse(requestBody)
       const prettified = JSON.stringify(parsed, null, 2)
       updateCurrentTabBody(prettified)
-      toast.success('JSON prettified')
+      showToast.success('JSON prettified', 'analyzer')
     } catch {
-      toast.error('Invalid JSON - cannot prettify')
+      showToast.error('Invalid JSON - cannot prettify', 'analyzer')
     }
   }
 
   const sendRequest = async () => {
     if (!url) {
-      toast.warning('Please select an endpoint')
+      showToast.warning('Please select an endpoint', 'analyzer')
       return
     }
 
-    const validation = isValidApiUrl(url)
+    const validation = isValidApiUrl(url, method)
     if (!validation.valid) {
-      toast.error(validation.error)
+      showToast.error(validation.error || 'Validation error', 'analyzer')
       return
     }
 
@@ -351,25 +428,24 @@ export default function Playground() {
     setResponseSize(null)
     setResponseHeaders({})
 
-    const startTime = Date.now()
+    let startTime = Date.now()
 
     try {
       const options: RequestInit = {
         method,
+        credentials: 'include',
         headers: {
           Accept: 'application/json',
         },
       }
 
-      // Use the webhook server base URL (default port 5000)
-      const baseUrl = 'http://127.0.0.1:5000'
-      let fetchUrl = `${baseUrl}${url}`
+      let fetchUrl = url
 
       if (method === 'GET') {
         if (requestBody.trim()) {
           try {
             const params = JSON.parse(requestBody)
-            const urlObj = new URL(fetchUrl)
+            const urlObj = new URL(url, window.location.origin)
             Object.entries(params).forEach(([key, value]) => {
               if (value !== null && value !== undefined && value !== '') {
                 urlObj.searchParams.append(key, String(value))
@@ -377,18 +453,23 @@ export default function Playground() {
             })
             fetchUrl = urlObj.toString()
           } catch {
-            toast.error('Invalid JSON for query parameters')
+            showToast.error('Invalid JSON for query parameters', 'analyzer')
             setIsLoading(false)
             return
           }
         }
       } else {
+        const csrfToken = await fetchCSRFToken()
         ;(options.headers as Record<string, string>)['Content-Type'] = 'application/json'
+        ;(options.headers as Record<string, string>)['X-CSRFToken'] = csrfToken
         if (requestBody.trim()) {
           options.body = requestBody
         }
       }
 
+      // Restart the clock here so the displayed time covers only the API
+      // request itself, not the CSRF token fetch above.
+      startTime = Date.now()
       const response = await fetch(fetchUrl, options)
       const elapsed = Date.now() - startTime
 
@@ -427,14 +508,14 @@ export default function Playground() {
   const copyResponse = () => {
     if (responseData) {
       navigator.clipboard.writeText(responseData)
-      toast.success('Response copied!')
+      showToast.success('Response copied!', 'clipboard')
     }
   }
 
   const copyApiKey = () => {
     if (apiKey) {
       navigator.clipboard.writeText(apiKey)
-      toast.success('API key copied!')
+      showToast.success('API key copied!', 'clipboard')
     }
   }
 
@@ -442,30 +523,29 @@ export default function Playground() {
     const result = await toggleAppMode()
     if (result.success) {
       const newMode = useThemeStore.getState().appMode
-      toast.success(`Switched to ${newMode === 'live' ? 'Live' : 'Analyze'} mode`)
+      showToast.success(`Switched to ${newMode === 'live' ? 'Live' : 'Analyze'} mode`, 'analyzer')
 
       if (newMode === 'analyzer') {
         setTimeout(() => {
-          toast.warning('⚠️ Analyzer (Sandbox) mode is for testing purposes only', {
+          showToast.warning('Analyzer (Sandbox) mode is for testing purposes only', 'analyzer', {
             duration: 10000,
           })
         }, 2000)
       }
     } else {
-      toast.error(result.message || 'Failed to toggle mode')
+      showToast.error(result.message || 'Failed to toggle mode', 'analyzer')
     }
   }
 
   const copyCurl = () => {
     if (!url) return
 
-    const baseUrl = 'http://127.0.0.1:5000'
-    let curlUrl = `${baseUrl}${url}`
+    let curlUrl = url
 
     if (method === 'GET' && requestBody.trim()) {
       try {
         const params = JSON.parse(requestBody)
-        const urlObj = new URL(curlUrl)
+        const urlObj = new URL(url, window.location.origin)
         Object.entries(params).forEach(([key, value]) => {
           if (value !== null && value !== undefined && value !== '') {
             urlObj.searchParams.append(key, String(value))
@@ -473,12 +553,13 @@ export default function Playground() {
         })
         curlUrl = urlObj.toString()
       } catch {
-        toast.error('Invalid JSON for query parameters')
+        showToast.error('Invalid JSON for query parameters', 'analyzer')
         return
       }
     }
 
-    let curl = `curl -X ${method} "${curlUrl}"`
+    const absoluteUrl = new URL(curlUrl, window.location.origin).href
+    let curl = `curl -X ${method} "${absoluteUrl}"`
     curl += ' \\\n  -H "Accept: application/json"'
 
     if (method !== 'GET' && requestBody.trim()) {
@@ -487,7 +568,7 @@ export default function Playground() {
     }
 
     navigator.clipboard.writeText(curl)
-    toast.success('Copied as cURL')
+    showToast.success('Copied as cURL', 'clipboard')
   }
 
   // Filter endpoints by search
@@ -537,6 +618,7 @@ export default function Playground() {
             size="icon"
             className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-accent"
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            aria-label={isSidebarOpen ? 'Close sidebar' : 'Open sidebar'}
           >
             <Menu className="h-4 w-4" />
           </Button>
@@ -564,7 +646,9 @@ export default function Playground() {
                   'text-[9px] px-1 py-0 h-4 border-0 font-semibold',
                   tab.endpoint.method === 'GET'
                     ? 'bg-sky-500/20 text-sky-400'
-                    : 'bg-emerald-500/20 text-emerald-400'
+                    : tab.endpoint.method === 'WS'
+                      ? 'bg-purple-500/20 text-purple-400'
+                      : 'bg-emerald-500/20 text-emerald-400'
                 )}
               >
                 {tab.endpoint.method}
@@ -591,6 +675,7 @@ export default function Playground() {
                 selectEndpoint(endpoints[firstCat][0])
               }
             }}
+            aria-label="New request tab"
           >
             <Plus className="h-3.5 w-3.5" />
           </Button>
@@ -598,6 +683,27 @@ export default function Playground() {
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2 px-2">
+          {/* Playground Mode Toggle */}
+          <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-secondary/50">
+            <Button
+              variant={playgroundMode === 'rest' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-6 px-2 text-xs"
+              onClick={() => setPlaygroundMode('rest')}
+            >
+              REST API
+            </Button>
+            <Button
+              variant={playgroundMode === 'websocket' ? 'default' : 'ghost'}
+              size="sm"
+              className="h-6 px-2 text-xs"
+              onClick={() => setPlaygroundMode('websocket')}
+            >
+              <Globe className="h-3 w-3 mr-1" />
+              WebSocket
+            </Button>
+          </div>
+
           {/* Mode Badge */}
           <Badge
             variant={appMode === 'live' ? 'default' : 'secondary'}
@@ -620,6 +726,7 @@ export default function Playground() {
             onClick={handleModeToggle}
             disabled={isTogglingMode}
             title={`Switch to ${appMode === 'live' ? 'Analyze' : 'Live'} mode`}
+            aria-label={`Switch to ${appMode === 'live' ? 'Analyze' : 'Live'} mode`}
           >
             {isTogglingMode ? (
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
@@ -638,6 +745,7 @@ export default function Playground() {
             onClick={toggleMode}
             disabled={appMode !== 'live'}
             title={mode === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+            aria-label={mode === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
           >
             {mode === 'light' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
           </Button>
@@ -656,6 +764,7 @@ export default function Playground() {
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8 rounded-full bg-primary text-primary-foreground"
+                aria-label="Open profile menu"
               >
                 <span className="text-sm font-medium">
                   {user?.username?.[0]?.toUpperCase() || 'O'}
@@ -686,7 +795,7 @@ export default function Playground() {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                onClick={handleLogout}
+                onClick={() => setShowLogoutDialog(true)}
                 className="text-destructive focus:text-destructive"
               >
                 <LogOut className="h-4 w-4 mr-2" />
@@ -697,364 +806,394 @@ export default function Playground() {
         </div>
       </div>
 
+      <LogoutConfirmDialog
+        open={showLogoutDialog}
+        onOpenChange={setShowLogoutDialog}
+        onConfirm={handleLogout}
+      />
+
       {/* Main Content */}
       <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
-        <div
-          className={cn(
-            'w-56 border-r border-border bg-card/30 flex flex-col overflow-hidden',
-            'transition-all duration-200',
-            isSidebarOpen ? 'translate-x-0' : '-translate-x-full absolute h-full z-50'
-          )}
-        >
-          {/* Search */}
-          <div className="p-2 border-b border-border shrink-0">
-            <div className="relative">
-              <Search className="h-3.5 w-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="search"
-                className="h-7 pl-8 text-xs bg-secondary/50 border-border text-foreground placeholder:text-muted-foreground"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Endpoints List */}
-          <div className="flex-1 overflow-y-auto min-h-0">
-            <div className="p-2">
-              {Object.entries(filteredEndpoints).map(([category, eps]) => (
-                <div key={category} className="mb-2">
-                  <button
-                    type="button"
-                    className="flex items-center gap-1.5 w-full px-2 py-1 rounded text-[11px] font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground hover:bg-accent/50"
-                    onClick={() => toggleCategory(category)}
-                  >
-                    {collapsedCategories.has(category) ? (
-                      <ChevronRight className="h-3 w-3" />
-                    ) : (
-                      <ChevronDown className="h-3 w-3" />
-                    )}
-                    {category}
-                  </button>
-
-                  {!collapsedCategories.has(category) && (
-                    <div className="mt-0.5 space-y-0.5">
-                      {eps.map((endpoint, idx) => (
-                        <button
-                          type="button"
-                          key={idx}
-                          className={cn(
-                            'w-full flex items-center gap-2 px-2 py-1 rounded text-left text-xs hover:bg-accent/50',
-                            activeTab?.endpoint.path === endpoint.path &&
-                              'bg-accent text-foreground'
-                          )}
-                          onClick={() => selectEndpoint(endpoint)}
-                        >
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              'text-[9px] px-1 py-0 h-4 border-0 font-semibold shrink-0',
-                              endpoint.method === 'GET'
-                                ? 'bg-sky-500/20 text-sky-400'
-                                : 'bg-emerald-500/20 text-emerald-400'
-                            )}
-                          >
-                            {endpoint.method}
-                          </Badge>
-                          <span className="truncate text-foreground/80">{endpoint.name}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
+        {playgroundMode === 'websocket' ? (
+          /* WebSocket Mode */
+          <WebSocketTesterPanel apiKey={apiKey} initialMessage={wsInitialMessage} />
+        ) : (
+          <>
+            {/* Sidebar */}
+            <div
+              className={cn(
+                'w-56 border-r border-border bg-card/30 flex flex-col overflow-hidden',
+                'transition-all duration-200',
+                isSidebarOpen ? 'translate-x-0' : '-translate-x-full absolute h-full z-50'
+              )}
+            >
+              {/* Search */}
+              <div className="p-2 border-b border-border shrink-0">
+                <div className="relative">
+                  <Search className="h-3.5 w-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="search here"
+                    className="h-7 pl-8 text-xs bg-secondary/50 border-border text-foreground placeholder:text-muted-foreground"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* API Key Section */}
-          <div className="p-2 border-t border-border shrink-0">
-            <div className="flex items-center gap-2 px-2 py-1.5 rounded bg-secondary/50">
-              <Key className="h-3 w-3 text-muted-foreground" />
-              <Input
-                type={showApiKey ? 'text' : 'password'}
-                value={apiKey}
-                readOnly
-                className="flex-1 h-5 text-[10px] font-mono bg-transparent border-none p-0 text-muted-foreground"
-                placeholder="No API key"
-              />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-5 w-5 text-muted-foreground hover:text-foreground"
-                onClick={() => setShowApiKey(!showApiKey)}
-              >
-                {showApiKey ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-5 w-5 text-muted-foreground hover:text-foreground"
-                onClick={copyApiKey}
-              >
-                <Copy className="h-3 w-3" />
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Main Panels */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {activeTab ? (
-            <>
-              {/* URL Bar */}
-              <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-card/30">
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    'text-xs px-2 py-0.5 border-0 font-semibold',
-                    method === 'GET'
-                      ? 'bg-sky-500/20 text-sky-400'
-                      : 'bg-emerald-500/20 text-emerald-400'
-                  )}
-                >
-                  {method}
-                </Badge>
-                <div className="flex-1 flex items-center gap-1 px-3 py-1.5 rounded bg-secondary/50 font-mono text-sm">
-                  <span className="text-muted-foreground">http://127.0.0.1:5000</span>
-                  <span className="text-foreground">{url}</span>
-                </div>
-                <Button
-                  size="sm"
-                  className="h-8 px-4 bg-emerald-600 hover:bg-emerald-700 text-white"
-                  onClick={sendRequest}
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <>
-                      <Send className="h-3.5 w-3.5 mr-1.5" />
-                      Send
-                    </>
-                  )}
-                </Button>
               </div>
 
-              {/* Request/Response Panels */}
-              <div className="flex-1 flex overflow-hidden">
-                {/* Request Panel */}
-                <div className="flex-1 flex flex-col border-r border-border min-w-0">
-                  {/* Request Tabs */}
-                  <Tabs defaultValue="body" className="flex-1 flex flex-col min-h-0">
-                    <div className="flex items-center justify-between px-4 py-1.5 border-b border-border bg-card/30">
-                      <TabsList className="h-7 bg-transparent p-0 gap-2">
-                        <TabsTrigger
-                          value="body"
-                          className="h-6 px-2 text-xs data-[state=active]:bg-accent data-[state=active]:text-foreground text-muted-foreground"
-                        >
-                          Body
-                        </TabsTrigger>
-                        <TabsTrigger
-                          value="headers"
-                          className="h-6 px-2 text-xs data-[state=active]:bg-accent data-[state=active]:text-foreground text-muted-foreground"
-                        >
-                          Headers
-                        </TabsTrigger>
-                      </TabsList>
-                      <div className="flex items-center gap-1">
-                        <span className="text-[10px] text-muted-foreground mr-2">JSON</span>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 text-[10px] text-muted-foreground hover:text-foreground hover:bg-accent"
-                          onClick={prettifyBody}
-                        >
-                          Prettify
-                        </Button>
-                      </div>
+              {/* Endpoints List */}
+              <div className="flex-1 overflow-y-auto min-h-0">
+                <div className="p-2">
+                  {Object.entries(filteredEndpoints).map(([category, eps]) => (
+                    <div key={category} className="mb-2">
+                      <button
+                        type="button"
+                        className="flex items-center gap-1.5 w-full px-2 py-1 rounded text-[11px] font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                        onClick={() => toggleCategory(category)}
+                      >
+                        {collapsedCategories.has(category) ? (
+                          <ChevronRight className="h-3 w-3" />
+                        ) : (
+                          <ChevronDown className="h-3 w-3" />
+                        )}
+                        {category}
+                      </button>
+
+                      {!collapsedCategories.has(category) && (
+                        <div className="mt-0.5 space-y-0.5">
+                          {eps.map((endpoint, idx) => (
+                            <button
+                              type="button"
+                              key={idx}
+                              className={cn(
+                                'w-full flex items-center gap-2 px-2 py-1 rounded text-left text-xs hover:bg-accent/50',
+                                activeTab?.endpoint.path === endpoint.path &&
+                                  'bg-accent text-foreground'
+                              )}
+                              onClick={() => selectEndpoint(endpoint)}
+                            >
+                              <Badge
+                                variant="outline"
+                                className={cn(
+                                  'text-[9px] px-1 py-0 h-4 border-0 font-semibold shrink-0',
+                                  endpoint.method === 'GET'
+                                    ? 'bg-sky-500/20 text-sky-400'
+                                    : endpoint.method === 'WS'
+                                      ? 'bg-purple-500/20 text-purple-400'
+                                      : 'bg-emerald-500/20 text-emerald-400'
+                                )}
+                              >
+                                {endpoint.method}
+                              </Badge>
+                              <span className="truncate text-foreground/80">{endpoint.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
-
-                    <TabsContent value="body" className="flex-1 m-0 overflow-hidden">
-                      <div className="h-full flex bg-background">
-                        <JsonEditor
-                          value={requestBody}
-                          onChange={updateCurrentTabBody}
-                          placeholder='{"apikey": ""}'
-                          className="flex-1 min-h-0"
-                        />
-                      </div>
-                    </TabsContent>
-
-                    <TabsContent
-                      value="headers"
-                      className="flex-1 m-0 p-4 overflow-auto bg-background"
-                    >
-                      <div className="text-xs font-mono space-y-2">
-                        <div className="flex gap-2">
-                          <span className="text-muted-foreground">Content-Type:</span>
-                          <span className="text-foreground/80">application/json</span>
-                        </div>
-                        <div className="flex gap-2">
-                          <span className="text-muted-foreground">Accept:</span>
-                          <span className="text-foreground/80">application/json</span>
-                        </div>
-                      </div>
-                    </TabsContent>
-                  </Tabs>
+                  ))}
                 </div>
+              </div>
 
-                {/* Response Panel */}
-                <div className="flex-1 flex flex-col min-w-0">
-                  {/* Response Header */}
-                  <Tabs defaultValue="response" className="flex-1 flex flex-col min-h-0">
-                    <div className="flex items-center justify-between px-4 py-1.5 border-b border-border bg-card/30">
-                      <TabsList className="h-7 bg-transparent p-0 gap-2">
-                        <TabsTrigger
-                          value="response"
-                          className="h-6 px-2 text-xs data-[state=active]:bg-accent data-[state=active]:text-foreground text-muted-foreground"
-                        >
-                          Response
-                        </TabsTrigger>
-                        <TabsTrigger
+              {/* API Key Section */}
+              <div className="p-2 border-t border-border shrink-0">
+                <div className="flex items-center gap-2 px-2 py-1.5 rounded bg-secondary/50">
+                  <Key className="h-3 w-3 text-muted-foreground" />
+                  <Input
+                    type={showApiKey ? 'text' : 'password'}
+                    value={apiKey}
+                    readOnly
+                    className="flex-1 h-5 text-[10px] font-mono bg-transparent border-none p-0 text-muted-foreground"
+                    placeholder="No API key"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                    onClick={() => setShowApiKey(!showApiKey)}
+                    aria-label={showApiKey ? 'Hide API key' : 'Show API key'}
+                  >
+                    {showApiKey ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5 text-muted-foreground hover:text-foreground"
+                    onClick={copyApiKey}
+                    aria-label="Copy API key"
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* Main Panels */}
+            <div className="flex-1 flex flex-col overflow-hidden">
+              {activeTab ? (
+                <>
+                  {/* URL Bar */}
+                  <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-card/30">
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        'text-xs px-2 py-0.5 border-0 font-semibold',
+                        method === 'GET'
+                          ? 'bg-sky-500/20 text-sky-400'
+                          : method === 'WS'
+                            ? 'bg-purple-500/20 text-purple-400'
+                            : 'bg-emerald-500/20 text-emerald-400'
+                      )}
+                    >
+                      {method}
+                    </Badge>
+                    <div className="flex-1 flex items-center gap-1 px-3 py-1.5 rounded bg-secondary/50 font-mono text-sm">
+                      {method === 'WS' ? (
+                        <span className="text-foreground">{url}</span>
+                      ) : (
+                        <>
+                          <span className="text-muted-foreground">{hostServer}</span>
+                          <span className="text-foreground">{url}</span>
+                        </>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      className="h-8 px-4 bg-emerald-600 hover:bg-emerald-700 text-white"
+                      onClick={sendRequest}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Send className="h-3.5 w-3.5 mr-1.5" />
+                          Send
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  {/* Request/Response Panels */}
+                  <div className="flex-1 flex overflow-hidden">
+                    {/* Request Panel */}
+                    <div className="flex-1 flex flex-col border-r border-border min-w-0">
+                      {/* Request Tabs */}
+                      <Tabs defaultValue="body" className="flex-1 flex flex-col min-h-0">
+                        <div className="flex items-center justify-between px-4 py-1.5 border-b border-border bg-card/30">
+                          <TabsList className="h-7 bg-transparent p-0 gap-2">
+                            <TabsTrigger
+                              value="body"
+                              className="h-6 px-2 text-xs data-[state=active]:bg-accent data-[state=active]:text-foreground text-muted-foreground"
+                            >
+                              Body
+                            </TabsTrigger>
+                            <TabsTrigger
+                              value="headers"
+                              className="h-6 px-2 text-xs data-[state=active]:bg-accent data-[state=active]:text-foreground text-muted-foreground"
+                            >
+                              Headers
+                            </TabsTrigger>
+                          </TabsList>
+                          <div className="flex items-center gap-1">
+                            <span className="text-[10px] text-muted-foreground mr-2">JSON</span>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 text-[10px] text-muted-foreground hover:text-foreground hover:bg-accent"
+                              onClick={prettifyBody}
+                            >
+                              Prettify
+                            </Button>
+                          </div>
+                        </div>
+
+                        <TabsContent value="body" className="flex-1 m-0 overflow-hidden">
+                          <div className="h-full flex bg-background">
+                            <JsonEditor
+                              value={requestBody}
+                              onChange={updateCurrentTabBody}
+                              placeholder='{"apikey": ""}'
+                              className="flex-1 min-h-0"
+                            />
+                          </div>
+                        </TabsContent>
+
+                        <TabsContent
                           value="headers"
-                          className="h-6 px-2 text-xs data-[state=active]:bg-accent data-[state=active]:text-foreground text-muted-foreground"
+                          className="flex-1 m-0 p-4 overflow-auto bg-background"
                         >
-                          Headers
-                        </TabsTrigger>
-                      </TabsList>
-                      <div className="flex items-center gap-3 text-xs font-mono">
-                        {responseStatus !== null && (
-                          <span
-                            className={cn(
-                              'px-2 py-0.5 rounded',
-                              getStatusBg(responseStatus),
-                              getStatusColor(responseStatus)
-                            )}
-                          >
-                            {responseStatus}{' '}
-                            {responseStatus >= 200 && responseStatus < 300 ? 'OK' : 'Error'}
-                          </span>
-                        )}
-                        {responseTime !== null && (
-                          <span className="text-muted-foreground flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {responseTime}ms
-                          </span>
-                        )}
-                        {responseSize !== null && (
-                          <span className="text-muted-foreground flex items-center gap-1">
-                            <Download className="h-3 w-3" />
-                            {formatSize(responseSize)}
-                          </span>
-                        )}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 text-[10px] text-muted-foreground hover:text-foreground hover:bg-accent"
-                          onClick={copyCurl}
-                        >
-                          <Terminal className="h-3 w-3 mr-1" />
-                          cURL
-                        </Button>
-                        {responseData && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 text-muted-foreground hover:text-foreground"
-                            onClick={copyResponse}
-                          >
-                            <Copy className="h-3 w-3" />
-                          </Button>
-                        )}
-                      </div>
+                          <div className="text-xs font-mono space-y-2">
+                            <div className="flex gap-2">
+                              <span className="text-muted-foreground">Content-Type:</span>
+                              <span className="text-foreground/80">application/json</span>
+                            </div>
+                            <div className="flex gap-2">
+                              <span className="text-muted-foreground">Accept:</span>
+                              <span className="text-foreground/80">application/json</span>
+                            </div>
+                          </div>
+                        </TabsContent>
+                      </Tabs>
                     </div>
 
-                    <TabsContent value="response" className="flex-1 m-0 overflow-hidden">
-                      <div className="h-full flex bg-background">
-                        {responseData ? (
-                          <>
-                            {/* Line Numbers */}
-                            <div className="w-10 bg-card/50 text-muted-foreground/50 text-xs font-mono py-3 px-2 text-right select-none overflow-hidden border-r border-border">
-                              {responseData.split('\n').map((_, i) => (
-                                <div key={i} className="leading-5">
-                                  {i + 1}
+                    {/* Response Panel */}
+                    <div className="flex-1 flex flex-col min-w-0">
+                      {/* Response Header */}
+                      <Tabs defaultValue="response" className="flex-1 flex flex-col min-h-0">
+                        <div className="flex items-center justify-between px-4 py-1.5 border-b border-border bg-card/30">
+                          <TabsList className="h-7 bg-transparent p-0 gap-2">
+                            <TabsTrigger
+                              value="response"
+                              className="h-6 px-2 text-xs data-[state=active]:bg-accent data-[state=active]:text-foreground text-muted-foreground"
+                            >
+                              Response
+                            </TabsTrigger>
+                            <TabsTrigger
+                              value="headers"
+                              className="h-6 px-2 text-xs data-[state=active]:bg-accent data-[state=active]:text-foreground text-muted-foreground"
+                            >
+                              Headers
+                            </TabsTrigger>
+                          </TabsList>
+                          <div className="flex items-center gap-3 text-xs font-mono">
+                            {responseStatus !== null && (
+                              <span
+                                className={cn(
+                                  'px-2 py-0.5 rounded',
+                                  getStatusBg(responseStatus),
+                                  getStatusColor(responseStatus)
+                                )}
+                              >
+                                {responseStatus}{' '}
+                                {responseStatus >= 200 && responseStatus < 300 ? 'OK' : 'Error'}
+                              </span>
+                            )}
+                            {responseTime !== null && (
+                              <span className="text-muted-foreground flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {responseTime}ms
+                              </span>
+                            )}
+                            {responseSize !== null && (
+                              <span className="text-muted-foreground flex items-center gap-1">
+                                <Download className="h-3 w-3" />
+                                {formatSize(responseSize)}
+                              </span>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 text-[10px] text-muted-foreground hover:text-foreground hover:bg-accent"
+                              onClick={copyCurl}
+                            >
+                              <Terminal className="h-3 w-3 mr-1" />
+                              cURL
+                            </Button>
+                            {responseData && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                                onClick={copyResponse}
+                                aria-label="Copy response"
+                              >
+                                <Copy className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+
+                        <TabsContent value="response" className="flex-1 m-0 overflow-hidden">
+                          <div className="h-full flex bg-background">
+                            {responseData ? (
+                              <>
+                                {/* Line Numbers */}
+                                <div className="w-10 bg-card/50 text-muted-foreground/50 text-xs font-mono py-3 px-2 text-right select-none overflow-hidden border-r border-border">
+                                  {responseData.split('\n').map((_, i) => (
+                                    <div key={i} className="leading-5">
+                                      {i + 1}
+                                    </div>
+                                  ))}
+                                </div>
+                                {/* Response Content */}
+                                <ScrollArea className="flex-1 p-3">
+                                  <pre className="text-xs font-mono whitespace-pre-wrap break-words leading-5">
+                                    {tokenizeJson(responseData).map((token, i) => (
+                                      <span key={i} className={getTokenClassName(token.type)}>
+                                        {token.text}
+                                      </span>
+                                    ))}
+                                  </pre>
+                                </ScrollArea>
+                              </>
+                            ) : (
+                              <div className="flex-1 flex flex-col items-center justify-center text-center">
+                                {isLoading ? (
+                                  <RefreshCw className="h-8 w-8 text-muted-foreground/50 animate-spin" />
+                                ) : (
+                                  <>
+                                    <Send className="h-10 w-10 text-muted-foreground/30 mb-3" />
+                                    <p className="text-muted-foreground text-sm">No response yet</p>
+                                    <p className="text-muted-foreground/70 text-xs mt-1">
+                                      Click Send to make a request
+                                    </p>
+                                  </>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </TabsContent>
+
+                        <TabsContent
+                          value="headers"
+                          className="flex-1 m-0 p-4 overflow-auto bg-background"
+                        >
+                          {Object.keys(responseHeaders).length > 0 ? (
+                            <div className="text-xs font-mono space-y-2">
+                              {Object.entries(responseHeaders).map(([key, value]) => (
+                                <div key={key} className="flex gap-2">
+                                  <span className="text-muted-foreground">{key}:</span>
+                                  <span className="text-foreground/80 break-all">{value}</span>
                                 </div>
                               ))}
                             </div>
-                            {/* Response Content */}
-                            <ScrollArea className="flex-1 p-3">
-                              <pre className="text-xs font-mono whitespace-pre-wrap break-words leading-5">
-                                {tokenizeJson(responseData).map((token, i) => (
-                                  <span key={i} className={getTokenClassName(token.type)}>
-                                    {token.text}
-                                  </span>
-                                ))}
-                              </pre>
-                            </ScrollArea>
-                          </>
-                        ) : (
-                          <div className="flex-1 flex flex-col items-center justify-center text-center">
-                            {isLoading ? (
-                              <RefreshCw className="h-8 w-8 text-muted-foreground/50 animate-spin" />
-                            ) : (
-                              <>
-                                <Send className="h-10 w-10 text-muted-foreground/30 mb-3" />
-                                <p className="text-muted-foreground text-sm">No response yet</p>
-                                <p className="text-muted-foreground/70 text-xs mt-1">
-                                  Click Send to make a request
-                                </p>
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </TabsContent>
-
-                    <TabsContent
-                      value="headers"
-                      className="flex-1 m-0 p-4 overflow-auto bg-background"
-                    >
-                      {Object.keys(responseHeaders).length > 0 ? (
-                        <div className="text-xs font-mono space-y-2">
-                          {Object.entries(responseHeaders).map(([key, value]) => (
-                            <div key={key} className="flex gap-2">
-                              <span className="text-muted-foreground">{key}:</span>
-                              <span className="text-foreground/80 break-all">{value}</span>
+                          ) : (
+                            <div className="text-xs text-muted-foreground">
+                              No headers to display
                             </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-xs text-muted-foreground">No headers to display</div>
-                      )}
-                    </TabsContent>
-                  </Tabs>
+                          )}
+                        </TabsContent>
+                      </Tabs>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                /* Empty State */
+                <div className="flex-1 flex flex-col items-center justify-center text-center bg-background">
+                  <img
+                    src="/images/android-chrome-192x192.png"
+                    alt="OpenAlgo"
+                    className="w-16 h-16 mb-4"
+                  />
+                  <h2 className="text-lg font-semibold text-foreground/80 mb-2">
+                    API Playground [WS-TEST]
+                  </h2>
+                  <p className="text-muted-foreground text-sm mb-4">
+                    Select an endpoint from the sidebar to get started
+                  </p>
+                  {!apiKey && (
+                    <Button variant="outline" size="sm" asChild>
+                      <Link to="/apikey">
+                        <Key className="h-4 w-4 mr-2" />
+                        Generate API Key
+                      </Link>
+                    </Button>
+                  )}
                 </div>
-              </div>
-            </>
-          ) : (
-            /* Empty State */
-            <div className="flex-1 flex flex-col items-center justify-center text-center bg-background">
-              <img
-                src="/images/android-chrome-192x192.png"
-                alt="OpenAlgo"
-                className="w-16 h-16 mb-4"
-              />
-              <h2 className="text-lg font-semibold text-foreground/80 mb-2">API Playground</h2>
-              <p className="text-muted-foreground text-sm mb-4">
-                Select an endpoint from the sidebar to get started
-              </p>
-              {!apiKey && (
-                <Button variant="outline" size="sm" asChild>
-                  <Link to="/apikey">
-                    <Key className="h-4 w-4 mr-2" />
-                    Generate API Key
-                  </Link>
-                </Button>
               )}
             </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
     </div>
   )

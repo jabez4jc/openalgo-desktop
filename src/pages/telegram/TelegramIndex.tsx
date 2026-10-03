@@ -12,8 +12,7 @@ import {
   Users,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
-import { toast } from 'sonner'
+import { Link } from 'react-router'
 import { webClient } from '@/api/client'
 import {
   AlertDialog,
@@ -38,6 +37,7 @@ import {
 } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import type { CommandStats, TelegramBotStatus, TelegramUser } from '@/types/telegram'
+import { showToast } from '@/utils/toast'
 
 interface TelegramIndexData {
   bot_status: TelegramBotStatus
@@ -64,9 +64,9 @@ export default function TelegramIndex() {
   const [showBroadcastConfirm, setShowBroadcastConfirm] = useState(false)
   const [isBroadcasting, setIsBroadcasting] = useState(false)
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: one-time fetch on mount; fetchData should not re-run on every render
   useEffect(() => {
     fetchData()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const fetchData = async () => {
@@ -75,9 +75,8 @@ export default function TelegramIndex() {
         '/telegram/api/index'
       )
       setData(response.data.data)
-    } catch (error) {
-      console.error('Error fetching telegram data:', error)
-      toast.error('Failed to load Telegram data')
+    } catch (_error) {
+      showToast.error('Failed to load Telegram data', 'telegram')
     } finally {
       setIsLoading(false)
     }
@@ -90,14 +89,14 @@ export default function TelegramIndex() {
         '/telegram/bot/start'
       )
       if (response.data.status === 'success') {
-        toast.success(response.data.message || 'Bot started successfully')
+        showToast.success(response.data.message || 'Bot started successfully', 'telegram')
         fetchData()
       } else {
-        toast.error(response.data.message || 'Failed to start bot')
+        showToast.error(response.data.message || 'Failed to start bot', 'telegram')
       }
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } }
-      toast.error(err.response?.data?.message || 'Failed to start bot')
+      showToast.error(err.response?.data?.message || 'Failed to start bot', 'telegram')
     } finally {
       setIsStarting(false)
     }
@@ -110,14 +109,14 @@ export default function TelegramIndex() {
         '/telegram/bot/stop'
       )
       if (response.data.status === 'success') {
-        toast.success(response.data.message || 'Bot stopped successfully')
+        showToast.success(response.data.message || 'Bot stopped successfully', 'telegram')
         fetchData()
       } else {
-        toast.error(response.data.message || 'Failed to stop bot')
+        showToast.error(response.data.message || 'Failed to stop bot', 'telegram')
       }
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } }
-      toast.error(err.response?.data?.message || 'Failed to stop bot')
+      showToast.error(err.response?.data?.message || 'Failed to stop bot', 'telegram')
     } finally {
       setIsStopping(false)
     }
@@ -130,13 +129,13 @@ export default function TelegramIndex() {
         '/telegram/test-message'
       )
       if (response.data.status === 'success') {
-        toast.success(response.data.message || 'Test message sent')
+        showToast.success(response.data.message || 'Test message sent', 'telegram')
       } else {
-        toast.error(response.data.message || 'Failed to send test message')
+        showToast.error(response.data.message || 'Failed to send test message', 'telegram')
       }
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } }
-      toast.error(err.response?.data?.message || 'Failed to send test message')
+      showToast.error(err.response?.data?.message || 'Failed to send test message', 'telegram')
     } finally {
       setIsSendingTest(false)
     }
@@ -144,7 +143,7 @@ export default function TelegramIndex() {
 
   const handleBroadcast = async () => {
     if (!broadcastMessage.trim()) {
-      toast.error('Please enter a message to broadcast')
+      showToast.error('Please enter a message to broadcast', 'telegram')
       return
     }
     setShowBroadcastConfirm(true)
@@ -162,14 +161,14 @@ export default function TelegramIndex() {
       }>('/telegram/broadcast', { message: broadcastMessage })
 
       if (response.data.status === 'success') {
-        toast.success(response.data.message || 'Broadcast sent successfully')
+        showToast.success(response.data.message || 'Broadcast sent successfully', 'telegram')
         setBroadcastMessage('')
       } else {
-        toast.error(response.data.message || 'Failed to send broadcast')
+        showToast.error(response.data.message || 'Failed to send broadcast', 'telegram')
       }
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } }
-      toast.error(err.response?.data?.message || 'Failed to send broadcast')
+      showToast.error(err.response?.data?.message || 'Failed to send broadcast', 'telegram')
     } finally {
       setIsBroadcasting(false)
     }

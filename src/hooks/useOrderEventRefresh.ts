@@ -1,15 +1,9 @@
-/**
- * Order Event Refresh hook for OpenAlgo Desktop
- *
- * In the desktop version, real-time updates come from Tauri events
- * instead of Socket.IO. This hook provides a compatible interface.
- */
-
-import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { Socket } from 'socket.io-client'
+import { useSocketContext } from '@/components/socket/SocketProvider'
 
 /**
- * Supported event types for order-related updates
+ * Supported Socket.IO event types for order-related updates
  */
 export type OrderEventType =
   | 'order_event'
@@ -17,6 +11,8 @@ export type OrderEventType =
   | 'close_position_event'
   | 'cancel_order_event'
   | 'modify_order_event'
+  // Pushed by the server-side scalping risk monitor when it trails/clears an SL.
+  | 'scalping_sl_update'
 
 /**
  * Configuration options for useOrderEventRefresh hook
@@ -31,10 +27,31 @@ export interface UseOrderEventRefreshOptions {
 }
 
 /**
- * Centralized hook for order event listeners using Tauri events.
+ * Centralized hook for Socket.IO order event listeners.
  *
- * Automatically sets up Tauri event listeners and calls the refresh
- * function with an optional delay when events occur.
+ * Listens for the specified events on the app-wide Socket.IO connection that
+ * SocketProvider owns, calling the refresh function with an optional delay when
+ * events occur. It opens no connection of its own.
+ *
+ * @example
+ * ```tsx
+ * // Basic usage - listens to order_event and analyzer_update
+ * useOrderEventRefresh(fetchPositions);
+ *
+ * // With additional events
+ * useOrderEventRefresh(fetchPositions, {
+ *   events: ['order_event', 'analyzer_update', 'close_position_event'],
+ *   delay: 500,
+ * });
+ *
+ * // Conditional enablement
+ * useOrderEventRefresh(fetchPositions, {
+ *   enabled: isAuthenticated,
+ * });
+ * ```
+ *
+ * @param refreshFn - Function to call when an event is received
+ * @param options - Configuration options
  */
 export function useOrderEventRefresh(
   refreshFn: () => void,
@@ -43,45 +60,91 @@ export function useOrderEventRefresh(
   const { events = ['order_event', 'analyzer_update'], delay = 500, enabled = true } = options
 
   const refreshFnRef = useRef(refreshFn)
+  const eventsRef = useRef(events)
+  eventsRef.current = events
+
+  // Reuse the ONE app-wide Socket.IO connection (SocketProvider) instead of opening
+  // our own. Each Socket.IO long-poll holds an HTTP connection, and the browser's
+  // ~6-per-host limit is shared across all tabs — so a per-hook connection (×pages
+  // ×tabs) exhausts the pool and the app hangs. Sharing one connection fixes that.
+  const { socket } = useSocketContext()
 
   // Keep refresh function reference up to date
   useEffect(() => {
     refreshFnRef.current = refreshFn
   }, [refreshFn])
 
+  // Key the effect on the event CONTENTS (callers pass inline arrays), and on the
+  // shared socket — re-attach listeners only when the socket or the set changes.
+  const eventsKey = events.join('|')
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: events read via ref; eventsKey tracks content
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled || !socket) return
 
-    const unlisteners: UnlistenFn[] = []
-
-    // Create handler for each event type
     const handleEvent = () => {
-      // Delay slightly to allow backend to process the event
+      // Delay slightly to allow server to process the event
       setTimeout(() => refreshFnRef.current(), delay)
     }
 
-    // Register listeners for all specified events
-    events.forEach((event) => {
-      listen(event, handleEvent).then((unlisten) => unlisteners.push(unlisten))
+    const subscribed = eventsRef.current
+    subscribed.forEach((event) => {
+      socket.on(event, handleEvent)
     })
 
-    // Cleanup on unmount
+    // Only remove OUR listeners — never disconnect the shared connection.
     return () => {
-      unlisteners.forEach((unlisten) => unlisten())
+      subscribed.forEach((event) => {
+        socket.off(event, handleEvent)
+      })
     }
-  }, [events, delay, enabled])
+  }, [socket, eventsKey, delay, enabled])
 }
 
 /**
- * Hook to get connection status for Tauri events.
- * Always returns connected since Tauri events are always available.
+ * Hook to get direct access to the app-wide Socket.IO connection for custom
+ * event handling.
+ *
+ * It hands back the ONE connection SocketProvider owns and never opens its own:
+ * every connection is a long-poll the server keeps waiting, which under the
+ * gthread worker holds one of its request threads for as long as the tab is
+ * open. Register handlers on it and remove them on cleanup, but never
+ * disconnect it: the rest of the page is listening on the same connection.
+ *
+ * @example
+ * ```tsx
+ * const { socket, isConnected } = useSocketConnection();
+ *
+ * useEffect(() => {
+ *   if (!socket) return;
+ *   socket.on('custom_event', handleCustomEvent);
+ *   return () => socket.off('custom_event', handleCustomEvent);
+ * }, [socket]);
+ * ```
  */
-export function useSocketConnection(_enabled = true): {
-  socket: null
+export function useSocketConnection(enabled = true): {
+  socket: Socket | null
   isConnected: boolean
 } {
-  return {
-    socket: null,
-    isConnected: true, // Tauri events are always available
-  }
+  const { socket: shared } = useSocketContext()
+  const socket = enabled ? shared : null
+  const [isConnected, setIsConnected] = useState(() => socket?.connected ?? false)
+
+  useEffect(() => {
+    if (!socket) {
+      setIsConnected(false)
+      return
+    }
+    setIsConnected(socket.connected)
+    const onConnect = () => setIsConnected(true)
+    const onDisconnect = () => setIsConnected(false)
+    socket.on('connect', onConnect)
+    socket.on('disconnect', onDisconnect)
+    return () => {
+      socket.off('connect', onConnect)
+      socket.off('disconnect', onDisconnect)
+    }
+  }, [socket])
+
+  return { socket, isConnected }
 }
