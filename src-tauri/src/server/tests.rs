@@ -1304,3 +1304,64 @@ async fn order_events_reach_the_log_subscriber_without_the_api_key() {
     assert_eq!(rows.len(), 1);
     assert!(!rows[0].1.contains("k-secret"));
 }
+
+// ------------------------------------------------------- listener lifecycle
+
+#[tokio::test]
+async fn port_in_use_is_reported_for_the_trader_and_stop_releases_the_port() {
+    let h = H::new();
+    let taken = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = taken.local_addr().unwrap().port();
+    h.ctx().config.write().http_port = port;
+    match crate::server::start(h.ctx().clone()).await {
+        Err(crate::state::ServerStatus::PortInUse { port: p, message }) => {
+            assert_eq!(p, port);
+            assert!(message.contains(&port.to_string()));
+            assert!(message.contains("already used by another program"));
+        }
+        Err(other) => panic!("unexpected status {:?}", other),
+        Ok(_) => panic!("bound a taken port"),
+    }
+    assert!(matches!(
+        &*h.ctx().server_status.read(),
+        crate::state::ServerStatus::PortInUse { .. }
+    ));
+    drop(taken);
+
+    // Free now: starts, answers over real TCP, and stopping releases the port.
+    let handle = crate::server::start(h.ctx().clone()).await.unwrap();
+    let mut s = tokio::net::TcpStream::connect(handle.addr).await.unwrap();
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    s.write_all(b"GET /auth/check-setup HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n")
+        .await
+        .unwrap();
+    let mut out = String::new();
+    s.read_to_string(&mut out).await.unwrap();
+    assert!(
+        out.starts_with("HTTP/1.1 400") || out.starts_with("HTTP/1.1 200"),
+        "{}",
+        out
+    );
+    handle.stop().await;
+    let again = tokio::net::TcpListener::bind(("127.0.0.1", port)).await;
+    assert!(again.is_ok(), "port released after stop");
+}
+
+#[tokio::test]
+async fn shutdown_stops_owned_tasks_and_the_bus() {
+    let h = H::new();
+    crate::session::spawn_expiry_task(h.ctx().clone());
+    assert!(h.ctx().task_count() >= 1);
+    assert!(h.ctx().bus.subscriber_count() >= 2);
+    h.ctx().shutdown().await;
+    assert_eq!(h.ctx().task_count(), 0);
+    assert_eq!(h.ctx().bus.subscriber_count(), 0);
+}
+
+#[tokio::test]
+async fn tauri_commands_require_the_signed_in_user() {
+    let h = H::new();
+    assert!(crate::commands::require_user(h.ctx()).is_err());
+    h.session(true);
+    assert_eq!(crate::commands::require_user(h.ctx()).unwrap(), USER);
+}
