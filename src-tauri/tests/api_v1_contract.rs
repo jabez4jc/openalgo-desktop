@@ -39,10 +39,6 @@ const SKIP: &[(&str, &str)] = &[
         "the strategy module arrives with the strategy wave",
     ),
     (
-        "market/",
-        "market holidays and timings belong to the market-calendar routes (another agent)",
-    ),
-    (
         "errors/rate_limit_probe_summary.json",
         "a summary record of the burst, not a request",
     ),

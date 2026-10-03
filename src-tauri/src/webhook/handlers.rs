@@ -3,6 +3,9 @@
 //! replaced by `crate::server::api_v1` and `crate::services`; the strategy
 //! webhook endpoint itself arrives with the strategy wave.
 
+/// Kept for routes that still import it from here.
+pub use crate::services::core::INVALID_API_KEY;
+
 /// A webhook strategy row.
 #[derive(Debug, Clone)]
 pub struct Strategy {
