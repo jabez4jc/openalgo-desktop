@@ -1,0 +1,23 @@
+{
+ "token_expired": {
+  "s": "error",
+  "code": -8,
+  "message": "Your token has expired. Please generate a token"
+ },
+ "invalid_token": {
+  "s": "error",
+  "code": -16,
+  "message": "Could not authenticate the user"
+ },
+ "order_rejected": {
+  "s": "error",
+  "code": -50,
+  "message": "Insufficient fund. Required margin is 1234.50",
+  "id": ""
+ },
+ "funds_unauth": {
+  "s": "error",
+  "code": -15,
+  "message": "Please provide valid token"
+ }
+}

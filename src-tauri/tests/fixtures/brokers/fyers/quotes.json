@@ -1,0 +1,82 @@
+{
+ "s": "ok",
+ "code": 200,
+ "message": "",
+ "d": [
+  {
+   "n": "NSE:SBIN-EQ",
+   "s": "ok",
+   "v": {
+    "ch": 3.45,
+    "chp": 0.36,
+    "lp": 954.1,
+    "spread": 0.05,
+    "ask": 954.1,
+    "bid": 954.05,
+    "open_price": 950.65,
+    "high_price": 959.1,
+    "low_price": 945.65,
+    "prev_close_price": 950.65,
+    "volume": 4823170,
+    "short_name": "SBIN-EQ",
+    "exchange": "NSE",
+    "description": "NSE:SBIN-EQ",
+    "original_name": "NSE:SBIN-EQ",
+    "symbol": "NSE:SBIN-EQ",
+    "tt": "1790985600"
+   }
+  },
+  {
+   "n": "NSE:NIFTY26OCTFUT",
+   "s": "ok",
+   "v": {
+    "ch": 60.5,
+    "chp": 0.27,
+    "lp": 22540.5,
+    "spread": 1.0,
+    "ask": 22541.0,
+    "bid": 22540.0,
+    "open_price": 22480.0,
+    "high_price": 22545.5,
+    "low_price": 22475.0,
+    "prev_close_price": 22480.0,
+    "volume": 1234567,
+    "short_name": "NIFTY26OCTFUT",
+    "exchange": "NSE",
+    "description": "NSE:NIFTY26OCTFUT",
+    "original_name": "NSE:NIFTY26OCTFUT",
+    "symbol": "NSE:NIFTY26OCTFUT",
+    "tt": "1790985600"
+   }
+  },
+  {
+   "n": "NSE:NIFTY50-INDEX",
+   "s": "ok",
+   "v": {
+    "ch": 32.35,
+    "chp": 0.14,
+    "lp": 22512.35,
+    "spread": 0,
+    "ask": 0,
+    "bid": 0,
+    "open_price": 22480.0,
+    "high_price": 22517.35,
+    "low_price": 22475.0,
+    "prev_close_price": 22480.0,
+    "volume": 0,
+    "short_name": "NIFTY50-INDEX",
+    "exchange": "NSE",
+    "description": "NSE:NIFTY50-INDEX",
+    "original_name": "NSE:NIFTY50-INDEX",
+    "symbol": "NSE:NIFTY50-INDEX",
+    "tt": "1790985600"
+   }
+  },
+  {
+   "n": "NSE:BAD-EQ",
+   "s": "error",
+   "errmsg": "invalid symbol",
+   "v": {}
+  }
+ ]
+}
