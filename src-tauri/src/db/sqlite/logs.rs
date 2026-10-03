@@ -60,12 +60,26 @@ impl LogsDb {
     pub fn new(path: &Path) -> Result<Self> {
         let pool = super::open_pool(path, 4)?;
         pool.get()?.execute_batch(SCHEMA)?;
+        super::monitor::migrate(&*pool.get()?)?;
         Ok(Self { pool })
+    }
+
+    /// Check out a pooled connection (monitoring tables). Drop it before any
+    /// network await.
+    pub fn conn(&self) -> Result<super::DbConn> {
+        Ok(self.pool.get()?)
+    }
+
+    /// Open and idle pooled connections (health monitor).
+    pub fn pool_state(&self) -> (u32, u32) {
+        let st = self.pool.state();
+        (st.connections, st.idle_connections)
     }
 
     /// Copy sandbox logs written by earlier builds into the main database, once.
     pub fn import_from_main(&self, main: &Connection) -> Result<()> {
         let conn = self.pool.get()?;
+        super::monitor::import_from_main(&conn, main)?;
         let done: bool = conn.query_row(
             "SELECT EXISTS(SELECT 1 FROM migrations WHERE name = '001_import_main_analyzer_logs')",
             [],

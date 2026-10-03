@@ -165,6 +165,9 @@ pub async fn login(
     match outcome {
         Ok(Ok(LoginOutcome::Success(user))) => {
             tracing::info!("Sign-in succeeded");
+            crate::services::security_service::record_login(
+                &ctx, &user, ip, "success", "password", None,
+            );
             finish_sign_in(&ctx, sess.as_ref().map(|s| s.id.as_str()), &user).await
         }
         Ok(Ok(LoginOutcome::TotpRequired(user))) => {
@@ -187,6 +190,14 @@ pub async fn login(
         }
         Ok(Ok(LoginOutcome::Invalid)) => {
             tracing::info!("Sign-in failed: invalid credentials");
+            crate::services::security_service::record_login(
+                &ctx,
+                &username,
+                ip,
+                "failed",
+                "password",
+                Some("invalid_credentials"),
+            );
             error(StatusCode::UNAUTHORIZED, "Invalid credentials")
         }
         Ok(Err(e)) => e.into_response(),
@@ -248,9 +259,22 @@ pub async fn login_totp(
         Ok(true) => {
             ctx.sessions
                 .update(&s.id, |x| x.totp_verified_at = Some(now));
+            crate::services::security_service::record_login(
+                &ctx, &user, ip, "success", "totp", None,
+            );
             finish_sign_in(&ctx, Some(&s.id), &user).await
         }
-        Ok(false) => error(StatusCode::UNAUTHORIZED, "Invalid TOTP code."),
+        Ok(false) => {
+            crate::services::security_service::record_login(
+                &ctx,
+                &user,
+                ip,
+                "failed",
+                "totp",
+                Some("invalid_totp"),
+            );
+            error(StatusCode::UNAUTHORIZED, "Invalid TOTP code.")
+        }
         Err(e) => e.into_response(),
     }
 }

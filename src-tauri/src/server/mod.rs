@@ -108,6 +108,11 @@ pub fn router(ctx: Arc<AppState>) -> (Router, socketioxide::SocketIo) {
         .layer(mw::from_fn_with_state(ctx.clone(), middleware::session_layer))
         .layer(DefaultBodyLimit::max(crate::config::BODY_LIMIT_BYTES))
         .layer(mw::from_fn_with_state(ctx.clone(), middleware::host_check))
+        // Traffic, latency and blocked-address checks (services::monitor).
+        .layer(mw::from_fn_with_state(
+            ctx.clone(),
+            crate::services::monitor::layer,
+        ))
         .layer(SetResponseHeaderLayer::if_not_present(
             header::CONTENT_SECURITY_POLICY,
             HeaderValue::from_static(CSP),

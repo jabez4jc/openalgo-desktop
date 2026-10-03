@@ -12,8 +12,10 @@ pub mod data_migrations;
 mod latency_logs;
 pub mod logs;
 mod market;
+pub mod market_calendar;
 pub(crate) mod migrations;
 pub mod models;
+pub mod monitor;
 pub mod oauth_state;
 mod order_logs;
 pub mod sandbox;
@@ -22,6 +24,7 @@ mod strategy;
 mod symbol;
 mod traffic_logs;
 pub mod user;
+pub mod webui;
 
 use crate::error::Result;
 use crate::state::SymbolInfo;
@@ -76,6 +79,12 @@ impl SqliteDb {
     /// Check out a pooled connection. Drop it before any network await.
     pub fn conn(&self) -> Result<DbConn> {
         Ok(self.pool.get()?)
+    }
+
+    /// Open and idle pooled connections (health monitor).
+    pub fn pool_state(&self) -> (u32, u32) {
+        let st = self.pool.state();
+        (st.connections, st.idle_connections)
     }
 
     /// Run database migrations

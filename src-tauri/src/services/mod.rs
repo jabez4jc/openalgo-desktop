@@ -30,16 +30,22 @@ pub mod analyzer_service;
 pub mod apikey_service;
 pub mod auth_service;
 pub mod broker_auth_service;
+pub mod error_log;
 pub mod funds_service;
+pub mod health_service;
 pub mod history_service;
 pub mod holdings_service;
+pub mod market_calendar_service;
+pub mod monitor;
 pub mod options_service;
 pub mod order_service;
 pub mod orderbook_service;
 pub mod position_service;
 pub mod quotes_service;
+pub mod security_service;
 pub mod smart_order_service;
 pub mod symbol_service;
+pub mod system_info;
 
 // Re-export commonly used types and services
 pub use analyzer_service::{AnalyzerService, AnalyzerStatus};

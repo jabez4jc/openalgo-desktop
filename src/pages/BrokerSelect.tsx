@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { desktopBrokerLoginUrl } from '@/lib/desktop'
 import { useAuthStore } from '@/stores/authStore'
 
 // All supported brokers with their display names and auth types
@@ -126,6 +127,16 @@ export default function BrokerSelect() {
     }
 
     setIsSubmitting(true)
+
+    // Desktop: the local server builds OAuth sign-in addresses (the API key never reaches the page).
+    const desktopLoginUrl = desktopBrokerLoginUrl(selectedBroker)
+    if (desktopLoginUrl) {
+      setTimeout(() => {
+        window.location.href = desktopLoginUrl
+      }, 100)
+      return
+    }
+
     let loginUrl = ''
 
     const { broker_api_key, redirect_url } = brokerConfig

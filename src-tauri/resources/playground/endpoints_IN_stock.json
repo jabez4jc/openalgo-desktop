@@ -1,0 +1,849 @@
+{
+  "account": [
+    {
+      "name": "Analyzer Status",
+      "method": "POST",
+      "path": "/api/v1/analyzer",
+      "body": {
+        "apikey": ""
+      }
+    },
+    {
+      "name": "Analyzer Toggle",
+      "method": "POST",
+      "path": "/api/v1/analyzer/toggle",
+      "body": {
+        "apikey": "",
+        "mode": true
+      }
+    },
+    {
+      "name": "funds",
+      "method": "POST",
+      "path": "/api/v1/funds",
+      "body": {
+        "apikey": ""
+      }
+    },
+    {
+      "name": "holdings",
+      "method": "POST",
+      "path": "/api/v1/holdings",
+      "body": {
+        "apikey": ""
+      }
+    },
+    {
+      "name": "Margin Calculator",
+      "method": "POST",
+      "path": "/api/v1/margin",
+      "body": {
+        "apikey": "",
+        "positions": [
+          {
+            "symbol": "NIFTY25AUG2624000CE",
+            "exchange": "NFO",
+            "action": "SELL",
+            "product": "NRML",
+            "pricetype": "MARKET",
+            "quantity": "65",
+            "price": "0"
+          }
+        ]
+      }
+    },
+    {
+      "name": "orderbook",
+      "method": "POST",
+      "path": "/api/v1/orderbook",
+      "body": {
+        "apikey": ""
+      }
+    },
+    {
+      "name": "positionbook",
+      "method": "POST",
+      "path": "/api/v1/positionbook",
+      "body": {
+        "apikey": ""
+      }
+    },
+    {
+      "name": "tradebook",
+      "method": "POST",
+      "path": "/api/v1/tradebook",
+      "body": {
+        "apikey": ""
+      }
+    }
+  ],
+  "orders": [
+    {
+      "name": "BasketOrder",
+      "method": "POST",
+      "path": "/api/v1/basketorder",
+      "body": {
+        "apikey": "",
+        "strategy": "your-strategy",
+        "orders": [
+          {
+            "symbol": "RELIANCE",
+            "exchange": "NSE",
+            "action": "BUY",
+            "quantity": "1",
+            "pricetype": "MARKET",
+            "product": "MIS"
+          },
+          {
+            "symbol": "INFY",
+            "exchange": "NSE",
+            "action": "SELL",
+            "quantity": "1",
+            "pricetype": "MARKET",
+            "product": "MIS"
+          }
+        ]
+      }
+    },
+    {
+      "name": "CancelAllOrder",
+      "method": "POST",
+      "path": "/api/v1/cancelallorder",
+      "body": {
+        "apikey": "",
+        "strategy": "Test Strategy"
+      }
+    },
+    {
+      "name": "CancelGTTOrder",
+      "method": "POST",
+      "path": "/api/v1/cancelgttorder",
+      "body": {
+        "apikey": "",
+        "strategy": "My GTT Strategy",
+        "trigger_id": "123456"
+      }
+    },
+    {
+      "name": "CancelOrder",
+      "method": "POST",
+      "path": "/api/v1/cancelorder",
+      "body": {
+        "apikey": "",
+        "strategy": "Test Strategy",
+        "orderid": "241214000000015"
+      }
+    },
+    {
+      "name": "CloseAllPositions",
+      "method": "POST",
+      "path": "/api/v1/closeposition",
+      "body": {
+        "apikey": "",
+        "strategy": "Test Strategy"
+      }
+    },
+    {
+      "name": "gttorderbook",
+      "method": "POST",
+      "path": "/api/v1/gttorderbook",
+      "body": {
+        "apikey": ""
+      }
+    },
+    {
+      "name": "ModifyGTTOrder",
+      "method": "POST",
+      "path": "/api/v1/modifygttorder",
+      "body": {
+        "apikey": "",
+        "strategy": "My GTT Strategy",
+        "trigger_id": "123456",
+        "trigger_type": "SINGLE",
+        "exchange": "NSE",
+        "symbol": "IDEA",
+        "action": "BUY",
+        "product": "CNC",
+        "quantity": 1,
+        "pricetype": "LIMIT",
+        "price": "0",
+        "triggerprice_sl": "0",
+        "stoploss": "",
+        "triggerprice_tg": "0",
+        "target": ""
+      }
+    },
+    {
+      "name": "ModifyOrder",
+      "method": "POST",
+      "path": "/api/v1/modifyorder",
+      "body": {
+        "apikey": "",
+        "strategy": "Test Message",
+        "symbol": "GOLDPETAL31OCT24FUT",
+        "action": "BUY",
+        "exchange": "MCX",
+        "orderid": "427510324509895",
+        "product": "MIS",
+        "pricetype": "LIMIT",
+        "price": "7410",
+        "quantity": "1",
+        "disclosed_quantity": "0",
+        "trigger_price": "0"
+      }
+    },
+    {
+      "name": "openposition",
+      "method": "POST",
+      "path": "/api/v1/openposition",
+      "body": {
+        "apikey": "",
+        "strategy": "Test Strategy",
+        "symbol": "YESBANK",
+        "exchange": "NSE",
+        "product": "CNC"
+      }
+    },
+    {
+      "name": "Options Multi Order",
+      "method": "POST",
+      "path": "/api/v1/optionsmultiorder",
+      "body": {
+        "apikey": "",
+        "strategy": "Iron Condor",
+        "underlying": "NIFTY",
+        "exchange": "NSE_INDEX",
+        "legs": [
+          {
+            "offset": "OTM10",
+            "option_type": "CE",
+            "action": "BUY",
+            "quantity": 65,
+            "expiry_date": "25AUG26",
+            "product": "NRML",
+            "splitsize": 0
+          },
+          {
+            "offset": "OTM10",
+            "option_type": "PE",
+            "action": "BUY",
+            "quantity": 65,
+            "expiry_date": "25AUG26",
+            "product": "NRML",
+            "splitsize": 0
+          },
+          {
+            "offset": "OTM5",
+            "option_type": "CE",
+            "action": "SELL",
+            "quantity": 65,
+            "expiry_date": "25AUG26",
+            "product": "NRML",
+            "splitsize": 0
+          },
+          {
+            "offset": "OTM5",
+            "option_type": "PE",
+            "action": "SELL",
+            "quantity": 65,
+            "expiry_date": "25AUG26",
+            "product": "NRML",
+            "splitsize": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "Options Order",
+      "method": "POST",
+      "path": "/api/v1/optionsorder",
+      "body": {
+        "apikey": "",
+        "strategy": "test_strategy",
+        "underlying": "NIFTY",
+        "exchange": "NSE_INDEX",
+        "expiry_date": "25AUG26",
+        "offset": "ATM",
+        "option_type": "CE",
+        "action": "BUY",
+        "quantity": 65,
+        "pricetype": "MARKET",
+        "product": "MIS",
+        "splitsize": 0
+      }
+    },
+    {
+      "name": "Order Status",
+      "method": "POST",
+      "path": "/api/v1/orderstatus",
+      "body": {
+        "apikey": "",
+        "strategy": "Test Strategy",
+        "orderid": ""
+      }
+    },
+    {
+      "name": "PlaceGTTOrder",
+      "method": "POST",
+      "path": "/api/v1/placegttorder",
+      "body": {
+        "apikey": "",
+        "strategy": "My GTT Strategy",
+        "trigger_type": "SINGLE",
+        "exchange": "NSE",
+        "symbol": "IDEA",
+        "action": "BUY",
+        "product": "CNC",
+        "quantity": 1,
+        "pricetype": "LIMIT",
+        "price": "0",
+        "triggerprice_sl": "0",
+        "stoploss": "",
+        "triggerprice_tg": "0",
+        "target": ""
+      }
+    },
+    {
+      "name": "PlaceOrder",
+      "method": "POST",
+      "path": "/api/v1/placeorder",
+      "body": {
+        "apikey": "",
+        "strategy": "My Strategy",
+        "exchange": "NSE",
+        "symbol": "NHPC",
+        "action": "BUY",
+        "product": "MIS",
+        "pricetype": "MARKET",
+        "quantity": "1",
+        "price": "0",
+        "trigger_price": "0",
+        "disclosed_quantity": "0"
+      }
+    },
+    {
+      "name": "PlaceSmartOrder",
+      "method": "POST",
+      "path": "/api/v1/placesmartorder",
+      "body": {
+        "apikey": "",
+        "strategy": "Test Strategy",
+        "exchange": "NSE",
+        "symbol": "YESBANK",
+        "action": "BUY",
+        "product": "MIS",
+        "pricetype": "MARKET",
+        "quantity": "10",
+        "price": "0",
+        "trigger_price": "0",
+        "disclosed_quantity": "0",
+        "position_size": "10"
+      }
+    },
+    {
+      "name": "SplitOrder",
+      "method": "POST",
+      "path": "/api/v1/splitorder",
+      "body": {
+        "apikey": "",
+        "strategy": "Test Strategy",
+        "exchange": "NSE",
+        "symbol": "YESBANK",
+        "action": "SELL",
+        "quantity": "105",
+        "splitsize": "20",
+        "pricetype": "MARKET",
+        "product": "MIS"
+      }
+    }
+  ],
+  "data": [
+    {
+      "name": "depth",
+      "method": "POST",
+      "path": "/api/v1/depth",
+      "body": {
+        "apikey": "",
+        "symbol": "M&M",
+        "exchange": "NSE"
+      }
+    },
+    {
+      "name": "Expiry",
+      "method": "POST",
+      "path": "/api/v1/expiry",
+      "body": {
+        "apikey": "",
+        "symbol": "NIFTY",
+        "exchange": "NFO",
+        "instrumenttype": "options"
+      }
+    },
+    {
+      "name": "history (DB source)",
+      "method": "POST",
+      "path": "/api/v1/history",
+      "body": {
+        "apikey": "",
+        "symbol": "SBIN",
+        "exchange": "NSE",
+        "interval": "D",
+        "start_date": "2025-01-01",
+        "end_date": "2025-12-31",
+        "source": "db"
+      }
+    },
+    {
+      "name": "history (EOD)",
+      "method": "POST",
+      "path": "/api/v1/history",
+      "body": {
+        "apikey": "",
+        "symbol": "SBIN",
+        "exchange": "NSE",
+        "interval": "D",
+        "start_date": "2025-01-01",
+        "end_date": "2025-11-20",
+        "source": "api"
+      }
+    },
+    {
+      "name": "history (intraday)",
+      "method": "POST",
+      "path": "/api/v1/history",
+      "body": {
+        "apikey": "",
+        "symbol": "SBIN",
+        "exchange": "NSE",
+        "interval": "1m",
+        "start_date": "2025-10-15",
+        "end_date": "2025-10-20",
+        "source": "api"
+      }
+    },
+    {
+      "name": "Instruments",
+      "method": "GET",
+      "path": "/api/v1/instruments",
+      "body": {
+        "apikey": "",
+        "exchange": "NSE_INDEX",
+        "format": "json"
+      }
+    },
+    {
+      "name": "intervals",
+      "method": "POST",
+      "path": "/api/v1/intervals",
+      "body": {
+        "apikey": ""
+      }
+    },
+    {
+      "name": "Multi Option Greeks",
+      "method": "POST",
+      "path": "/api/v1/multioptiongreeks",
+      "body": {
+        "apikey": "",
+        "symbols": [
+          {
+            "symbol": "NIFTY25AUG2626000CE",
+            "exchange": "NFO"
+          },
+          {
+            "symbol": "NIFTY25AUG2626000PE",
+            "exchange": "NFO"
+          }
+        ]
+      }
+    },
+    {
+      "name": "multiquotes",
+      "method": "POST",
+      "path": "/api/v1/multiquotes",
+      "body": {
+        "apikey": "",
+        "symbols": [
+          {
+            "symbol": "SBIN",
+            "exchange": "NSE"
+          },
+          {
+            "symbol": "TCS",
+            "exchange": "NSE"
+          },
+          {
+            "symbol": "INFY",
+            "exchange": "BSE"
+          },
+          {
+            "symbol": "NIFTY25AUG26FUT",
+            "exchange": "NFO"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Option Chain",
+      "method": "POST",
+      "path": "/api/v1/optionchain",
+      "body": {
+        "apikey": "",
+        "underlying": "NIFTY",
+        "exchange": "NSE_INDEX",
+        "expiry_date": "25AUG26",
+        "strike_count": 10,
+        "with_greeks": true
+      }
+    },
+    {
+      "name": "Option Greeks",
+      "method": "POST",
+      "path": "/api/v1/optiongreeks",
+      "body": {
+        "apikey": "",
+        "exchange": "NFO",
+        "symbol": "NIFTY25AUG2624000CE"
+      }
+    },
+    {
+      "name": "Option Symbol",
+      "method": "POST",
+      "path": "/api/v1/optionsymbol",
+      "body": {
+        "apikey": "",
+        "exchange": "NSE_INDEX",
+        "expiry_date": "25AUG26",
+        "offset": "ATM",
+        "option_type": "CE",
+        "underlying": "NIFTY"
+      }
+    },
+    {
+      "name": "quotes",
+      "method": "POST",
+      "path": "/api/v1/quotes",
+      "body": {
+        "apikey": "",
+        "symbol": "SBIN",
+        "exchange": "NSE"
+      }
+    },
+    {
+      "name": "Search",
+      "method": "POST",
+      "path": "/api/v1/search",
+      "body": {
+        "apikey": "",
+        "query": "NIFTY 25000 CE",
+        "exchange": "NFO"
+      }
+    },
+    {
+      "name": "Symbol",
+      "method": "POST",
+      "path": "/api/v1/symbol",
+      "body": {
+        "apikey": "",
+        "symbol": "SBIN",
+        "exchange": "NSE"
+      }
+    },
+    {
+      "name": "Synthetic Future",
+      "method": "POST",
+      "path": "/api/v1/syntheticfuture",
+      "body": {
+        "apikey": "",
+        "underlying": "NIFTY",
+        "exchange": "NSE_INDEX",
+        "expiry_date": "25AUG26"
+      }
+    },
+    {
+      "name": "Ticker",
+      "method": "GET",
+      "path": "/api/v1/ticker/NSE:SBIN",
+      "params": {
+        "apikey": "",
+        "interval": "D",
+        "from": "2025-01-01",
+        "to": "2025-01-31",
+        "format": "json"
+      }
+    }
+  ],
+  "utilities": [
+    {
+      "name": "chart_get",
+      "method": "GET",
+      "path": "/api/v1/chart",
+      "params": {
+        "apikey": ""
+      }
+    },
+    {
+      "name": "chart_update",
+      "method": "POST",
+      "path": "/api/v1/chart",
+      "body": {
+        "apikey": "",
+        "tv_theme": "dark",
+        "tv_chart_layout": "{\"timeframe\":\"1D\"}"
+      }
+    },
+    {
+      "name": "Market Holidays",
+      "method": "POST",
+      "path": "/api/v1/market/holidays",
+      "body": {
+        "apikey": "",
+        "year": 2025
+      }
+    },
+    {
+      "name": "Market Timings",
+      "method": "POST",
+      "path": "/api/v1/market/timings",
+      "body": {
+        "apikey": "",
+        "date": "2025-04-30"
+      }
+    },
+    {
+      "name": "Ping",
+      "method": "POST",
+      "path": "/api/v1/ping",
+      "body": {
+        "apikey": ""
+      }
+    },
+    {
+      "name": "Telegram Notify",
+      "method": "POST",
+      "path": "/api/v1/telegram/notify",
+      "body": {
+        "apikey": "",
+        "username": "your_openalgo_username",
+        "message": "Test alert from OpenAlgo API",
+        "priority": 5
+      }
+    },
+    {
+      "name": "WhatsApp Notify",
+      "method": "POST",
+      "path": "/api/v1/whatsapp/notify",
+      "body": {
+        "apikey": "",
+        "self": true,
+        "message": "Test alert from OpenAlgo API"
+      }
+    }
+  ],
+  "websocket": [
+    {
+      "name": "Get Broker Info",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "get_broker_info"
+      },
+      "description": "Get information about the authenticated broker"
+    },
+    {
+      "name": "Get Supported Brokers",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "get_supported_brokers"
+      },
+      "description": "List all brokers supported by the WebSocket server"
+    },
+    {
+      "name": "Ping (Latency Test)",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "ping",
+        "timestamp": 1737345600000
+      },
+      "description": "Test connection latency with ping/pong"
+    },
+    {
+      "name": "Subscribe Depth 20 Levels (Mode 3)",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "subscribe",
+        "symbol": "RELIANCE",
+        "exchange": "NSE",
+        "mode": 3,
+        "depth": 20
+      },
+      "description": "Subscribe to Market Depth with 20 bid/ask levels"
+    },
+    {
+      "name": "Subscribe Depth 30 Levels (Mode 3)",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "subscribe",
+        "symbol": "RELIANCE",
+        "exchange": "NSE",
+        "mode": 3,
+        "depth": 30
+      },
+      "description": "Subscribe to Market Depth with 30 bid/ask levels"
+    },
+    {
+      "name": "Subscribe Depth 5 Levels (Mode 3)",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "subscribe",
+        "symbol": "RELIANCE",
+        "exchange": "NSE",
+        "mode": 3,
+        "depth": 5
+      },
+      "description": "Subscribe to Market Depth with 5 bid/ask levels (default)"
+    },
+    {
+      "name": "Subscribe Depth 50 Levels (Mode 3)",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "subscribe",
+        "symbol": "RELIANCE:50",
+        "exchange": "NSE",
+        "mode": 3,
+        "depth": 50
+      },
+      "description": "Subscribe to Market Depth with 50 bid/ask levels (full depth)"
+    },
+    {
+      "name": "Subscribe LTP (Mode 1)",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "subscribe",
+        "symbol": "RELIANCE",
+        "exchange": "NSE",
+        "mode": 1
+      },
+      "description": "Subscribe to Last Traded Price - minimal data, lowest bandwidth"
+    },
+    {
+      "name": "Subscribe Multiple Symbols",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "subscribe",
+        "symbols": [
+          {
+            "symbol": "RELIANCE",
+            "exchange": "NSE"
+          },
+          {
+            "symbol": "TCS",
+            "exchange": "NSE"
+          },
+          {
+            "symbol": "INFY",
+            "exchange": "NSE"
+          },
+          {
+            "symbol": "HDFCBANK",
+            "exchange": "NSE"
+          },
+          {
+            "symbol": "NIFTY25JANFUT",
+            "exchange": "NFO"
+          }
+        ],
+        "mode": 2
+      },
+      "description": "Subscribe to multiple symbols in a single request"
+    },
+    {
+      "name": "Subscribe Quote (Mode 2)",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "subscribe",
+        "symbol": "RELIANCE",
+        "exchange": "NSE",
+        "mode": 2
+      },
+      "description": "Subscribe to Quote data - includes OHLC, volume, change"
+    },
+    {
+      "name": "Unsubscribe All",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "unsubscribe_all"
+      },
+      "description": "Unsubscribe from all symbols at once"
+    },
+    {
+      "name": "Unsubscribe Depth (Mode 3)",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "unsubscribe",
+        "symbol": "RELIANCE",
+        "exchange": "NSE",
+        "mode": 3
+      },
+      "description": "Unsubscribe from Market Depth data for a symbol"
+    },
+    {
+      "name": "Unsubscribe Depth 50 Levels (Mode 3)",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "unsubscribe",
+        "symbol": "RELIANCE:50",
+        "exchange": "NSE",
+        "mode": 3,
+        "depth": 50
+      },
+      "description": "Unsubscribe from 50-level Market Depth (broker dependent)"
+    },
+    {
+      "name": "Unsubscribe LTP (Mode 1)",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "unsubscribe",
+        "symbol": "RELIANCE",
+        "exchange": "NSE",
+        "mode": 1
+      },
+      "description": "Unsubscribe from LTP data for a symbol"
+    },
+    {
+      "name": "Unsubscribe Quote (Mode 2)",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "unsubscribe",
+        "symbol": "RELIANCE",
+        "exchange": "NSE",
+        "mode": 2
+      },
+      "description": "Unsubscribe from Quote data for a symbol"
+    },
+    {
+      "name": "WebSocket Authenticate",
+      "method": "WS",
+      "path": "ws://127.0.0.1:8765",
+      "body": {
+        "action": "authenticate",
+        "apikey": ""
+      },
+      "description": "Authenticate with the WebSocket server using API key"
+    }
+  ]
+}

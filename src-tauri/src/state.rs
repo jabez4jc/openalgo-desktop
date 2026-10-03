@@ -78,6 +78,8 @@ pub struct AppState {
     /// The symbol master, shared with every broker adapter in `brokers`.
     pub symbols: SymbolResolver,
     pub data_dir: PathBuf,
+    /// Traffic, latency and security monitoring (bounded queue + writer).
+    pub monitor: crate::services::monitor::Monitor,
 }
 
 pub struct OpenOptions {
@@ -139,6 +141,7 @@ impl AppState {
             shutdown: CancellationToken::new(),
             tasks: Mutex::new(JoinSet::new()),
             data_dir: data_dir.to_path_buf(),
+            monitor: crate::services::monitor::Monitor::new(),
         }))
     }
 

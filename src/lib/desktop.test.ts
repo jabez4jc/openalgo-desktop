@@ -7,6 +7,7 @@ vi.mock('@tauri-apps/plugin-shell', () => ({ open: tauri.open }))
 
 import {
   DEFAULT_WEBSOCKET_URL,
+  desktopBrokerLoginUrl,
   desktopProfileMenuItems,
   installDesktopShellHandlers,
   isDesktopShell,
@@ -41,6 +42,20 @@ describe('isExternalHttpUrl', () => {
     expect(isExternalHttpUrl('mailto:support@openalgo.in', base)).toBe(false)
     expect(isExternalHttpUrl('blob:http://127.0.0.1:5000/abc', base)).toBe(false)
     expect(isExternalHttpUrl('javascript:void(0)', base)).toBe(false)
+  })
+})
+
+describe('desktopBrokerLoginUrl', () => {
+  it('sends OAuth brokers to the server-side sign-in start', () => {
+    expect(desktopBrokerLoginUrl('zerodha')).toBe('/zerodha/initiate-oauth')
+    expect(desktopBrokerLoginUrl('fyers')).toBe('/fyers/initiate-oauth')
+    expect(desktopBrokerLoginUrl('dhan')).toBe('/dhan/initiate-oauth')
+  })
+
+  it('leaves form-login brokers to the existing flow', () => {
+    expect(desktopBrokerLoginUrl('angel')).toBeNull()
+    expect(desktopBrokerLoginUrl('shoonya')).toBeNull()
+    expect(desktopBrokerLoginUrl('')).toBeNull()
   })
 })
 

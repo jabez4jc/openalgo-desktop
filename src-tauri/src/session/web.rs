@@ -151,6 +151,19 @@ impl WebSessionStore {
         self.map.lock().values().find_map(|s| s.user.clone())
     }
 
+    /// Signed-in sessions (security dashboard), most recently seen first.
+    pub fn authenticated_sessions(&self) -> Vec<WebSession> {
+        let mut v: Vec<WebSession> = self
+            .map
+            .lock()
+            .values()
+            .filter(|s| s.user.is_some())
+            .cloned()
+            .collect();
+        v.sort_by(|a, b| b.last_seen.cmp(&a.last_seen));
+        v
+    }
+
     pub fn authenticated_count(&self) -> usize {
         self.map
             .lock()

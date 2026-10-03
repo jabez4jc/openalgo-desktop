@@ -99,6 +99,13 @@ urlencoding = "2.1"
 # UUID generation
 uuid = { version = "1.8", features = ["v4"] }
 
+# Process and host metrics (health monitor, diagnostics)
+sysinfo = { version = "0.38", default-features = false, features = ["system", "disk"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# Thread count for the health monitor (proc_pidinfo).
+libc = "0.2"
+
 [dev-dependencies]
 tempfile = "3.10"
 proptest = "1"

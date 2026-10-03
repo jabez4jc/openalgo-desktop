@@ -27,6 +27,13 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
         m042_broker_credentials_market,
     )?;
     run_rust_migration(conn, "043_symtoken_master", super::symbol::migrate_symtoken)?;
+    run_rust_migration(conn, "050_market_calendar", super::market_calendar::migrate)?;
+    run_rust_migration(
+        conn,
+        "051_security_settings",
+        super::webui::migrate_security_settings,
+    )?;
+    run_rust_migration(conn, "052_leverage_config", super::webui::migrate_leverage)?;
 
     tracing::info!("Database migrations completed");
     Ok(())
