@@ -1,0 +1,35 @@
+{
+  "stat": "Ok",
+  "stCode": 200,
+  "data": [
+    {
+      "actId": "<USER_ID>",
+      "nOrdNo": "261003000101",
+      "flId": "50000123",
+      "exSeg": "nse_cm",
+      "tok": "",
+      "trdSym": "SBIN-EQ",
+      "sym": "SBIN",
+      "trnsTp": "B",
+      "prod": "CNC",
+      "fldQty": 10,
+      "avgPrc": "812.35",
+      "exTm": "03-Oct-2026 09:20:12",
+      "GuiOrdId": "openalgo"
+    },
+    {
+      "actId": "<USER_ID>",
+      "nOrdNo": "261003000110",
+      "flId": "50000140",
+      "exSeg": "nse_fo",
+      "tok": "",
+      "trdSym": "NIFTY26O2725000PE",
+      "trnsTp": "S",
+      "prod": "NRML",
+      "fldQty": "75",
+      "avgPrc": "98.40",
+      "exTm": "03-Oct-2026 11:00:00",
+      "GuiOrdId": "openalgo"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+[
+  {
+    "exchange": "ALL",
+    "tradingSymbol": "HDFCBANK",
+    "securityId": "1333",
+    "isin": "INE040A01034",
+    "totalQty": 20,
+    "dpQty": 20,
+    "t1Qty": 0,
+    "availableQty": 20,
+    "collateralQty": 0,
+    "avgCostPrice": 1650.25
+  },
+  {
+    "exchange": "ALL",
+    "tradingSymbol": "SBIN",
+    "securityId": "500112",
+    "isin": "INE062A01020",
+    "totalQty": 5,
+    "dpQty": 3,
+    "t1Qty": 2,
+    "availableQty": 5,
+    "collateralQty": 0,
+    "avgCostPrice": 700.0
+  }
+]

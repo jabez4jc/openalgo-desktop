@@ -1,0 +1,129 @@
+{
+  "login_totp": {
+    "data": {
+      "token": "<VIEW_TOKEN>",
+      "sid": "<VIEW_SID>",
+      "rid": "r-1",
+      "hsServerId": "",
+      "isUserPwdExpired": false,
+      "ucc": "<USER_ID>",
+      "greetingName": "TRADER",
+      "isTrialAccount": false,
+      "dataCenter": "E43",
+      "searchAPIKey": "",
+      "derivativesRiskDisclosure": "",
+      "mfAccess": 1,
+      "dataCenterMap": null,
+      "dormancyStatus": "A",
+      "asbaStatus": "",
+      "clientType": "RI",
+      "isNRI": false,
+      "kId": "<USER_ID>",
+      "kType": "View",
+      "status": "success",
+      "incRange": 0,
+      "incUpdFlag": "",
+      "clientGroup": ""
+    }
+  },
+  "login_mpin": {
+    "data": {
+      "token": "<TRADE_TOKEN>",
+      "sid": "<TRADE_SID>",
+      "rid": "r-2",
+      "hsServerId": "",
+      "ucc": "<USER_ID>",
+      "dataCenter": "E43",
+      "baseUrl": "https://cis.kotaksecurities.com",
+      "kType": "Trade",
+      "status": "success"
+    }
+  },
+  "login_error": {
+    "errMsg": "Invalid TOTP",
+    "code": "10522",
+    "message": "Invalid TOTP"
+  },
+  "place_ok": {"stat": "Ok", "nOrdNo": "261003000201", "stCode": 200},
+  "modify_ok": {"stat": "Ok", "nOrdNo": "261003000201", "stCode": 200},
+  "cancel_ok": {"stat": "Ok", "result": "261003000201", "nOrdNo": "261003000201", "stCode": 200},
+  "order_error": {"stat": "Not_Ok", "emsg": "Market order with Algo Id not allowed", "stCode": 1041},
+  "session_error": {"stat": "Not_Ok", "emsg": "Invalid Session Token", "stCode": 1003},
+  "margin_ok": {
+    "stat": "Ok",
+    "stCode": 200,
+    "avlMrgn": "402108.10",
+    "reqdMrgn": "98234.55",
+    "ordMrgn": "98234.55",
+    "mrgnUsd": "0.20",
+    "rmsVldtd": "OK"
+  },
+  "margin_error": {"stat": "Not_Ok", "errMsg": "Scrip not allowed for margin calculation", "stCode": 1009},
+  "quotes_not_ok": {"stat": "Not_Ok", "emsg": "Invalid neosymbol", "stCode": 1009},
+  "file_paths": {
+    "data": {
+      "filesPaths": [
+        "https://lapi.kotaksecurities.com/wso2-scripmaster/v1/prod/2026-10-03/transformed-v1/nse_cm-v1.csv",
+        "https://lapi.kotaksecurities.com/wso2-scripmaster/v1/prod/2026-10-03/transformed/nse_fo.csv",
+        "https://lapi.kotaksecurities.com/wso2-scripmaster/v1/prod/2026-10-03/transformed-v1/bse_cm-v1.csv",
+        "https://lapi.kotaksecurities.com/wso2-scripmaster/v1/prod/2026-10-03/transformed/bse_fo.csv",
+        "https://lapi.kotaksecurities.com/wso2-scripmaster/v1/prod/2026-10-03/transformed/cde_fo.csv",
+        "https://lapi.kotaksecurities.com/wso2-scripmaster/v1/prod/2026-10-03/transformed/mcx_fo.csv",
+        "https://lapi.kotaksecurities.com/wso2-scripmaster/v1/prod/2026-10-03/transformed/nse_com.csv"
+      ],
+      "baseFolder": "https://lapi.kotaksecurities.com/wso2-scripmaster/v1/prod"
+    }
+  },
+  "feed_config": {
+    "data": {
+      "configs": {
+        "E43_broadcast_source": "sh",
+        "E43_sh_broadcast_endpoint": "https://sfeed-e43.kotaksecurities.com/apifeed",
+        "E43_sh_interactive_endpoint": "https://e43.kotaksecurities.com/realtime",
+        "E21_broadcast_source": "ks",
+        "E21_ks_broadcast_endpoint": "cdtstream-e21.kotaksecurities.com/feed",
+        "E10_broadcast_source": "hs",
+        "E10_hs_broadcast_endpoint": "mlhsm.kotaksecurities.com"
+      }
+    }
+  },
+  "order_feed_order": {
+    "type": "order",
+    "data": {
+      "nOrdNo": "261003000102",
+      "ordSt": "Trigger Pending",
+      "exSeg": "nse_fo",
+      "trdSym": "NIFTY26O2725000CE",
+      "tok": "52011",
+      "qty": "75",
+      "fldQty": "0",
+      "unFldSz": "75",
+      "prcTp": "SL",
+      "trnsTp": "S",
+      "prc": "117.60",
+      "trgPrc": "120.00",
+      "avgPrc": "0.00",
+      "prod": "NRML",
+      "rejRsn": ""
+    }
+  },
+  "order_feed_rejected": {
+    "type": "order",
+    "data": {
+      "nOrdNo": "261003000103",
+      "ordSt": "rejected",
+      "exSeg": "nse_cm",
+      "trdSym": "TCS-EQ",
+      "tok": "",
+      "qty": "1",
+      "fldQty": "0",
+      "prcTp": "L",
+      "trnsTp": "B",
+      "prc": "3500.00",
+      "trgPrc": "0.00",
+      "avgPrc": "0.00",
+      "prod": "MIS",
+      "rejRsn": "RMS:Margin Exceeds"
+    }
+  }
+}

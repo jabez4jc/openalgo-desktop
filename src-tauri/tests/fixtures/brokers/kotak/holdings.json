@@ -1,0 +1,33 @@
+{
+  "data": [
+    {
+      "displaySymbol": "SBIN",
+      "averagePrice": 700.123,
+      "quantity": 20,
+      "exchangeSegment": "nse_cm",
+      "exchangeIdentifier": "3045",
+      "holdingCost": 14002.46,
+      "mktValue": 16282.0,
+      "scripId": "3045",
+      "instrumentToken": 3045,
+      "instrumentType": "Equity",
+      "isAlternateScrip": false,
+      "closingPrice": 812.35,
+      "symbol": "SBIN",
+      "sellableQuantity": 20,
+      "securityType": "Stock",
+      "securitySubType": "Equity",
+      "isin": "INE062A01020"
+    },
+    {
+      "displaySymbol": "UNLISTEDCO",
+      "averagePrice": 10.0,
+      "quantity": 5,
+      "exchangeSegment": "bse_cm",
+      "holdingCost": 0,
+      "mktValue": 0,
+      "instrumentToken": 999999,
+      "instrumentType": "Equity"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "Data": {
+    "exchange": "NSE",
+    "segment": "D",
+    "source": "P",
+    "securityId": "35003",
+    "clientId": "<USER_ID>",
+    "exchOrderNo": "1100000012345999",
+    "orderNo": "52261003002",
+    "product": "M",
+    "txnType": "S",
+    "orderType": "SL",
+    "validity": "DAY",
+    "remainingQuantity": 25,
+    "quantity": 75,
+    "tradedQty": 50,
+    "price": 118.5,
+    "triggerPrice": 120.0,
+    "tradedPrice": 118.6,
+    "avgTradedPrice": 118.55,
+    "status": "Pending",
+    "symbol": "NIFTY",
+    "displayName": "NIFTY 27 OCT 25000 CALL",
+    "reasonDescription": "CONFIRMED",
+    "lotSize": 75
+  },
+  "Type": "order_alert"
+}

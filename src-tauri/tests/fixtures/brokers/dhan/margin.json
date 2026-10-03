@@ -1,0 +1,27 @@
+{
+  "single": {
+    "totalMargin": 152340.5,
+    "spanMargin": 110250.25,
+    "exposureMargin": 42090.25,
+    "availableBalance": 500000.0,
+    "variableMargin": 0.0,
+    "insufficientBalance": 0.0,
+    "brokerage": 20.0,
+    "leverage": "1.00"
+  },
+  "multi_snake": {
+    "total_margin": "61250.75",
+    "span_margin": "45000.5",
+    "exposure_margin": "16250.25",
+    "equity_margin": "0",
+    "fo_margin": "61250.75",
+    "commodity_margin": "0",
+    "currency": "0",
+    "hedge_benefit": "98234.5"
+  },
+  "multi_camel": {
+    "totalMargin": 61250.75,
+    "spanMargin": 45000.5,
+    "exposure": 16250.25
+  }
+}

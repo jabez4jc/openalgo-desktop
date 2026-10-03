@@ -1,0 +1,37 @@
+{
+  "no_holdings": {
+    "errorType": "Holding_Error",
+    "errorCode": "DHOLDING_ERROR",
+    "errorMessage": "No holdings available",
+    "internalErrorCode": "DH-1111",
+    "internalErrorMessage": "No holdings available"
+  },
+  "invalid_token": {
+    "errorType": "Invalid_Authentication",
+    "errorCode": "DH-901",
+    "errorMessage": "Client ID or user generated access token is invalid or expired."
+  },
+  "order_error": {
+    "errorType": "Order_Error",
+    "errorCode": "DH-906",
+    "errorMessage": "Trigger Price should be greater than Price"
+  },
+  "data_rate_limit": {
+    "status": "failed",
+    "data": {"805": "Too many requests. Further requests may result in the user being blocked."},
+    "remarks": "Too many requests"
+  },
+  "data_not_subscribed": {
+    "status": "failed",
+    "data": {"806": "Data APIs not subscribed"},
+    "remarks": "Data APIs not subscribed"
+  },
+  "margin_error_200": {
+    "status": "error",
+    "errorMessage": "Invalid securityId for the given exchangeSegment"
+  },
+  "funds_error": {
+    "status": "error",
+    "errors": "Internal Server Error"
+  }
+}

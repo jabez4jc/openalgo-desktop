@@ -130,6 +130,30 @@ pub fn login_fields(broker: &str) -> &'static [LoginField] {
                 required: false,
             },
         ],
+        // Kotak Neo (web BrokerTOTP.tsx): the stored API key is the UCC and
+        // the secret the Neo access token; the form carries the mobile
+        // number and TOTP (step one) and the MPIN (step two), posted
+        // together as on the web.
+        "kotak" => &[
+            LoginField {
+                name: "mobile",
+                label: "Mobile number",
+                secret: false,
+                required: true,
+            },
+            LoginField {
+                name: "totp",
+                label: "TOTP from the Kotak NEO app",
+                secret: true,
+                required: true,
+            },
+            LoginField {
+                name: "mpin",
+                label: "MPIN",
+                secret: true,
+                required: true,
+            },
+        ],
         _ => &[],
     }
 }
@@ -144,6 +168,10 @@ pub fn extract_code(broker: &str, params: &HashMap<String, String>) -> Option<St
     match broker {
         "zerodha" => get("request_token"),
         "fyers" => get("auth_code"),
+        // Dhan consent redirect (web brlogin accepts all three spellings).
+        "dhan" | "dhan_sandbox" => get("tokenId")
+            .or_else(|| get("token_id"))
+            .or_else(|| get("token")),
         "arrow" | "hdfcsecurities" | "hdfcsky" => get("request_token")
             .or_else(|| get("requestToken"))
             .or_else(|| get("request-token"))
@@ -212,6 +240,31 @@ mod tests {
         assert!(f.iter().all(|x| x.secret && !x.required));
         assert_eq!(auth_type("groww"), AuthType::Form);
         assert!(login_fields("zerodha").is_empty());
+    }
+
+    #[test]
+    fn dhan_uses_token_id() {
+        let p = q(&[("tokenId", "tid-1"), ("code", "x")]);
+        assert_eq!(extract_code("dhan", &p).as_deref(), Some("tid-1"));
+        assert_eq!(
+            extract_code("dhan", &q(&[("token_id", "t2")])).as_deref(),
+            Some("t2")
+        );
+        assert_eq!(extract_code("dhan", &q(&[("code", "x")])), None);
+        assert_eq!(auth_type("kotak"), AuthType::Form);
+        assert_eq!(auth_type("dhan_sandbox"), AuthType::Form);
+        // The sandbox signs in with the stored token alone.
+        assert!(login_fields("dhan_sandbox").is_empty());
+        assert!(login_fields("dhan").is_empty());
+    }
+
+    #[test]
+    fn kotak_login_fields_are_mobile_totp_mpin() {
+        let f = login_fields("kotak");
+        let names: Vec<&str> = f.iter().map(|x| x.name).collect();
+        assert_eq!(names, ["mobile", "totp", "mpin"]);
+        assert!(f.iter().all(|x| x.required));
+        assert!(!f[0].secret && f[1].secret && f[2].secret);
     }
 
     #[test]
