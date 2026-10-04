@@ -123,6 +123,12 @@ export default defineConfig({
         target: BACKEND,
         changeOrigin: true,
       },
+      // Desktop: broker sign-in entry (/<broker>/callback). The Rust server
+      // sends form brokers on to /broker/<broker>/totp and takes the POST.
+      '^/[a-z0-9_]+/callback$': {
+        target: BACKEND,
+        changeOrigin: true,
+      },
       // Desktop: every other backend prefix, with page navigations bypassed.
       ...Object.fromEntries(SHARED_PREFIXES.map((p) => [p, pageOrApi])),
     },
