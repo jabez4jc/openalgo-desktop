@@ -15,12 +15,14 @@ pub mod latency;
 pub mod leverage;
 pub mod log;
 pub mod market_calendar;
+pub mod options_tools;
 pub mod orders;
 pub mod playground;
 pub mod sandbox;
 pub mod search;
 pub mod security;
 pub mod settings;
+pub mod strategy_portfolio;
 pub mod traffic;
 pub mod watchlist;
 pub mod websocket_example;
@@ -356,6 +358,145 @@ pub fn table() -> Vec<RouteSpec> {
         r!(POST, "/alerts/fired", User, watchlist::alert_fired),
         r!(GET, "/alerts/log", User, watchlist::alert_log_list),
         r!(DELETE, "/alerts/log", User, watchlist::alert_log_clear),
+        // Options tools (web blueprints oiprofile, oitracker, ivchart,
+        // gamma_density, straddle_chart, custom_straddle, vol_surface, gex,
+        // ivsmile, arbitrage, strategy_chart)
+        r!(
+            POST,
+            "/oiprofile/api/profile-data",
+            User,
+            options_tools::profile_data
+        ),
+        r!(
+            GET,
+            "/oiprofile/api/intervals",
+            User,
+            options_tools::oiprofile_intervals
+        ),
+        r!(POST, "/oitracker/api/oi-data", User, options_tools::oi_data),
+        r!(
+            POST,
+            "/oitracker/api/maxpain",
+            User,
+            options_tools::max_pain
+        ),
+        r!(POST, "/ivchart/api/iv-data", User, options_tools::iv_data),
+        r!(
+            POST,
+            "/ivchart/api/default-symbols",
+            User,
+            options_tools::default_symbols
+        ),
+        r!(
+            GET,
+            "/ivchart/api/intervals",
+            User,
+            options_tools::ivchart_intervals
+        ),
+        r!(
+            POST,
+            "/gammadensity/api/gamma-data",
+            User,
+            options_tools::gamma_data
+        ),
+        r!(
+            POST,
+            "/straddle/api/straddle-data",
+            User,
+            options_tools::straddle_data
+        ),
+        r!(
+            GET,
+            "/straddle/api/intervals",
+            User,
+            options_tools::all_intervals
+        ),
+        r!(
+            POST,
+            "/straddlepnl/api/simulate",
+            User,
+            options_tools::simulate
+        ),
+        r!(
+            GET,
+            "/straddlepnl/api/lotsize",
+            User,
+            options_tools::lotsize
+        ),
+        r!(
+            GET,
+            "/straddlepnl/api/intervals",
+            User,
+            options_tools::all_intervals
+        ),
+        r!(
+            POST,
+            "/volsurface/api/surface-data",
+            User,
+            options_tools::surface_data
+        ),
+        r!(POST, "/gex/api/gex-data", User, options_tools::gex_data),
+        r!(
+            POST,
+            "/ivsmile/api/iv-smile-data",
+            User,
+            options_tools::iv_smile_data
+        ),
+        r!(
+            GET,
+            "/arbitrage/api/universe",
+            User,
+            options_tools::arbitrage_universe
+        ),
+        r!(
+            POST,
+            "/strategybuilder/api/strategy-chart",
+            User,
+            options_tools::strategy_chart
+        ),
+        r!(
+            POST,
+            "/strategybuilder/api/multi-strike-oi",
+            User,
+            options_tools::multi_strike_oi
+        ),
+        r!(
+            GET,
+            "/strategybuilder/api/intervals",
+            User,
+            options_tools::all_intervals
+        ),
+        // Strategy Builder portfolio (web blueprints/strategy_portfolio.py)
+        r!(
+            GET,
+            "/api/strategy-portfolio",
+            User,
+            strategy_portfolio::list
+        ),
+        r!(
+            POST,
+            "/api/strategy-portfolio",
+            User,
+            strategy_portfolio::create
+        ),
+        r!(
+            GET,
+            "/api/strategy-portfolio/{id}",
+            User,
+            strategy_portfolio::get
+        ),
+        r!(
+            PUT,
+            "/api/strategy-portfolio/{id}",
+            User,
+            strategy_portfolio::update
+        ),
+        r!(
+            DELETE,
+            "/api/strategy-portfolio/{id}",
+            User,
+            strategy_portfolio::delete
+        ),
     ]
 }
 

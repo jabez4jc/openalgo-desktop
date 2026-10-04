@@ -3,9 +3,9 @@
 //! `option_greeks_service.py`). Responses are flat (no `data` wrapper).
 
 use super::core::{broker_handle, float, num, BrokerHandle, Reply};
-use super::greeks_service::{self as bs, Flag};
 use super::market_data_service::fetch_quote;
 use super::symbol_service::freeze_qty_for_option;
+use crate::analytics::black76::{self as bs, Flag};
 use crate::brokers::common::master_contract::{format_strike, parse_oa_expiry};
 use crate::brokers::common::symbols::SymToken;
 use crate::brokers::types::{Quote, QuoteKey};
@@ -155,6 +155,13 @@ fn near_future(rows: &[SymToken], base: &str, exchange: &str, today: NaiveDate) 
         .filter(|(d, _)| *d >= today)
         .min()
         .map(|(_, s)| s)
+}
+
+/// The near-month unexpired future of `base` on `exchange` (web
+/// `resolve_underlying_quote` for exchanges without a spot).
+pub fn near_future_symbol(ctx: &AppState, base: &str, exchange: &str) -> Option<String> {
+    let snap = ctx.symbols.snapshot();
+    near_future(snap.rows(), base, exchange, today_ist(ctx))
 }
 
 /// `{base}{expiry}` options of one type on the options exchange, ascending
