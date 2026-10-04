@@ -12,9 +12,12 @@
 //! | [`batch_order_service`] | basket, split |
 //! | [`options_order_service`] | optionsorder, optionsmultiorder |
 //! | [`options_service`] | optionsymbol, optionchain, syntheticfuture, optiongreeks, multioptiongreeks |
-//! | [`greeks_service`] | Black-76 pricing, IV and Greeks |
 //! | [`account_service`] | orderbook, tradebook, positionbook, holdings, funds, orderstatus, openposition, pnl/symbols |
 //! | [`market_data_service`] | quotes, multiquotes, depth, history, intervals, ticker, margin |
+//! | [`chain_tools_service`] | OI tracker, max pain, GEX, IV smile, gamma density, OI profile |
+//! | [`history_tools_service`] | IV chart, straddle chart and simulation, vol surface, Strategy Builder charts |
+//! | [`tools_service`] | shared tool plumbing: references, nearest future, bounded history fan-out |
+//! | [`arbitrage_service`] | futures calendar-spread universe |
 //! | [`symbol_service`] | symbol, search, expiry, instruments, freeze quantities |
 //! | [`gtt_service`] | place/modify/cancel GTT, GTT book |
 //! | [`analyzer_service`] | analyzer status and toggle (engine lifecycle) |
@@ -25,15 +28,17 @@ pub mod action_center_service;
 pub mod analyzer_log_service;
 pub mod analyzer_service;
 pub mod apikey_service;
+pub mod arbitrage_service;
 pub mod auth_service;
 pub mod batch_order_service;
 pub mod broker_auth_service;
+pub mod chain_tools_service;
 pub mod chart_test_service;
 pub mod core;
 pub mod error_log;
-pub mod greeks_service;
 pub mod gtt_service;
 pub mod health_service;
+pub mod history_tools_service;
 pub mod market_calendar_service;
 pub mod market_data_service;
 pub mod monitor;
@@ -50,6 +55,7 @@ pub mod search_ui_service;
 pub mod security_service;
 pub mod symbol_service;
 pub mod system_info;
+pub mod tools_service;
 pub mod ui_order_service;
 
 pub use analyzer_service::{AnalyzerService, AnalyzerStatus};
