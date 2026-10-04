@@ -25,6 +25,7 @@ export default function BrokerProxyCard() {
   const [saved, setSaved] = useState<FormState | null>(null)
   const [form, setForm] = useState<FormState | null>(null)
   const [hasPassword, setHasPassword] = useState(false)
+  const [active, setActive] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [fetchError, setFetchError] = useState(false)
@@ -38,6 +39,7 @@ export default function BrokerProxyCard() {
       setSaved(current)
       setForm(current)
       setHasPassword(p.has_password)
+      setActive(p.active)
     } catch {
       setFetchError(true)
       showToast.error('Could not load the proxy settings. Try again.')
@@ -68,6 +70,7 @@ export default function BrokerProxyCard() {
         setSaved(next)
         setForm(next)
         setHasPassword(p?.has_password ?? false)
+        setActive(p?.active ?? false)
         showToast.success(res.message || 'Proxy settings saved.')
       } else {
         showToast.error(res.message || 'The proxy settings were not saved. Try again.')
@@ -139,6 +142,13 @@ export default function BrokerProxyCard() {
               handleSave()
             }}
           >
+            <p className="text-sm">
+              {active
+                ? 'In use: broker calls are going through the proxy.'
+                : saved?.url
+                  ? 'Saved but not in use yet. Restart OpenAlgo to start using it.'
+                  : 'Not in use: broker calls connect directly.'}
+            </p>
             <div className="space-y-2">
               <Label htmlFor="proxy-url">Proxy address</Label>
               <Input

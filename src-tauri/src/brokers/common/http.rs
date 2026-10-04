@@ -31,6 +31,11 @@ static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
 /// route changed, and an order would leave from the wrong address.
 static PROXY: OnceLock<reqwest::Url> = OnceLock::new();
 
+/// Whether broker calls are going through a proxy right now.
+pub fn proxy_active() -> bool {
+    PROXY.get().is_some()
+}
+
 /// Route broker calls through `url` (credentials in the URL). Takes effect
 /// once; a later call is ignored until the app restarts.
 pub fn set_proxy(url: reqwest::Url) {

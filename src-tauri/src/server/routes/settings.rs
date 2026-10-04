@@ -192,6 +192,9 @@ fn proxy_data(v: crate::services::broker_proxy::ProxyView) -> Value {
         "url": v.url.unwrap_or_default(),
         "username": v.username.unwrap_or_default(),
         "has_password": v.has_password,
+        // Whether the running app is using a proxy (a saved change only
+        // applies after a restart).
+        "active": crate::brokers::common::http::proxy_active(),
     })
 }
 

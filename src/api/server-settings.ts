@@ -41,6 +41,8 @@ export interface BrokerProxy {
   url: string
   username: string
   has_password: boolean
+  /** The running app is sending broker calls through the proxy. */
+  active: boolean
 }
 
 export interface BrokerProxyResponse {

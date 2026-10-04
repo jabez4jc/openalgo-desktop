@@ -144,7 +144,10 @@ pub fn load(conn: &Connection, sec: &SecurityManager) {
         (Some(ct), Some(nonce)) => match sec.decrypt(&ct, &nonce, &aad()) {
             Ok(p) => Some(p),
             // Locked until sign-in; load runs again then.
-            Err(_) => return,
+            Err(e) => {
+                tracing::warn!("Broker proxy password could not be read yet: {}", e);
+                return;
+            }
         },
         _ => None,
     };
