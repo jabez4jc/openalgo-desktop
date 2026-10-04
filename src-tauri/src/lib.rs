@@ -4,6 +4,7 @@
 //! broker callbacks, `/api/v1`, Socket.IO), the services, the event bus and
 //! the databases. The Tauri window is a browser pointed at that server.
 
+pub mod analytics;
 pub mod brokers;
 pub mod clock;
 pub mod commands;

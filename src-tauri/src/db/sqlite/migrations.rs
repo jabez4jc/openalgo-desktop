@@ -42,6 +42,11 @@ pub fn run_migrations(conn: &Connection) -> Result<()> {
     run_rust_migration(conn, "061_watchlists", super::watchlist::migrate)?;
     run_rust_migration(conn, "062_alert_log", super::alert_log::migrate)?;
     run_rust_migration(conn, "063_broker_proxy", m063_broker_proxy)?;
+    run_rust_migration(
+        conn,
+        "063_strategy_portfolio",
+        super::strategy_portfolio::migrate,
+    )?;
 
     tracing::info!("Database migrations completed");
     Ok(())

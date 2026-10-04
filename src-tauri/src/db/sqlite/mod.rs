@@ -23,6 +23,7 @@ mod order_logs;
 pub mod sandbox;
 mod settings;
 mod strategy;
+pub mod strategy_portfolio;
 mod symbol;
 mod traffic_logs;
 pub mod user;

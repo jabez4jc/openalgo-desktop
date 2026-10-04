@@ -1,5 +1,6 @@
 //! Black-76 option pricing and Greeks (web `option_greeks_service.py`, which
-//! uses `opengreeks.black76`, a clone of `py_vollib.black`).
+//! uses `opengreeks.black76`, a clone of `py_vollib.black`). Shared by the
+//! `/api/v1` option services and every options tool.
 //!
 //! Hand-written: the normal CDF is Hart's double-precision algorithm (West
 //! 2005); the implied-volatility solver is a bracketed bisection on
@@ -117,6 +118,12 @@ pub fn greeks(flag: Flag, f: f64, k: f64, t: f64, r: f64, sigma: f64) -> Greeks 
         vega,
         rho,
     }
+}
+
+/// Black-76 gamma alone (web `black76.gamma`).
+pub fn gamma(f: f64, k: f64, t: f64, r: f64, sigma: f64) -> f64 {
+    let (d1, _) = d1d2(f, k, t, sigma);
+    (-r * t).exp() * norm_pdf(d1) / (f * sigma * t.sqrt())
 }
 
 pub const IV_LOW: f64 = 1e-6;
