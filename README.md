@@ -1,6 +1,6 @@
 # OpenAlgo Desktop downloads
 
-How many times the files of each [OpenAlgo Desktop](https://github.com/jabez4jc/openalgo-desktop) release were downloaded from GitHub, read on 2026-10-27 (UTC). Updated every 6 hours.
+How many times the files of each [OpenAlgo Desktop](https://github.com/jabez4jc/openalgo-desktop) release were downloaded from GitHub, read on 2026-10-28 (UTC). Updated every 6 hours.
 
 ## Totals
 
